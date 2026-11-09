@@ -1,10 +1,10 @@
 import {
   LETTERS, LETTER_DOTS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js';
+} from './braille.js?v=2';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js';
+} from './data.js?v=2';
 
 // ---------- tiny helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -60,6 +60,11 @@ sheet.addEventListener('click', (e) => { if (e.target.closest('a')) closeSheet()
 const WORDSIGN_OF = Object.fromEntries(CONTRACTIONS['Alphabetic wordsigns'].items.map(([w, d]) => [fromDots(d), w]));
 const DIGIT_OF = Object.fromEntries('abcdefghij'.split('').map((l, i) => [l, String((i + 1) % 10)]));
 
+// Mirror image (swap left/right columns) — the most common beginner confusion.
+const mirror = (cell) => fromDots(toDots(cell).map((d) => (d <= 3 ? d + 3 : d - 3)).join(''));
+const LETTER_OF = Object.fromEntries(Object.entries(LETTERS).map(([l, c]) => [c, l]));
+const mirrorLetter = (l) => { const m = LETTER_OF[mirror(LETTERS[l])]; return m && m !== l ? m : null; };
+
 function letterDetail(l) {
   const c = LETTERS[l];
   const idx = 'abcdefghijklmnopqrstuvwxyz'.indexOf(l);
@@ -75,6 +80,7 @@ function letterDetail(l) {
       ${DIGIT_OF[l] ? `<dt>As a number</dt><dd>After the number sign ${cellHTML(IND.number, 'sm')} it means <b>${DIGIT_OF[l]}</b></dd>` : ''}
       ${WORDSIGN_OF[c] ? `<dt>Grade 2</dt><dd>Alone, it stands for the word <b>“${WORDSIGN_OF[c]}”</b></dd>` : ''}
       <dt>Capital</dt><dd>${cellHTML(IND.capital, 'sm')}${cellHTML(c, 'sm')} = ${l.toUpperCase()}</dd>
+      ${mirrorLetter(l) ? `<dt>Don’t confuse</dt><dd>${cellHTML(LETTERS[mirrorLetter(l)], 'sm')} <b>${mirrorLetter(l)}</b> is its mirror image</dd>` : ''}
     </dl>
     <div class="row"><a class="btn primary" href="#/practice?set=${idx < 10 ? 'aj' : idx < 20 ? 'kt' : 'uz'}">Practise this row</a><a class="btn" href="#/sweep?src=alphabet">Sweep the alphabet</a></div>
   </div>`;
@@ -142,13 +148,16 @@ views[''] = () => {
     ['u–z', 'Add dots 3 and 6', 'uvxyz', [3, 6], 'Same shapes again, with both bottom dots. (W is special, see below.)'],
   ];
   const helloParts = translate('hello', 'en', 1);
+  const m = store.get('mastery', {});
+  const known = 'abcdefghijklmnopqrstuvwxyz'.split('').filter((l) => (m[l] || 0) >= 3).length;
   view.innerHTML = `
     <div class="hero">
       <div>
         <div class="kicker">Braille, one cell at a time</div>
         <h1>Six dots.<br>Every letter.</h1>
         <p class="lead">Start with the alphabet below — it’s really just ten shapes, repeated three times. Then practise, sweep your finger across real phrases, and learn to read the signs around you.</p>
-        <div class="row"><a class="btn primary" href="#/practice">Start practising</a><a class="btn" href="#/sweep">Try finger sweep</a></div>
+        <div class="row"><a class="btn primary" href="#/practice">${known ? 'Keep practising' : 'Start practising'}</a><a class="btn" href="#/sweep">Try finger sweep</a></div>
+        ${known ? `<p class="muted small" style="margin-top:14px">You know <b style="color:var(--ink)">${known} of 26</b> letters well so far.</p>` : ''}
       </div>
       <div class="hero-demo"><div class="word card">${toCells(helloParts).map((c) => `<span class="bw">${cellHTML(c.cell, 'raised')}<span class="lbl">${c.print}</span></span>`).join('')}</div></div>
     </div>
@@ -323,7 +332,12 @@ views.practice = (q) => {
       btn.classList.add(ok ? 'right' : 'wrong');
       const fb = $('#fb');
       if (ok) { fb.className = 'feedback good'; fb.textContent = pick(['Yes!', 'Nice.', 'Exactly.', 'You’ve got it.']); setTimeout(renderRead, 650); }
-      else { fb.className = 'feedback bad'; fb.textContent = `Not quite — ${dotsLabel(item.cells.slice(-1))}. Try again.`; }
+      else {
+        const picked = opts.find((o) => o.key === btn.dataset.k);
+        const isMirror = picked && picked.cells.length === 1 && item.cells.length === 1 && mirror(picked.cells) === item.cells;
+        fb.className = 'feedback bad';
+        fb.textContent = isMirror ? `Close — ${picked.answer} is the mirror image. Check which column the dots are in.` : `Not quite — that’s ${picked ? picked.answer : '?'} ${picked ? '(' + dotsLabel(picked.cells.slice(-1)) + ')' : ''}. Try again.`;
+      }
     };
     stage.onclick = (e) => choose(e.target.closest('.choice'));
     state.key = (e) => {
@@ -434,14 +448,17 @@ function tick(row, when = 0) {
 }
 
 views.sweep = (q) => {
-  const canVibrate = 'vibrate' in navigator;
+  const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
+  const canSpeak = 'speechSynthesis' in window;
   const st = {
     src: q.get('src') || store.get('swSrc', 'words'),
     grade: store.get('swGrade', 1),
     labels: store.get('swLabels', 'show'),
     sound: store.get('swSound', true),
     vibe: store.get('swVibe', canVibrate),
-    speed: store.get('swSpeed', 0.7),
+    speak: store.get('swSpeak', false),
+    size: store.get('swSize', 'large'),
+    speed: store.get('swSpeed2', 1),
     custom: q.get('text') || store.get('swCustom', 'Welcome to Ontario'),
   };
   if (q.get('text')) st.src = 'custom';
@@ -449,35 +466,41 @@ views.sweep = (q) => {
   view.innerHTML = `
     <div class="sweep-intro">
       <h1 style="font-size:2rem">Finger sweep</h1>
-      <p class="muted">Your fingertip is the ring. Drag right across the strip and the braille slides left beneath it, just like moving along a real line. Each raised dot clicks as it passes under you — high for the top row, low for the bottom — so you can “hear” the shape before you look.</p>
+      <p class="muted">Put your finger on the line and slide right. The cell directly under your finger is the one you’re reading, and it shows in the bubble above so your finger never hides it. Each raised dot clicks as you cross it: high for the top row, low for the bottom. Keep going into the shaded right edge and the line scrolls under your finger, so you can read on without lifting. On a laptop, just move the mouse across.</p>
     </div>
     <div class="scroll-x" style="margin-bottom:12px"><div class="chips" id="srcChips">${Object.entries(SOURCES).map(([k, v]) => `<button class="chip" data-s="${k}">${v}</button>`).join('')}</div></div>
     <div class="row" id="customRow" style="margin-bottom:12px"><input class="custom-input" id="customText" maxlength="200" placeholder="Type something to read"><button class="btn" id="customGo">Load</button></div>
-    <div class="sweep-box" id="box" tabindex="0" aria-label="Braille strip. Use arrow keys to move.">
-      <div class="reader" id="reader"></div>
+    <div class="sweep-box" id="box" tabindex="0" aria-label="Braille strip. Use arrow keys to move cell by cell.">
+      <div class="edge left"></div><div class="edge right"></div>
       <div class="sweep-track" id="track"></div>
+      <div class="reader" id="reader"></div>
       <div class="loupe" id="loupe"></div>
       <div class="finger" id="finger"></div>
-      <div class="sweep-hint" id="hint">drag → to read · tap a cell to jump · arrow keys work too</div>
+      <div class="sweep-hint" id="hint">place a finger on the line and slide right</div>
     </div>
     <div class="word-reveal" id="wordReveal"></div>
     <div class="sweep-controls">
       <div class="row">
         <div class="seg" id="gradeSeg"><button data-g="1">Grade 1</button><button data-g="2">Grade 2</button></div>
         <div class="seg" id="lblSeg"><button data-l="show">Letters shown</button><button data-l="after">Reveal after</button><button data-l="hidden">Hidden</button></div>
+        <div class="seg" id="sizeSeg"><button data-z="large">Large</button><button data-z="real">Real size</button></div>
       </div>
       <div class="row">
         <label class="toggle"><input type="checkbox" id="snd"> Dot clicks</label>
         ${canVibrate ? '<label class="toggle"><input type="checkbox" id="vib"> Vibrate</label>' : ''}
-        <label class="toggle">Speed <input type="range" id="spd" min="0.25" max="1.5" step="0.05"></label>
-        <button class="btn" id="glide">▶ Glide</button>
+        ${canSpeak ? '<label class="toggle"><input type="checkbox" id="spk"> Say letters</label>' : ''}
+      </div>
+      <div class="row">
+        <button class="btn" id="glide">▶ Auto-glide</button>
+        <label class="toggle">Glide speed <input type="range" id="spd" min="0.4" max="2" step="0.1"></label>
         <button class="btn ghost" id="restart">↺ Start over</button>
         <button class="btn ghost" id="shuffleBtn">New line</button>
       </div>
     </div>`;
 
   const box = $('#box'), track = $('#track'), loupe = $('#loupe'), finger = $('#finger'), reader = $('#reader');
-  let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, readerX = 0, lastKey = '', curIdx = -1, glideOn = false, raf = 0;
+  let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
+  let lastKey = '', curIdx = -1, glideOn = false, raf = 0, edgeRaf = 0, active = false;
 
   function textFor() {
     if (st.src === 'alphabet') return 'abcdefghijklmnopqrstuvwxyz'.split('').join(' ');
@@ -492,20 +515,18 @@ views.sweep = (q) => {
     const grade = st.src === 'signs' ? 2 : st.grade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
-      ? `<div class="sc space" data-i="${i}" style="width:34px"></div>`
-      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, 'raised')}<span class="lbl">${esc(c.idx === 0 ? (c.print || '·') : '')}</span></div>`).join('');
-    track.style.gap = '20px';
+      ? `<div class="sc space" data-i="${i}"></div>`
+      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell)}<span class="lbl">${esc(c.idx === 0 ? (c.print || '·') : '')}</span></div>`).join('');
     requestAnimationFrame(() => { measure(); reset(); });
   }
   function measure() {
     const els = $$('.sc', track);
     lefts = els.map((e) => e.offsetLeft); widths = els.map((e) => e.offsetWidth);
-    totalW = track.scrollWidth;
-    readerX = Math.round(box.clientWidth * (box.clientWidth < 600 ? 0.4 : 0.32));
-    reader.style.left = readerX + 'px'; finger.style.left = readerX + 'px'; loupe.style.left = readerX + 'px';
+    totalW = track.scrollWidth; W = box.clientWidth;
   }
-  function reset() { offset = readerX + 24; lastKey = ''; curIdx = -1; $('#wordReveal').textContent = ''; update(false); }
-  const clamp = () => { offset = Math.max(readerX - totalW - 30, Math.min(readerX + 60, offset)); };
+  const startOffset = () => Math.round(W * 0.16);
+  function reset() { offset = startOffset(); headX = Math.round(W * 0.1); lastKey = ''; curIdx = -1; $('#wordReveal').textContent = ''; update(false); }
+  const clamp = () => { offset = Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), offset)); };
 
   function wordAround(i) {
     let a = i, b = i;
@@ -513,45 +534,49 @@ views.sweep = (q) => {
     while (b < cells.length - 1 && cells[b + 1].kind !== 'space') b++;
     return [a, b];
   }
+  function say(t) {
+    if (!st.speak || !canSpeak || !t) return;
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 1.1; u.lang = 'en-CA'; speechSynthesis.speak(u); } catch {}
+  }
   function update(feedback = true) {
     clamp();
     track.style.transform = `translateX(${offset}px)`;
-    const pos = readerX - offset;
+    reader.style.left = headX + 'px'; finger.style.left = headX + 'px';
+    loupe.style.left = Math.max(80, Math.min(W - 80, headX)) + 'px';
+    box.classList.toggle('active', active || glideOn);
+    const pos = headX - offset; // position along the line, in track pixels
     let idx = -1;
-    for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] - 10 && pos < lefts[i] + widths[i] + 10) { idx = i; break; }
-    // passed state for reveal-after mode
+    for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
     $$('.sc', track).forEach((el, i) => el.classList.toggle('passed', lefts[i] + widths[i] < pos));
     if (idx !== curIdx) {
       $$('.sc.cur', track).forEach((e) => e.classList.remove('cur'));
-      if (idx >= 0 && cells[idx].kind !== 'space') track.children[idx].classList.add('cur');
-      // finished a word?
-      if (curIdx >= 0 && idx > curIdx && cells[idx] && cells[idx].kind === 'space' || (idx === -1 && pos > totalW)) {
-        const [a, b] = wordAround(Math.max(0, curIdx));
+      if (idx >= 0 && cells[idx].kind !== 'space') {
+        track.children[idx].classList.add('cur');
+        const c = cells[idx];
+        if (feedback && c.idx === 0) say(c.kind === 'indicator' ? '' : c.print);
+      }
+      const finished = curIdx >= 0 && cells[curIdx].kind !== 'space' && (idx > curIdx && (!cells[idx] || cells[idx].kind === 'space') || (idx === -1 && pos > totalW));
+      if (finished) {
+        const [a, b] = wordAround(curIdx);
         $('#wordReveal').textContent = cells.slice(a, b + 1).map((c) => (c.idx === 0 ? c.print : '')).join('');
       }
-      curIdx = idx;
+      if (idx !== -1 || pos > totalW) curIdx = idx;
     }
     const c = cells[idx];
     if (c && c.kind !== 'space') {
       loupe.style.display = '';
       const g = c.group;
-      const label = g.print || '';
       const kindName = c.kind === 'indicator' ? (c.note || 'indicator') : c.kind === 'contraction' ? (g.note === 'groupsign' ? 'groupsign' : 'contraction') : c.kind === 'digit' ? 'digit' : c.kind === 'punct' ? (c.note || 'punctuation') : dotsLabel(c.cell);
-      loupe.innerHTML = `${cellHTML(c.cell, 'numbered')}<div class="lp"><b>${esc(label || '·')}</b><span>${esc(kindName)}${c.span > 1 ? ` · cell ${c.idx + 1}/${c.span}` : ''}</span></div>`;
-      const hideNow = st.labels === 'hidden' || (st.labels === 'after');
-      loupe.classList.toggle('hidden-print', hideNow);
-      // per-column dot feedback
+      loupe.innerHTML = `${cellHTML(c.cell, 'numbered')}<div class="lp"><b>${esc(g.print || '·')}</b><span>${esc(kindName)}${c.span > 1 ? ` · cell ${c.idx + 1}/${c.span}` : ''}</span></div>`;
+      loupe.classList.toggle('hidden-print', st.labels !== 'show');
       if (feedback) {
-        const rel = (pos - lefts[idx]) / widths[idx];
-        const col = rel < 0.5 ? 0 : 1;
+        const col = (pos - lefts[idx]) / widths[idx] < 0.5 ? 0 : 1;
         const key = idx + ':' + col;
         if (key !== lastKey) {
           lastKey = key;
           const dots = toDots(c.cell).filter((d) => (col === 0 ? d <= 3 : d >= 4 && d <= 6));
           if (st.sound) dots.forEach((d, k) => tick((d - 1) % 3, k * 0.025));
-          if (st.vibe && canVibrate && dots.length) {
-            const pat = []; dots.forEach(() => pat.push(14, 18)); try { navigator.vibrate(pat); } catch {}
-          }
+          if (st.vibe && canVibrate && dots.length) { const pat = []; dots.forEach(() => pat.push(14, 18)); try { navigator.vibrate(pat); } catch {} }
         }
       }
     } else {
@@ -560,42 +585,56 @@ views.sweep = (q) => {
     }
   }
 
-  // pointer drag: finger moving right pulls the text left
-  let dragging = false, lastX = 0, downX = 0, moved = 0;
+  // Edge zones: holding your finger near an edge scrolls the line under it,
+  // so the text moves beneath a still fingertip (which is also how reading feels).
+  const EDGE = () => Math.min(90, W * 0.18);
+  function edgeLoop() {
+    cancelAnimationFrame(edgeRaf);
+    let prev = performance.now();
+    const step = (t) => {
+      const dt = Math.min(50, t - prev) / 1000; prev = t;
+      if (!active) return;
+      const e = EDGE();
+      let v = 0;
+      if (headX > W - e) v = -((headX - (W - e)) / e);
+      else if (headX < e) v = (e - headX) / e;
+      if (v) { offset += v * 260 * dt; update(); }
+      edgeRaf = requestAnimationFrame(step);
+    };
+    edgeRaf = requestAnimationFrame(step);
+  }
+
+  // Pointer: the reading point is exactly where the finger / cursor is (1:1).
+  const boxX = (e) => e.clientX - box.getBoundingClientRect().left;
   box.addEventListener('pointerdown', (e) => {
-    dragging = true; lastX = downX = e.clientX; moved = 0; box.setPointerCapture(e.pointerId); box.classList.add('dragging'); stopGlide();
-    $('#hint').style.opacity = 0;
+    stopGlide(); active = true; box.setPointerCapture(e.pointerId); box.classList.add('dragging');
+    headX = boxX(e); $('#hint').style.opacity = 0; update(); edgeLoop();
   });
   box.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - lastX; lastX = e.clientX; moved += Math.abs(dx);
-    offset -= dx * st.speed; update();
+    const touchLike = e.pointerType !== 'mouse';
+    if (touchLike && !box.hasPointerCapture(e.pointerId)) return;
+    if (!touchLike && glideOn) return;
+    if (!active && !touchLike) { active = true; edgeLoop(); $('#hint').style.opacity = 0; }
+    headX = Math.max(0, Math.min(W, boxX(e))); update();
   });
   const end = (e) => {
-    if (!dragging) return; dragging = false; box.classList.remove('dragging');
-    if (moved < 6) {
-      // tap: glide the tapped cell under the reader
-      const r = track.getBoundingClientRect();
-      const x = e.clientX - r.left;
-      const i = lefts.findIndex((l, k) => x >= l && x < l + widths[k]);
-      if (i >= 0) animateTo(readerX - (lefts[i] + widths[i] * 0.25));
-    }
+    if (e.pointerType !== 'mouse' || e.type === 'pointerleave') { active = false; box.classList.remove('dragging'); update(false); }
   };
-  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
-  box.addEventListener('wheel', (e) => { e.preventDefault(); offset -= (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * 0.5; update(); }, { passive: false });
+  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end); box.addEventListener('pointerleave', end);
+  box.addEventListener('wheel', (e) => { e.preventDefault(); offset -= (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * 0.6; update(false); }, { passive: false });
   box.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       e.preventDefault();
       const dir = e.key === 'ArrowRight' ? 1 : -1;
       let i = Math.max(0, curIdx) + dir;
       while (cells[i] && cells[i].kind === 'space') i += dir;
-      if (cells[i]) animateTo(readerX - (lefts[i] + widths[i] * 0.25));
+      if (cells[i]) animateTo(headX - (lefts[i] + widths[i] * 0.3));
     } else if (e.key === ' ') { e.preventDefault(); glideOn ? stopGlide() : startGlide(); }
   });
 
   function animateTo(target) {
     stopGlide();
-    const start = offset, t0 = performance.now(), dur = 380;
+    const start = offset, t0 = performance.now(), dur = 420;
     const step = (t) => {
       const k = Math.min(1, (t - t0) / dur); const ease = 1 - Math.pow(1 - k, 3);
       offset = start + (target - start) * ease; update();
@@ -605,46 +644,52 @@ views.sweep = (q) => {
   }
   function startGlide() {
     glideOn = true; $('#glide').textContent = '❚❚ Pause';
+    if (headX < W * 0.2 || headX > W * 0.8) headX = Math.round(W * 0.35);
     let prev = performance.now();
     const step = (t) => {
       if (!glideOn) return;
-      offset -= (t - prev) / 1000 * 70 * st.speed; prev = t; update();
-      if (readerX - offset > totalW) { stopGlide(); return; }
+      // about 1 cell per second at speed 1
+      const pitch = widths[0] ? widths[0] * 1.4 : 60;
+      offset -= (t - prev) / 1000 * pitch * st.speed; prev = t; update();
+      if (headX - offset > totalW + 10) { stopGlide(); return; }
       raf = requestAnimationFrame(step);
     };
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
   }
-  function stopGlide() { glideOn = false; const g = $('#glide'); if (g) g.textContent = '▶ Glide'; }
+  function stopGlide() { glideOn = false; const g = $('#glide'); if (g) g.textContent = '▶ Auto-glide'; }
 
-  // controls
   function syncControls() {
     $$('#srcChips .chip').forEach((b) => b.classList.toggle('on', b.dataset.s === st.src));
     $$('#gradeSeg button').forEach((b) => b.classList.toggle('on', Number(b.dataset.g) === (st.src === 'signs' ? 2 : st.grade)));
     $$('#lblSeg button').forEach((b) => b.classList.toggle('on', b.dataset.l === st.labels));
+    $$('#sizeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.z === st.size));
     box.classList.toggle('labels-hidden', st.labels === 'hidden');
     box.classList.toggle('labels-after', st.labels === 'after');
+    box.classList.toggle('real', st.size === 'real');
     $('#customRow').style.display = st.src === 'custom' ? '' : 'none';
     $('#shuffleBtn').style.display = ['words', 'sentences', 'signs'].includes(st.src) ? '' : 'none';
     $('#customText').value = st.custom;
-    $('#snd').checked = st.sound; if ($('#vib')) $('#vib').checked = st.vibe; $('#spd').value = st.speed;
-    store.set('swSrc', st.src); store.set('swGrade', st.grade); store.set('swLabels', st.labels);
+    $('#snd').checked = st.sound; if ($('#vib')) $('#vib').checked = st.vibe; if ($('#spk')) $('#spk').checked = st.speak; $('#spd').value = st.speed;
+    store.set('swSrc', st.src); store.set('swGrade', st.grade); store.set('swLabels', st.labels); store.set('swSize', st.size);
   }
   $('#srcChips').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; st.src = b.dataset.s; text = textFor(); syncControls(); build(); };
   $('#gradeSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.grade = Number(b.dataset.g); syncControls(); build(); };
   $('#lblSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.labels = b.dataset.l; syncControls(); update(false); };
+  $('#sizeSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.size = b.dataset.z; syncControls(); build(); };
   $('#snd').onchange = (e) => { st.sound = e.target.checked; store.set('swSound', st.sound); if (st.sound) tick(0); };
   if ($('#vib')) $('#vib').onchange = (e) => { st.vibe = e.target.checked; store.set('swVibe', st.vibe); };
-  $('#spd').oninput = (e) => { st.speed = Number(e.target.value); store.set('swSpeed', st.speed); };
+  if ($('#spk')) $('#spk').onchange = (e) => { st.speak = e.target.checked; store.set('swSpeak', st.speak); };
+  $('#spd').oninput = (e) => { st.speed = Number(e.target.value); store.set('swSpeed2', st.speed); };
   $('#glide').onclick = () => (glideOn ? stopGlide() : startGlide());
-  $('#restart').onclick = () => { stopGlide(); animateTo(readerX + 24); $('#wordReveal').textContent = ''; };
+  $('#restart').onclick = () => { stopGlide(); headX = Math.round(W * 0.1); animateTo(startOffset()); $('#wordReveal').textContent = ''; };
   $('#shuffleBtn').onclick = () => { text = textFor(); build(); };
   const loadCustom = () => { st.custom = $('#customText').value.trim() || st.custom; store.set('swCustom', st.custom); text = st.custom; build(); };
   $('#customGo').onclick = loadCustom;
   $('#customText').onkeydown = (e) => { if (e.key === 'Enter') loadCustom(); };
-  const onResize = () => { const p = readerX - offset; measure(); offset = readerX - p; update(false); };
+  const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
   window.addEventListener('resize', onResize);
   syncControls(); build();
-  return () => { stopGlide(); cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); };
+  return () => { stopGlide(); active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); window.removeEventListener('resize', onResize); try { speechSynthesis.cancel(); } catch {} };
 };
 
 // ---------- signs ----------
