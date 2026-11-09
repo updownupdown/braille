@@ -94,14 +94,15 @@ export const CONTRACTIONS = {
   'Lower groupsigns': {
     blurb: 'Cells using only the lower dots (2, 3, 5, 6). Position in the word matters.',
     items: [
-      ['ea', '2', 'middle of a word'], ['bb', '23', 'middle'], ['cc', '25', 'middle'], ['ff', '235', 'middle'],
-      ['gg', '2356', 'middle'], ['en', '26'], ['in', '35'],
-      ['be', '23', 'start of a word'], ['con', '25', 'start'], ['dis', '256', 'start'],
+      ['ea', '2', 'inside a word only · tea'], ['bb', '23', 'inside only · rabbit'], ['cc', '25', 'inside only · accept'],
+      ['ff', '235', 'inside only · coffee'], ['gg', '2356', 'inside only · egg'], ['en', '26', 'anywhere in a word · ten'],
+      ['in', '35', 'anywhere in a word · pin'],
+      ['be', '23', 'first syllable only · begin'], ['con', '25', 'first syllable only · concert'], ['dis', '256', 'first syllable only · dislike'],
     ],
   },
   'Lower wordsigns': {
     blurb: 'Lower cells that stand alone as words.',
-    items: [['be', '23'], ['enough', '26'], ['were', '2356'], ['his', '236'], ['in', '35'], ['was', '356']],
+    items: [['be', '23', 'alone'], ['enough', '26', 'alone'], ['were', '2356', 'alone'], ['his', '236', 'alone'], ['in', '35', 'alone'], ['was', '356', 'alone']],
   },
   'Initial-letter contractions': {
     blurb: 'A prefix cell (dots 5, 45 or 456) plus the word’s first letter or groupsign.',
@@ -140,6 +141,11 @@ export const CONTRACTIONS = {
       ['quick', '12345 13'], ['receive', '1235 14 1236'], ['said', '234 145'], ['should', '146 145'],
       ['such', '234 16'], ['today', '2345 145'], ['together', '2345 1245 1235'], ['tomorrow', '2345 134'],
       ['tonight', '2345 1345'], ['would', '2456 145'], ['your', '13456 1235'], ['yourself', '13456 1235 124'],
+      ['yourselves', '13456 1235 1236 234'], ['conceive', '25 14 1236'], ['conceiving', '25 14 1236 1245'],
+      ['deceive', '145 14 1236'], ['deceiving', '145 14 1236 1245'], ['declare', '145 14 123'], ['declaring', '145 14 123 1245'],
+      ['oneself', '5 135 124'], ['ourselves', '1256 1235 1236 234'], ['perceive', '1234 12456 14 1236'],
+      ['perceiving', '1234 12456 14 1236 1245'], ['receiving', '1235 14 1236 1245'], ['rejoice', '1235 245 14'],
+      ['rejoicing', '1235 245 14 1245'], ['themselves', '2346 134 1236 234'], ['thyself', '1456 13456 124'],
     ],
   },
 };

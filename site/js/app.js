@@ -1,10 +1,10 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=3';
+} from './braille.js?v=4';
 import {
-  SIGN_WORDS, WORDS, SENTENCES, SCIENCE, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=3';
+  SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
+} from './data.js?v=4';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -17,7 +17,7 @@ const store = {
 const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-// ---------- icons (line icons, not dots) ----------
+// ---------- icons ----------
 const P = {
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
   practice: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
@@ -26,32 +26,27 @@ const P = {
   settings: '<path d="M4 6h10"/><path d="M18 6h2"/><circle cx="16" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.5"/><path d="M12 17h.01"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
-  play: '<path d="M7 5v14l11-7z" fill="currentColor"/>',
-  pause: '<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>',
+  right: '<path d="m9 6 6 6-6 6"/>',
   restart: '<path d="M3.5 12a8.5 8.5 0 1 0 2.7-6.2"/><path d="M3 4v5h5"/>',
   shuffle: '<path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   check: '<path d="m5 12 5 5 9-10"/>',
   arrow: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
 };
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = {
-  theme: 'auto', dotNums: false, hideLetters: false, signsHide: false, trLabels: true, trLarge: false,
-  swGrade: 1, swLabels: 'show', swSize: 'large', swSound: true, swVibe: true, swSpeak: false, swSpeed: 1,
-};
+const DEFAULTS = { theme: 'auto', dotNums: false, hideLetters: false, trLabels: true, swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
-const canSpeak = 'speechSynthesis' in window;
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
-  b.toggle('s-dotnums', S.dotNums); b.toggle('s-hide-letters', S.hideLetters); b.toggle('s-signs-hide', S.signsHide);
-  b.toggle('s-tr-nolabels', !S.trLabels); b.toggle('s-tr-large', S.trLarge);
-  b.toggle('s-sw-hidden', S.swLabels === 'hidden'); b.toggle('s-sw-after', S.swLabels === 'after'); b.toggle('s-sw-real', S.swSize === 'real');
+  b.toggle('s-dotnums', S.dotNums); b.toggle('s-hide-letters', S.hideLetters);
+  b.toggle('s-tr-nolabels', !S.trLabels); b.toggle('s-sw-real', S.swSize === 'real');
 }
 function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
 
@@ -78,18 +73,27 @@ function lineHTML(parts, { labels = true, cls = '' } = {}) {
   flush();
   return `<div class="braille-line">${out}</div>`;
 }
+// Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
+function groupsHTML(spec, cls = 'md') {
+  return `<div class="braille-line groups">${spec.split(' ').map((g) => {
+    if (g === '_') return '<span class="bw space"></span>';
+    const i = g.indexOf(':');
+    const cells = g.slice(0, i), label = g.slice(i + 1);
+    return `<span class="bgroup"><span class="mrow">${cellsHTML(cells, cls)}</span><span class="lbl">${esc(label)}</span></span>`;
+  }).join('')}</div>`;
+}
 
 // ---------- modal sheet ----------
 const sheet = $('#sheet');
 const backdrop = $('#sheetBackdrop');
-let sheetClose = null;
-function openSheet(html, { title = '', onClose = null } = {}) {
-  sheet.innerHTML = `<div class="sheet-head">${title ? `<h2>${esc(title)}</h2>` : '<span></span>'}<button class="close" aria-label="Close">✕</button></div>${html}`;
-  sheet.hidden = false; backdrop.hidden = false; sheetClose = onClose;
+function openSheet(html, { title = '' } = {}) {
+  sheet.innerHTML = `<div class="sheet-head"><h2>${esc(title)}</h2><button class="icon-btn close" aria-label="Close">${icon('close', 20)}</button></div><div class="sheet-body">${html}</div>`;
+  sheet.hidden = false; backdrop.hidden = false;
+  sheet.scrollTop = 0;
   $('.close', sheet).onclick = closeSheet;
   $('.close', sheet).focus({ preventScroll: true });
 }
-function closeSheet() { if (sheet.hidden) return; sheet.hidden = true; backdrop.hidden = true; const f = sheetClose; sheetClose = null; f && f(); }
+function closeSheet() { if (sheet.hidden) return; sheet.hidden = true; backdrop.hidden = true; }
 backdrop.onclick = closeSheet;
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDD(); closeSheet(); } });
 sheet.addEventListener('click', (e) => { if (e.target.closest('a[href^="#"]')) closeSheet(); });
@@ -123,42 +127,44 @@ function dropdown(el, { label = '', options, value, onChange }) {
   };
   $('.dd-menu', el).onclick = (e) => {
     const b = e.target.closest('.dd-opt'); if (!b) return;
-    e.stopPropagation();
-    closeDD();
+    e.stopPropagation(); closeDD();
     const v = options.find((o) => String(o.value) === b.dataset.v).value;
     dropdown(el, { label, options, value: v, onChange });
     onChange(v);
   };
 }
-const seg = (name, opts, value) => `<div class="seg" data-seg="${name}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" class="${String(v) === String(value) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-const toggle = (name, label, checked) => `<label class="toggle"><input type="checkbox" data-set="${name}" ${checked ? 'checked' : ''}> ${label}</label>`;
+// Segmented radio group
+const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}">${opts.map(([v, l]) => `<button type="button" role="radio" aria-checked="${String(v) === String(value)}" data-v="${v}" class="${String(v) === String(value) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+function bindRadios(root, fn) {
+  root.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-seg]'), b = e.target.closest('[data-seg] button');
+    if (!g || !b || !root.contains(g)) return;
+    $$('button', g).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+    fn(g.dataset.seg, b.dataset.v);
+  });
+}
+const switchRow = (name, label, checked) => `<label class="set-row switch"><span>${label}</span><input type="checkbox" data-set="${name}" ${checked ? 'checked' : ''}></label>`;
+
+// ---------- header context ----------
+const headCtx = $('#headCtx');
+const setHead = (html) => { headCtx.innerHTML = html; };
 
 // ---------- settings modal ----------
 function openSettings() {
   openSheet(`<div class="settings">
-    <div class="set-group"><h3>Appearance</h3>${seg('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div>
-    <div class="set-group"><h3>Alphabet</h3>${toggle('dotNums', 'Show dot numbers', S.dotNums)}${toggle('hideLetters', 'Hide letters (test yourself)', S.hideLetters)}</div>
+    <div class="set-group"><div class="set-row"><span class="set-title">Appearance</span>${radios('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div></div>
+    <div class="set-group"><h3>Alphabet & practice</h3>${switchRow('dotNums', 'Show dot numbers', S.dotNums)}${switchRow('hideLetters', 'Hide letters in the alphabet', S.hideLetters)}</div>
     <div class="set-group"><h3>Sweep</h3>
-      <div class="set-row"><span>Braille</span>${seg('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
-      <div class="set-row"><span>Letters</span>${seg('swLabels', [['show', 'Shown'], ['after', 'After'], ['hidden', 'Hidden']], S.swLabels)}</div>
-      <div class="set-row"><span>Cell size</span>${seg('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
-      <div class="set-row"><span>Glide speed</span><input type="range" data-range="swSpeed" min="0.4" max="2" step="0.1" value="${S.swSpeed}"></div>
-      ${toggle('swSound', 'Dot clicks', S.swSound)}
-      ${canVibrate ? toggle('swVibe', 'Vibrate on dots', S.swVibe) : ''}
-      ${canSpeak ? toggle('swSpeak', 'Say letters aloud', S.swSpeak) : ''}
+      <div class="set-row"><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
+      <div class="set-row"><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
+      ${canVibrate ? switchRow('swVibe', 'Vibrate on dots', S.swVibe) : ''}
     </div>
-    <div class="set-group"><h3>Signs</h3>${toggle('signsHide', 'Hide print until tapped', S.signsHide)}</div>
-    <div class="set-group"><h3>Translate</h3>${toggle('trLabels', 'Print labels under cells', S.trLabels)}${toggle('trLarge', 'Large cells', S.trLarge)}</div>
-    <div class="set-group"><h3>Practice</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
-    <div class="set-group about"><h3>About Dots</h3><p>A personal braille learning site. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
+    <div class="set-group"><h3>Translate</h3>${switchRow('trLabels', 'Print labels under cells', S.trLabels)}</div>
+    <div class="set-group"><h3>Progress</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
+    <div class="set-group about"><h3>About Learn Braille</h3><p>A personal braille learning site. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
   </div>`, { title: 'Settings' });
-  $$('[data-seg]', sheet).forEach((g) => g.addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    $$('button', g).forEach((x) => x.classList.toggle('on', x === b));
-    const k = g.dataset.seg; setS(k, typeof DEFAULTS[k] === 'number' ? Number(b.dataset.v) : b.dataset.v);
-  }));
+  bindRadios($('.settings', sheet), (k, v) => setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v));
   $$('[data-set]', sheet).forEach((i) => { i.onchange = () => setS(i.dataset.set, i.checked); });
-  $$('[data-range]', sheet).forEach((i) => { i.oninput = () => setS(i.dataset.range, Number(i.value)); });
   let armed = false;
   $('#resetAll').onclick = (e) => {
     if (!armed) { armed = true; e.target.textContent = 'Tap again to confirm'; return; }
@@ -191,7 +197,7 @@ function letterDetail(l) {
       <dt>Capital</dt><dd>${cellHTML(IND.capital, 'sm')}${cellHTML(c, 'sm')} = ${l.toUpperCase()}</dd>
       ${m ? `<dt>Don’t confuse</dt><dd>${cellHTML(LETTERS[m], 'sm')} <b>${m}</b> is its mirror image</dd>` : ''}
     </dl>
-    <div class="row"><a class="btn primary" href="#/practice/read?set=${idx < 10 ? 'aj' : idx < 20 ? 'kt' : 'uz'}">Practise this row</a><a class="btn" href="#/practice/sweep?src=alphabet">Sweep the alphabet</a></div>
+    <div class="row"><a class="btn primary" href="#/practice/read?cat=letters&set=${idx < 10 ? 'aj' : idx < 20 ? 'kt' : 'uz'}">Practise this row</a><a class="btn" href="#/practice/sweep?src=alphabet">Sweep the alphabet</a></div>
   </div>`;
 }
 function symbolDetail(e) {
@@ -233,22 +239,22 @@ const groupBlock = (g, title, blurb) => `<div class="group-title"><h3>${title}</
 const view = $('#view');
 const views = {};
 const mastery = () => store.get('mastery', {});
-// 0 untried, 1 pale blue, 2 mid blue, 3 dark blue, 4+ known (green)
-const level = (score) => Math.min(4, score);
+const level = (score) => Math.min(4, score); // 0 untried · 1–3 blues · 4+ known (green)
 
 // ---------- home ----------
 views[''] = () => {
+  setHead('');
   const m = mastery();
   const known = 'abcdefghijklmnopqrstuvwxyz'.split('').filter((l) => (m[l] || 0) >= 4).length;
   const mini = (s, cls = 'sm') => `<span class="mrow">${cellsHTML(s, cls)}</span>`;
   const tile = (href, title, desc, art, cls = '') => `<a class="tile ${cls}" href="${href}"><div class="art">${art}</div><div class="tile-text"><b>${title}</b><span>${desc}</span></div></a>`;
   view.innerHTML = `
     <div class="home-head">
-      <div>
-        <h1>Learn braille</h1>
-        <p class="muted">Six dots, one fingertip. Start with the alphabet, then read the world around you.</p>
+      <div class="home-brand">
+        <span class="logo big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <div><h1>Learn Braille</h1><p class="muted">Six dots, one fingertip. Start with the alphabet, then read the world around you.</p></div>
       </div>
-      <a class="progress-card" href="#/practice/read?set=az">
+      <a class="progress-card" href="#/practice/read?cat=letters&set=az">
         <div class="pbar"><i style="width:${(known / 26) * 100}%"></i></div>
         <span><b>${known}</b> of 26 letters known</span>
       </a>
@@ -278,75 +284,98 @@ views[''] = () => {
     </div>`;
 };
 
-// ---------- practice ----------
-const PRACTICE_SETS = {
-  aj: { name: 'Letters a–j', group: 'Letters', items: () => 'abcdefghij'.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l })) },
-  kt: { name: 'Letters k–t', group: 'Letters', items: () => 'klmnopqrst'.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l })) },
-  uz: { name: 'Letters u–z', group: 'Letters', items: () => 'uvwxyz'.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l })) },
-  az: { name: 'All letters', group: 'Letters', items: () => 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l })) },
-  num: { name: 'Numbers', group: 'More', items: () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d, writeCell: LETTERS['jabcdefghi'[Number(d)]] })) },
-  punct: { name: 'Punctuation', group: 'More', items: () => [',', ';', ':', '.', '!', '?', "'", '-'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1] })) },
-  g2: { name: 'Contractions', group: 'More', items: () => [...CONTRACTIONS['Strong contractions'].items, ...CONTRACTIONS['Strong groupsigns'].items, ...CONTRACTIONS['Alphabetic wordsigns'].items.slice(0, 12)].map(([w, d]) => ({ key: 'c' + w, cells: cellsOf(d), answer: w })) },
+// ---------- practice data ----------
+const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l }));
+const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d]) => ({ key: 'c' + w, cells: cellsOf(d), answer: w }));
+const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
+const CATS = {
+  letters: { name: 'Letters', sets: {
+    aj: ['a–j', L('abcdefghij')], kt: ['k–t', L('klmnopqrst')], uz: ['u–z', L('uvwxyz')],
+    az: ['All letters', L('abcdefghijklmnopqrstuvwxyz')], mirror: ['Mirror pairs', L('dfeihjrw'), 'd/f, e/i, h/j, r/w'],
+  } },
+  symbols: { name: 'Symbols', sets: {
+    num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d }))],
+    punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1] }))],
+    signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1] }))],
+    ind: ['Indicators', () => INDICATORS.map(([p, d]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p }))],
+  } },
+  contractions: { name: 'Contractions', sets: {
+    ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
+    all: ['All contractions', () => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)())],
+  } },
 };
 const WORD_SETS = {
-  simple: { name: 'Simple words', grade: 1, list: WORDS },
-  signs: { name: 'Sign words', hint: 'Grade 2', grade: 2, list: SIGN_WORDS.map((w) => w.toLowerCase()) },
-  g2: { name: 'Contracted words', hint: 'Grade 2', grade: 2, list: ['the', 'and', 'with', 'for', 'children', 'knowledge', 'people', 'there', 'father', 'mother', 'station', 'thing', 'shower', 'river', 'beach', 'information', 'kindness', 'house', 'light', 'stone'] },
+  simple: { name: 'Simple', grade: 1, list: WORDS },
+  signs: { name: 'Signs', grade: 2, list: SIGN_WORDS.map((w) => w.toLowerCase()) },
+  g2: { name: 'Contracted', grade: 2, list: ['the', 'and', 'with', 'for', 'children', 'knowledge', 'people', 'there', 'father', 'mother', 'station', 'thing', 'shower', 'river', 'beach', 'information', 'kindness', 'house', 'light', 'stone'] },
 };
+// Merge items that share the same cells (e.g. "bb" and "be") so a reading quiz is never ambiguous.
+function mergeByCells(items) {
+  const map = new Map();
+  for (const it of items) {
+    const m = map.get(it.cells);
+    if (m) { if (!m.answer.split(' / ').includes(it.answer)) m.answer += ' / ' + it.answer; } else map.set(it.cells, { ...it });
+  }
+  return [...map.values()];
+}
 const SWEEP_SRC = { alphabet: 'Alphabet', words: 'Words', sentences: 'Sentences', signs: 'Sign words', custom: 'Your own text' };
+const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
 const HELP = {
-  read: ['Read', 'A cell appears — pick the letter it stands for. On a keyboard, type the answer or press 1–4.', 'Your progress shows under the card: letters go from pale blue to dark blue as you get them right, and turn green once you know them. Ones you miss come up more often.'],
-  write: ['Write', 'Tap the dots that make the letter, then Check.', 'On a keyboard use F D S for dots 1 2 3 and J K L for dots 4 5 6 — the same fingers as a Perkins brailler — and Enter to check.'],
-  words: ['Words', 'Decode the whole word and type it. Hint reveals one cell at a time.', 'Grade 2 sets use contractions; see Reference → Grade 2 if one is new to you.'],
-  sweep: ['Sweep', 'Put your finger on the line and slide right. The cell directly under your finger is the one you’re reading; it appears in the bubble above so your finger never hides it.', 'Each raised dot clicks as you cross it — high for the top row, low for the bottom — and vibrates on Android. Hold your finger in the shaded right edge and the line keeps scrolling under it. On a laptop, just move the mouse across, or use the arrow keys.', 'The buttons: ▶ glides the line automatically, ↺ starts over, and the shuffle button loads a new line. Grade, letter visibility, real-size cells, sounds and speed are in Settings.'],
+  read: 'A braille cell appears — pick what it says. The card glows green when you’re right and red (with a shake) when you’re not. On a keyboard, press 1–4. Your progress for each item goes from pale blue to dark blue, then green once you know it; ones you miss come up more often.',
+  write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Turn on dot numbers in Settings to see them on the pad.',
+  words: 'Decode the word and type it — it checks as you type. Hint reveals one cell at a time; Skip shows the answer.',
+  sweep: 'Put your finger on the line and slide right. The cell under your finger lights up, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. Use the buttons to load a new line or start over; grade and real-size cells are in Settings.',
 };
 
 views.practice = (q, sub) => {
-  const mode = ['read', 'write', 'words', 'sweep'].includes(sub) ? sub : store.get('pmode', 'read');
+  const mode = MODES[sub] ? sub : store.get('pmode', 'read');
   store.set('pmode', mode);
-  view.innerHTML = `
-    <div class="practice-wrap mode-${mode}">
-      <div class="page-head">
-        <div class="seg seg-wide" id="modeSeg">${['read', 'write', 'words', 'sweep'].map((m) => `<a href="#/practice/${m}" class="${m === mode ? 'on' : ''}">${HELP[m][0]}</a>`).join('')}</div>
-        <button class="icon-btn" id="helpBtn" aria-label="How this works">${icon('help')}</button>
-      </div>
-      <div class="sub-head" id="subHead"></div>
-      <div id="modeBody"></div>
-    </div>`;
-  $('#helpBtn').onclick = () => openSheet(HELP[mode].slice(1).map((p) => `<p>${esc(p)}</p>`).join(''), { title: HELP[mode][0] });
+  setHead(`<div id="modeDD" class="dd-title"></div><button class="icon-btn" id="helpBtn" aria-label="How this works">${icon('help')}</button>`);
+  dropdown($('#modeDD'), { options: Object.entries(MODES).map(([k, v]) => ({ value: k, label: v })), value: mode, onChange: (v) => { location.hash = '#/practice/' + v; } });
+  $('#helpBtn').onclick = () => openSheet(`<p>${esc(HELP[mode])}</p>`, { title: MODES[mode] });
+  view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
   return mode === 'sweep' ? sweepMode(q) : quizMode(mode, q);
 };
 
 function quizMode(mode, q) {
-  const state = { set: q.get('set') || store.get('pset', 'aj'), wset: store.get('pwset', 'simple'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
-  if (!PRACTICE_SETS[state.set]) state.set = 'aj';
+  const saved = store.get('psel', { cat: 'letters', set: 'aj' });
+  const state = { cat: q.get('cat') || saved.cat, set: q.get('set') || saved.set, wset: store.get('pwset', 'simple'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
+  if (!CATS[state.cat]) state.cat = 'letters';
+  if (!CATS[state.cat].sets[state.set]) state.set = Object.keys(CATS[state.cat].sets)[0];
   const m = mastery();
-  const subHead = $('#subHead'), body = $('#modeBody');
+  const picker = $('#picker'), body = $('#modeBody');
   body.innerHTML = `<div class="card stage" id="stage"></div>
     <div class="below-stage">
-      <div class="stats"><span>Streak <b id="sStreak">0</b></span><span>Correct <b id="sRight">0</b>/<b id="sTotal">0</b></span></div>
+      <div class="stats-row"><div class="stats"><span>Streak <b id="sStreak">0</b></span><span>Correct <b id="sRight">0</b>/<b id="sTotal">0</b></span></div>
+      ${mode === 'words' ? '' : '<span class="legend" title="Learning → known"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i><small>known</small></span>'}</div>
       <div class="mastery" id="mastery"></div>
     </div>`;
   const stage = $('#stage');
   const items = () => {
-    let it = PRACTICE_SETS[state.set].items();
-    if (mode === 'write') it = it.filter((x) => (x.writeCell || x.cells).length === 1);
-    return it;
+    const it = CATS[state.cat].sets[state.set][1]();
+    return mode === 'read' ? mergeByCells(it) : it;
   };
   const score = (k) => m[k] || 0;
   const bump = (k, d) => { m[k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m); };
 
-  subHead.innerHTML = '<div id="setDD"></div><span class="legend" title="Learning → known"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i><small>known</small></span>';
-  if (mode === 'words') {
-    dropdown($('#setDD'), { options: Object.entries(WORD_SETS).map(([k, s]) => ({ value: k, label: s.name, hint: s.hint })), value: state.wset, onChange: (v) => { state.wset = v; store.set('pwset', v); next(); } });
-    $('.legend', subHead).remove();
-  } else {
-    dropdown($('#setDD'), { options: Object.entries(PRACTICE_SETS).map(([k, s]) => ({ value: k, label: s.name, group: s.group })), value: state.set, onChange: (v) => { state.set = v; store.set('pset', v); state.last = null; renderMastery(); next(); } });
+  function renderPicker() {
+    if (mode === 'words') {
+      picker.innerHTML = radios('wset', Object.entries(WORD_SETS).map(([k, s]) => [k, s.name]), state.wset);
+    } else {
+      picker.innerHTML = radios('cat', Object.entries(CATS).map(([k, c]) => [k, c.name]), state.cat) + '<div id="setDD"></div>';
+      dropdown($('#setDD'), { options: Object.entries(CATS[state.cat].sets).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
+    }
   }
+  const saveSel = () => store.set('psel', { cat: state.cat, set: state.set });
+  bindRadios(picker, (k, v) => {
+    if (k === 'wset') { state.wset = v; store.set('pwset', v); next(); return; }
+    state.cat = v; state.set = Object.keys(CATS[v].sets)[0]; saveSel(); renderPicker(); restart();
+  });
+  function restart() { state.last = null; renderMastery(); next(); }
   function renderMastery() {
     const el = $('#mastery');
     if (mode === 'words') { el.innerHTML = ''; return; }
-    el.innerHTML = items().map((x) => `<span data-l="${level(score(x.key))}" title="${esc(x.answer)}">${esc(x.answer.length > 3 ? x.answer.slice(0, 3) : x.answer)}</span>`).join('');
+    el.innerHTML = items().map((x) => `<span data-l="${level(score(x.key))}" title="${esc(x.answer)}">${esc(x.answer.length > 4 ? x.answer.slice(0, 3) + '…' : x.answer)}</span>`).join('');
   }
   function nextItem() {
     const it = items();
@@ -367,25 +396,26 @@ function quizMode(mode, q) {
     $('#sStreak').textContent = state.streak; $('#sRight').textContent = state.right; $('#sTotal').textContent = state.total;
     renderMastery();
   }
-  // The top line is the prompt until the first guess, then becomes feedback.
-  const say = (text, cls = '') => { const t = $('#top', stage); t.className = 'stage-top ' + cls; t.textContent = text; };
+  // Feedback is a coloured glow on the card (plus a shake when wrong).
+  const glow = (ok) => {
+    stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth;
+    stage.classList.add(ok ? 'glow-good' : 'glow-bad');
+  };
 
   function renderRead() {
     const item = nextItem(); state.last = item; state.firstTry = true;
-    const opts = shuffle([item, ...shuffle(items().filter((x) => x.key !== item.key)).slice(0, 3)]);
+    stage.classList.remove('glow-good', 'glow-bad');
+    const opts = shuffle([item, ...shuffle(items().filter((x) => x.cells !== item.cells)).slice(0, 3)]);
+    const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
-      <div class="stage-top" id="top">What does this say?</div>
       <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
-      <div class="choices ${opts.some((o) => o.answer.length > 2) ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
+      <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
     const choose = (btn) => {
       if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong')) return;
       const ok = btn.dataset.k === item.key;
-      result(ok, item);
+      result(ok, item); glow(ok);
       btn.classList.add(ok ? 'right' : 'wrong');
-      if (ok) { say(pick(['Yes!', 'Nice.', 'Exactly.', 'You’ve got it.']), 'good'); setTimeout(next, 650); return; }
-      const picked = opts.find((o) => o.key === btn.dataset.k);
-      const isMirror = picked.cells.length === 1 && item.cells.length === 1 && mirror(picked.cells) === item.cells;
-      say(isMirror ? `${picked.answer} is the mirror image — check the columns.` : `That’s ${picked.answer}. Try again.`, 'bad');
+      if (ok) setTimeout(next, 650);
     };
     stage.onclick = (e) => choose(e.target.closest('.choice'));
     state.key = (e) => {
@@ -398,34 +428,42 @@ function quizMode(mode, q) {
 
   function renderWrite() {
     const item = nextItem(); state.last = item; state.firstTry = true;
-    const target = item.writeCell || item.cells;
-    const want = new Set(toDots(target));
+    stage.classList.remove('glow-good', 'glow-bad');
+    const targets = [...item.cells];
+    let ci = 0, done = false;
     const on = new Set();
     stage.innerHTML = `
-      <div class="stage-top" id="top">${state.set === 'num' ? 'Make this digit (after the number sign)' : 'Make this'}</div>
       <div class="target">${esc(item.answer)}</div>
-      <div class="dotpad" id="pad">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="dot ${d}">${d}</button>`).join('')}</div>
-      <div class="row"><button class="btn primary" id="check">Check</button><button class="btn ghost" id="skip">Show me</button></div>`;
+      ${targets.length > 1 ? `<div class="build" id="build">${targets.map(() => '<span class="slot"></span>').join('')}</div>` : ''}
+      <div class="dotpad ${S.dotNums ? 'nums' : ''}" id="pad">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="dot ${d}">${d}</button>`).join('')}</div>
+      <button class="link-btn" id="skip">Show me</button>`;
     const pad = $('#pad');
-    const tog = (d) => { on.has(d) ? on.delete(d) : on.add(d); $(`[data-d="${d}"]`, pad).classList.toggle('on', on.has(d)); pad.classList.remove('wrong'); };
-    pad.onclick = (e) => { const b = e.target.closest('button'); if (b) tog(Number(b.dataset.d)); };
-    const check = () => {
-      const ok = on.size === want.size && [...want].every((d) => on.has(d));
-      result(ok, item);
-      if (ok) { pad.classList.add('right'); say(`Yes — ${dotsLabel(target)}.`, 'good'); setTimeout(next, 800); }
-      else { pad.classList.add('wrong'); say('Not quite. Adjust and check again.', 'bad'); }
+    const want = () => new Set(toDots(targets[ci]));
+    const paint = () => [1, 2, 3, 4, 5, 6].forEach((d) => $(`[data-d="${d}"]`, pad).classList.toggle('on', on.has(d)));
+    const markSlots = () => $$('#build .slot').forEach((s, i) => { s.innerHTML = i < ci ? cellHTML(targets[i], 'sm') : ''; s.classList.toggle('cur', i === ci); });
+    markSlots();
+    const evaluate = (added) => {
+      if (done) return;
+      const w = want();
+      if (added && !w.has(added)) { result(false, item); glow(false); return; }
+      if (on.size === w.size && [...w].every((d) => on.has(d))) {
+        ci++;
+        if (ci >= targets.length) { done = true; markSlots(); result(true, item); glow(true); setTimeout(next, 750); }
+        else { on.clear(); setTimeout(() => { paint(); markSlots(); }, 180); }
+      }
     };
-    $('#check').onclick = check;
+    const tog = (d) => {
+      if (done) return;
+      if (on.has(d)) { on.delete(d); paint(); evaluate(0); } else { on.add(d); paint(); evaluate(d); }
+    };
+    pad.onclick = (e) => { const b = e.target.closest('button'); if (b) tog(Number(b.dataset.d)); };
     $('#skip').onclick = () => {
+      if (done) return;
       if (state.firstTry) result(false, item);
-      [1, 2, 3, 4, 5, 6].forEach((d) => { if (want.has(d) !== on.has(d)) tog(d); });
-      say(`${item.answer} is ${dotsLabel(target)}.`);
+      on.clear(); toDots(targets[ci]).forEach((d) => on.add(d)); paint(); evaluate(0);
     };
     const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
-    state.key = (e) => {
-      if (KEYS[e.key.toLowerCase()]) tog(KEYS[e.key.toLowerCase()]);
-      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); check(); }
-    };
+    state.key = (e) => { if (KEYS[e.key.toLowerCase()]) tog(KEYS[e.key.toLowerCase()]); };
   }
 
   function renderWords() {
@@ -433,74 +471,61 @@ function quizMode(mode, q) {
     let word = pick(ws.list);
     if (state.last === word) word = pick(ws.list);
     state.last = word; state.firstTry = true;
+    stage.classList.remove('glow-good', 'glow-bad');
     const cells = toCells(translate(word, 'en', ws.grade));
-    let shown = 0;
+    let shown = 0, done = false;
     stage.innerHTML = `
-      <div class="stage-top" id="top">Decode this word</div>
-      <div class="prompt-cells ${cells.length > 6 ? 'many' : ''}" id="wcells">${cells.map((c) => `<span class="bw">${cellHTML(c.cell)}<span class="lbl"></span></span>`).join('')}</div>
-      <input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="type it">
-      <div class="row"><button class="btn primary" id="check">Check</button><button class="btn ghost" id="hint">Hint</button><button class="btn ghost" id="skip">Skip</button></div>`;
+      <div class="prompt-cells words ${cells.length > 6 ? 'many' : ''}" id="wcells">${cells.map((c) => `<span class="bw">${cellHTML(c.cell)}<span class="lbl"></span></span>`).join('')}</div>
+      <input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Type the word">
+      <div class="row"><button class="btn ghost" id="hint">Hint</button><button class="btn ghost" id="skip">Skip</button></div>`;
     const ans = $('#ans');
     if (matchMedia('(pointer: fine)').matches) ans.focus();
     const lbls = $$('#wcells .lbl');
     const reveal = (n) => cells.slice(0, n).forEach((c, i) => { lbls[i].textContent = c.idx === 0 ? c.print || '·' : ''; });
-    const check = () => {
-      const ok = ans.value.trim().toLowerCase() === word;
-      result(ok, {});
-      if (ok) { say('Yes!', 'good'); reveal(cells.length); setTimeout(next, 900); } else say('Not quite — try a hint.', 'bad');
+    ans.oninput = () => {
+      if (done) return;
+      if (ans.value.trim().toLowerCase() === word) { done = true; result(true, {}); glow(true); reveal(cells.length); setTimeout(next, 900); }
     };
-    $('#check').onclick = check;
-    ans.onkeydown = (e) => { if (e.key === 'Enter') check(); };
+    ans.onkeydown = (e) => { if (e.key === 'Enter' && !done && ans.value.trim()) { result(false, {}); glow(false); } };
     $('#hint').onclick = () => { state.firstTry = false; shown = Math.min(cells.length, shown + 1); reveal(shown); };
-    $('#skip').onclick = () => { reveal(cells.length); say(`It was “${word}”.`); setTimeout(next, 1400); };
+    $('#skip').onclick = () => { done = true; reveal(cells.length); ans.value = word; setTimeout(next, 1300); };
     state.key = null;
   }
-  function next() { ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
+  let dead = false;
+  function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
   const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; state.key && state.key(e); };
-  const onSet = (e) => { if (e.detail === 'mastery') { Object.keys(m).forEach((k) => delete m[k]); renderMastery(); } };
+  const onSet = (e) => {
+    if (e.detail === 'mastery') { Object.keys(m).forEach((k) => delete m[k]); renderMastery(); }
+    if (e.detail === 'dotNums') { const pad = $('#pad'); if (pad) pad.classList.toggle('nums', S.dotNums); }
+  };
   document.addEventListener('keydown', onKey);
   window.addEventListener('settings', onSet);
-  renderMastery(); next();
-  return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('settings', onSet); };
+  renderPicker(); renderMastery(); next();
+  return () => { dead = true; document.removeEventListener('keydown', onKey); window.removeEventListener('settings', onSet); };
 }
 
 // ---------- sweep ----------
-let audioCtx = null;
-function tick(row, when = 0) {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const t = audioCtx.currentTime + when;
-    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    o.type = 'sine'; o.frequency.value = [880, 660, 495][row];
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
-    o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 0.07);
-  } catch {}
-}
-
 function sweepMode(q) {
   let src = q.get('src') || store.get('swSrc', 'words');
   if (!SWEEP_SRC[src]) src = 'words';
-  let custom = store.get('swCustom', 'Welcome to Ontario');
-  $('#subHead').innerHTML = `<div id="srcDD"></div>
+  let custom = store.get('swCustom', 'Welcome to Canada');
+  $('#picker').innerHTML = `<div id="srcDD"></div>
     <div class="icon-row">
       <button class="icon-btn" id="editBtn" aria-label="Edit text">${icon('edit')}</button>
       <button class="icon-btn" id="shuffleBtn" aria-label="New line">${icon('shuffle')}</button>
       <button class="icon-btn" id="restart" aria-label="Start over">${icon('restart')}</button>
-      <button class="icon-btn accent" id="glide" aria-label="Auto-glide">${icon('play')}</button>
     </div>`;
   $('#modeBody').innerHTML = `
     <div class="sweep-box" id="box" tabindex="0" aria-label="Braille line. Arrow keys move cell by cell.">
       <div class="edge left"></div><div class="edge right"></div>
       <div class="sweep-track" id="track"></div>
       <div class="reader" id="reader"></div>
-      <div class="loupe" id="loupe"></div>
       <div class="finger" id="finger"></div>
-      <div class="word-reveal" id="wordReveal"></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>`;
-  const box = $('#box'), track = $('#track'), loupe = $('#loupe'), finger = $('#finger'), reader = $('#reader');
+  const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
   let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
-  let lastKey = '', curIdx = -1, glideOn = false, raf = 0, edgeRaf = 0, active = false;
+  let lastKey = '', curIdx = -1, raf = 0, edgeRaf = 0, active = false;
 
   const textFor = () => {
     if (src === 'alphabet') return 'abcdefghijklmnopqrstuvwxyz'.split('').join(' ');
@@ -520,7 +545,6 @@ function sweepMode(q) {
     $('#swText').focus();
     $('#swLoad').onclick = () => { custom = $('#swText').value.trim() || custom; store.set('swCustom', custom); text = custom; closeSheet(); build(); };
   }
-
   function build() {
     const grade = src === 'signs' ? 2 : S.swGrade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
@@ -535,49 +559,33 @@ function sweepMode(q) {
     totalW = track.scrollWidth; W = box.clientWidth;
   }
   const startOffset = () => Math.round(W * 0.16);
-  function reset() { offset = startOffset(); headX = Math.round(W * 0.1); lastKey = ''; curIdx = -1; $('#wordReveal').textContent = ''; update(false); }
+  function reset() { offset = startOffset(); headX = Math.round(W * 0.1); lastKey = ''; curIdx = -1; update(false); }
   const clamp = () => { offset = Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), offset)); };
-  const wordAround = (i) => { let a = i, b = i; while (a > 0 && cells[a - 1].kind !== 'space') a--; while (b < cells.length - 1 && cells[b + 1].kind !== 'space') b++; return [a, b]; };
-  const speak = (t) => { if (!S.swSpeak || !canSpeak || !t) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate = 1.1; u.lang = 'en-CA'; speechSynthesis.speak(u); } catch {} };
 
   function update(feedback = true) {
     clamp();
     track.style.transform = `translateX(${offset}px)`;
     reader.style.left = headX + 'px'; finger.style.left = headX + 'px';
-    loupe.style.left = Math.max(80, Math.min(W - 80, headX)) + 'px';
-    box.classList.toggle('active', active || glideOn);
+    box.classList.toggle('active', active);
     const pos = headX - offset;
     let idx = -1;
     for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
     $$('.sc', track).forEach((el, i) => el.classList.toggle('passed', lefts[i] + widths[i] < pos));
     if (idx !== curIdx) {
       $$('.sc.cur', track).forEach((e) => e.classList.remove('cur'));
-      if (idx >= 0 && cells[idx].kind !== 'space') {
-        track.children[idx].classList.add('cur');
-        if (feedback && cells[idx].idx === 0 && cells[idx].kind !== 'indicator') speak(cells[idx].print);
-      }
-      const finished = curIdx >= 0 && cells[curIdx].kind !== 'space' && ((idx > curIdx && (!cells[idx] || cells[idx].kind === 'space')) || (idx === -1 && pos > totalW));
-      if (finished) { const [a, b] = wordAround(curIdx); $('#wordReveal').textContent = cells.slice(a, b + 1).map((c) => (c.idx === 0 ? c.print : '')).join(''); }
-      if (idx !== -1 || pos > totalW) curIdx = idx;
+      if (idx >= 0 && cells[idx].kind !== 'space') track.children[idx].classList.add('cur');
+      curIdx = idx;
     }
     const c = cells[idx];
-    if (c && c.kind !== 'space') {
-      loupe.style.display = '';
-      const g = c.group;
-      const kind = c.kind === 'indicator' ? (c.note || 'indicator') : c.kind === 'contraction' ? (g.note === 'groupsign' ? 'groupsign' : 'contraction') : c.kind === 'digit' ? 'digit' : c.kind === 'punct' ? (c.note || 'punctuation') : dotsLabel(c.cell);
-      loupe.innerHTML = `${cellHTML(c.cell, 'numbered')}<div class="lp"><b>${esc(g.print || '·')}</b><span>${esc(kind)}${c.span > 1 ? ` · ${c.idx + 1}/${c.span}` : ''}</span></div>`;
-      loupe.classList.toggle('hidden-print', S.swLabels !== 'show');
-      if (feedback) {
-        const col = (pos - lefts[idx]) / widths[idx] < 0.5 ? 0 : 1;
-        const key = idx + ':' + col;
-        if (key !== lastKey) {
-          lastKey = key;
-          const dots = toDots(c.cell).filter((d) => (col === 0 ? d <= 3 : d >= 4 && d <= 6));
-          if (S.swSound) dots.forEach((d, k) => tick((d - 1) % 3, k * 0.025));
-          if (S.swVibe && canVibrate && dots.length) { const pat = []; dots.forEach(() => pat.push(14, 18)); try { navigator.vibrate(pat); } catch {} }
-        }
+    if (feedback && c && c.kind !== 'space' && S.swVibe && canVibrate) {
+      const col = (pos - lefts[idx]) / widths[idx] < 0.5 ? 0 : 1;
+      const key = idx + ':' + col;
+      if (key !== lastKey) {
+        lastKey = key;
+        const dots = toDots(c.cell).filter((d) => (col === 0 ? d <= 3 : d >= 4 && d <= 6));
+        if (dots.length) { const pat = []; dots.forEach(() => pat.push(14, 18)); try { navigator.vibrate(pat); } catch {} }
       }
-    } else { loupe.style.display = 'none'; if (!c) lastKey = ''; }
+    }
   }
   const EDGE = () => Math.min(90, W * 0.18);
   function edgeLoop() {
@@ -595,11 +603,10 @@ function sweepMode(q) {
     edgeRaf = requestAnimationFrame(step);
   }
   const boxX = (e) => e.clientX - box.getBoundingClientRect().left;
-  box.addEventListener('pointerdown', (e) => { stopGlide(); active = true; box.setPointerCapture(e.pointerId); headX = boxX(e); $('#hint').style.opacity = 0; update(); edgeLoop(); });
+  box.addEventListener('pointerdown', (e) => { active = true; box.setPointerCapture(e.pointerId); headX = boxX(e); $('#hint').style.opacity = 0; update(); edgeLoop(); });
   box.addEventListener('pointermove', (e) => {
     const touchLike = e.pointerType !== 'mouse';
     if (touchLike && !box.hasPointerCapture(e.pointerId)) return;
-    if (!touchLike && glideOn) return;
     if (!active && !touchLike) { active = true; edgeLoop(); $('#hint').style.opacity = 0; }
     headX = Math.max(0, Math.min(W, boxX(e))); update();
   });
@@ -607,47 +614,29 @@ function sweepMode(q) {
   box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end); box.addEventListener('pointerleave', end);
   box.addEventListener('wheel', (e) => { e.preventDefault(); offset -= (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * 0.6; update(false); }, { passive: false });
   box.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      const dir = e.key === 'ArrowRight' ? 1 : -1;
-      let i = Math.max(0, curIdx) + dir;
-      while (cells[i] && cells[i].kind === 'space') i += dir;
-      if (cells[i]) animateTo(headX - (lefts[i] + widths[i] * 0.3));
-    } else if (e.key === ' ') { e.preventDefault(); glideOn ? stopGlide() : startGlide(); }
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    let i = Math.max(0, curIdx) + dir;
+    while (cells[i] && cells[i].kind === 'space') i += dir;
+    if (cells[i]) animateTo(headX - (lefts[i] + widths[i] * 0.3));
   });
   function animateTo(target) {
-    stopGlide();
     const start = offset, t0 = performance.now();
     const step = (t) => { const k = Math.min(1, (t - t0) / 420); offset = start + (target - start) * (1 - Math.pow(1 - k, 3)); update(); if (k < 1) raf = requestAnimationFrame(step); };
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
   }
-  function startGlide() {
-    glideOn = true; $('#glide').innerHTML = icon('pause');
-    if (headX < W * 0.2 || headX > W * 0.8) headX = Math.round(W * 0.35);
-    $('#hint').style.opacity = 0;
-    let prev = performance.now();
-    const step = (t) => {
-      if (!glideOn) return;
-      const pitch = widths[0] ? widths[0] * 1.4 : 60;
-      offset -= ((t - prev) / 1000) * pitch * S.swSpeed; prev = t; update();
-      if (headX - offset > totalW + 10) { stopGlide(); return; }
-      raf = requestAnimationFrame(step);
-    };
-    cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
-  }
-  function stopGlide() { glideOn = false; const g = $('#glide'); if (g) g.innerHTML = icon('play'); }
-  $('#glide').onclick = () => (glideOn ? stopGlide() : startGlide());
-  $('#restart').onclick = () => { stopGlide(); headX = Math.round(W * 0.1); animateTo(startOffset()); $('#wordReveal').textContent = ''; };
+  $('#restart').onclick = () => { headX = Math.round(W * 0.1); animateTo(startOffset()); };
   $('#shuffleBtn').onclick = () => { text = textFor(); build(); };
   $('#editBtn').onclick = editText;
   const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
-  const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); else update(false); };
+  const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); };
   window.addEventListener('resize', onResize); window.addEventListener('settings', onSet);
   syncHead(); build();
-  return () => { stopGlide(); active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); try { speechSynthesis.cancel(); } catch {} };
+  return () => { active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); };
 }
 
-// ---------- signs (inside reference) ----------
+// ---------- signs ----------
 const SIGN_ICONS = {
   people: '<svg width="34" height="28" viewBox="0 0 30 24" fill="currentColor"><circle cx="8" cy="4.5" r="2.2"/><path d="M5.5 8h5l1 7h-2l-.4 7H7l-.4-7H4.5z"/><circle cx="22" cy="4.5" r="2.2"/><path d="M19.5 8h5l2.5 9h-3l-.3 5h-3l-.3-5h-3z"/></svg>',
   person: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="4.5" r="2.3"/><path d="M9 8h6l1 7h-2l-.5 7h-3L10 15H8z"/></svg>',
@@ -661,13 +650,13 @@ const SIGN_ICONS = {
 function signIcon(w) {
   w = w.toLowerCase();
   if (/wash|toilet|restroom/.test(w)) return SIGN_ICONS.people;
-  if (/^men|women/.test(w)) return SIGN_ICONS.person;
+  if (/^men|women|hommes|femmes/.test(w)) return SIGN_ICONS.person;
   if (/exit|sortie|way out/.test(w)) return SIGN_ICONS.exit;
-  if (/stair/.test(w)) return SIGN_ICONS.stairs;
+  if (/stair|escalier/.test(w)) return SIGN_ICONS.stairs;
   if (/elev|lift|ascen|main floor/.test(w)) return SIGN_ICONS.elevator;
-  if (/info/.test(w)) return SIGN_ICONS.info;
+  if (/info|accueil/.test(w)) return SIGN_ICONS.info;
   if (/fire|alarm/.test(w)) return SIGN_ICONS.fire;
-  if (/room|office|platform/.test(w)) return SIGN_ICONS.door;
+  if (/room|office|platform|salle|entr/.test(w)) return SIGN_ICONS.door;
   return '';
 }
 function plateHTML(print, lang = 'en', grade = 2, extra = null, cls = '') {
@@ -679,41 +668,40 @@ function plateHTML(print, lang = 'en', grade = 2, extra = null, cls = '') {
     ${extra ? lineHTML(translate(extra[0], extra[1], 1)) : ''}
   </button>`;
 }
+const textList = (pairs) => `<div class="prose-list">${pairs.map(([t, p]) => `<h4>${esc(t)}</h4><p>${esc(p)}</p>`).join('')}</div>`;
+function kanaTable() {
+  return JAPANESE.rows.map(([n, r]) => `<div class="group-title"><h3>${n}</h3></div><div class="sym-grid">${r.map(([p, c]) => `<div class="sym"><span class="cells">${cellHTML(c)}</span><b>${p}</b></div>`).join('')}</div>`).join('');
+}
 function signsSection(regionKey) {
-  const region = SIGN_REGIONS[regionKey] ? regionKey : store.get('signRegion', 'ca');
+  const region = SIGN_REGIONS[regionKey] ? regionKey : (SIGN_REGIONS[store.get('signRegion')] ? store.get('signRegion') : 'ca');
   store.set('signRegion', region);
   const R = SIGN_REGIONS[region];
-  const elevator = region === 'ca' || region === 'us';
+  const lang = R.signLang || 'en';
+  const grade = R.signLang ? 1 : 2;
   const parts = [];
-  if (region === 'jp') parts.push(['sg-kana', 'Kana braille', `<p class="muted">${esc(JAPANESE.blurb)}</p>${JAPANESE.rows.map(([n, r]) => `<div class="group-title"><h3>${n}</h3></div><div class="sym-grid">${r.map(([p, c]) => `<div class="sym"><span class="cells">${cellHTML(c)}</span><b>${p}</b></div>`).join('')}</div>`).join('')}`]);
-  else parts.push(['sg-read', 'Read these signs', `<div class="sign-gallery">${R.signs.map((s) => plateHTML(s, R.signLang || 'en', R.signLang ? 1 : 2)).join('')}${(R.bilingual || []).map(([en, fr]) => plateHTML(en, 'en', 2, [fr, 'fr'], 'light')).join('')}</div><p class="muted small">Tap a sign to see what each cell means.${R.signLang ? ' Shown in uncontracted French braille.' : ' Shown in UEB Grade 2, the way new signs are made.'}</p>`]);
-  parts.push(['sg-how', 'How it works here', `<div class="facts">${R.facts.map(([t, p]) => `<div class="fact"><b>${esc(t)}</b><p>${esc(p)}</p></div>`).join('')}</div>`]);
-  if (region !== 'jp') parts.push(['sg-anatomy', 'Anatomy of a room sign', `<div class="anatomy">${plateHTML('Room 101', 'en', 2)}<ol>
+  if (region === 'jp') parts.push(['sg-kana', 'Kana braille', `<p class="lead-p">${esc(JAPANESE.blurb)}</p>${kanaTable()}`]);
+  else parts.push(['sg-read', 'Read these signs', `<div class="sign-gallery">${R.signs.map((s) => plateHTML(s, lang, grade)).join('')}${(R.bilingual || []).map(([en, fr]) => plateHTML(en, 'en', 2, [fr, 'fr'], 'light')).join('')}</div><p class="muted small">Tap a sign to see what each cell means. ${esc(R.note || 'Shown in UEB Grade 2, the way new signs are made.')}</p>`]);
+  parts.push(['sg-how', 'How it works here', textList(R.facts)]);
+  if (R.room) parts.push(['sg-anatomy', 'Anatomy of a room sign', `<div class="anatomy">${plateHTML(R.room, lang, grade)}<ol>
       <li>Raised capitals or a pictogram you can feel.</li>
       <li>Braille directly <b>below</b>, starting at the left.</li>
-      <li>${cellHTML(IND.capital, 'sm')} capital sign, then the word — often contracted.</li>
-      <li>${cellHTML(IND.number, 'sm')} number sign before the digits.</li>
+      <li>A capital sign, then the word${grade === 2 ? ' — often contracted' : ''}.</li>
+      <li>A number sign before the digits.</li>
       <li>Mounted on the handle side of the door, at about shoulder height.</li></ol></div>`]);
-  if (elevator) parts.push(['sg-elevator', 'Elevator buttons', `<div class="elev-wrap"><div class="elevator">
+  if (R.elevator) parts.push(['sg-elevator', 'Elevator buttons', `<div class="elev-wrap"><div class="elevator">
       ${[['★', 'main'], ['3', '3'], ['2', '2'], ['1', '1'], ['◁▷', 'open'], ['▷◁', 'close'], ['bell', 'alarm']].map(([face, word]) => {
         const cs = unicodeOf(translate(word, 'en', 2)).replace(/ /g, '⠀');
         return `<span class="eb">${[...cs].map((c) => cellHTML(c)).join('')}</span><span class="ebtn">${face === 'bell' ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z"/></svg>' : face}</span>`;
       }).join('')}
     </div><div class="elev-text">
-      <p>Braille sits to the <b>left</b> of each button. Floors use the number sign: ${cellHTML(IND.number, 'sm')}${cellHTML(LETTERS.b, 'sm')} = 2.</p>
+      <p>Braille sits beside each button, usually on the left. Floors use the number sign: ${cellHTML(IND.number, 'sm')}${cellHTML(LETTERS.b, 'sm')} = 2.</p>
       <p>★ is the main floor, spelled <b>main</b>: ${cellsHTML(unicodeOf(translate('main', 'en', 2)), 'sm')} (m-a-<span class="acc">in</span>).</p>
       <p>“Open” is ${cellsHTML(unicodeOf(translate('open', 'en', 2)), 'sm')} (o-p-<span class="acc">en</span>); “alarm” uses <span class="acc">ar</span>: ${cellsHTML(unicodeOf(translate('alarm', 'en', 2)), 'sm')}.</p>
       <p class="muted small">Outside, the same numbers are on both sides of the door frame.</p></div></div>`]);
-  if (region === 'ca') {
-    parts.push(['sg-money', 'Feel your money', `<p class="muted">Canadian notes carry raised cell-shaped clusters in the top corner. Count them:</p><div class="money">${[5, 10, 20, 50, 100].map((v, i) => `<div class="note"><span>${cellHTML(fromDots('123456'), 'sm').repeat(i + 1)}</span><b>$${v}</b></div>`).join('')}</div>`]);
-    parts.push(['sg-tips', 'Field tips for Ontario', `<div class="facts">
-      <div class="fact"><b>Start with numbers</b><p>Room numbers and elevator floors are the easiest wins — the number sign plus a–j.</p></div>
-      <div class="fact"><b>Expect contractions</b><p>Learn sh, en, ar, in, st and “the” early: washroom, men, women, alarm, main, stairs.</p></div>
-      <div class="fact"><b>Missing capitals</b><p>Older (EBAE) signs often leave out the capital sign.</p></div>
-      <div class="fact"><b>Keep moving</b><p>Use the pad of your finger with light pressure. Stopping makes dots harder to feel.</p></div></div>`]);
-  }
+  if (R.money) parts.push(['sg-money', 'Feel your money', `<p>Canadian notes carry raised cell-shaped clusters in the top corner. Count them:</p><div class="money">${[5, 10, 20, 50, 100].map((v, i) => `<div class="note"><span>${cellHTML(fromDots('123456'), 'sm').repeat(i + 1)}</span><b>$${v}</b></div>`).join('')}</div>`]);
+  if (R.tips) parts.push(['sg-tips', 'Field tips', textList(R.tips)]);
   return {
-    html: `<div class="sub-head"><div id="regionDD"></div><div id="jumpDD"></div></div>
+    html: `<div class="picker"><div id="regionDD"></div><div id="jumpDD"></div></div>
       ${parts.map(([id, t, h]) => `<div class="sg" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join('')}`,
     bind: () => {
       dropdown($('#regionDD'), { label: 'Region', options: Object.entries(SIGN_REGIONS).map(([k, r]) => ({ value: k, label: r.name })), value: region, onChange: (v) => { location.hash = '#/reference/signs/' + v; } });
@@ -723,9 +711,54 @@ function signsSection(regionKey) {
   };
 }
 
+
+// ---------- grade 2: compact tables ----------
+const SHORT_SPELL = {
+  about: 'ab', above: 'abv', according: 'ac', across: 'acr', after: 'af', afternoon: 'afn', afterward: 'afw', again: 'ag',
+  against: 'ag-st', almost: 'alm', already: 'alr', also: 'al', although: 'al-th', altogether: 'alt', always: 'alw',
+  because: 'be-c', before: 'be-f', behind: 'be-h', below: 'be-l', beneath: 'be-n', beside: 'be-s', between: 'be-t', beyond: 'be-y',
+  blind: 'bl', braille: 'brl', children: 'ch-n', conceive: 'con-cv', conceiving: 'con-cvg', could: 'cd', deceive: 'dcv',
+  deceiving: 'dcvg', declare: 'dcl', declaring: 'dclg', either: 'ei', first: 'f-st', friend: 'fr', good: 'gd', great: 'grt',
+  herself: 'h-er-f', him: 'hm', himself: 'hmf', immediate: 'imm', its: 'xs', itself: 'xf', letter: 'lr', little: 'll',
+  much: 'm-ch', must: 'm-st', myself: 'myf', necessary: 'nec', neither: 'nei', oneself: 'one-f', ourselves: 'ou-rvs',
+  paid: 'pd', perceive: 'p-er-cv', perceiving: 'p-er-cvg', perhaps: 'p-er-h', quick: 'qk', receive: 'rcv', receiving: 'rcvg',
+  rejoice: 'rjc', rejoicing: 'rjcg', said: 'sd', should: 'sh-d', such: 's-ch', themselves: 'the-mvs', thyself: 'th-yf',
+  today: 'td', together: 'tgr', tomorrow: 'tm', tonight: 'tn', would: 'wd', your: 'yr', yourself: 'yrf', yourselves: 'yrvs',
+};
+const G2_EXAMPLE = {
+  ch: 'chip', gh: 'laugh', sh: 'shy', th: 'myth', wh: 'whip', ed: 'edit', er: 'verb', ou: 'loud', ow: 'owl', st: 'stop',
+  ar: 'park', ing: 'sing', and: 'sand', for: 'form', of: 'often', the: 'other', with: 'without',
+  ound: 'pound', ance: 'dance', sion: 'mansion', less: 'useless', ount: 'mount', ence: 'fence', ong: 'song', ful: 'joyful',
+  tion: 'nation', ness: 'madness', ment: 'moment', ity: 'city',
+};
+const G2_START = ['and', 'for', 'of', 'the', 'with', 'but', 'can', 'do', 'it', 'that', 'you', 'ing', 'st', 'sh', 'th', 'ch', 'er', 'ed'];
+function grade2Section() {
+  const cats = Object.entries(CONTRACTIONS);
+  const row = (e, i) => {
+    const note = e.cat === 'Shortforms' ? (SHORT_SPELL[e.print] || '') : (e.note || (G2_EXAMPLE[e.print] ? 'e.g. ' + G2_EXAMPLE[e.print] : ''));
+    return `<button class="crow" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c)).join('')}</span><b>${esc(e.print)}</b><span class="cdots">${[...e.cells].map((c) => toDots(c).join('')).join(' ')}</span><span class="cnote">${esc(note)}</span></button>`;
+  };
+  const sample = 'The children went to the park with their father.';
+  const g1 = unicodeOf(translate(sample, 'en', 1)).replace(/ /g, '').length;
+  const g2 = unicodeOf(translate(sample, 'en', 2)).replace(/ /g, '').length;
+  const html = `
+    <p class="lead-p">Grade 2 uses about 180 contractions to make braille shorter. Most books and public signs in Canada use it. Many cells mean different things alone versus inside a word, so each table notes where a sign may go.</p>
+    <div class="picker"><div id="g2Jump"></div></div>
+    <div class="g2-compare">
+      <div><small>Grade 1 · ${g1} cells</small>${lineHTML(translate(sample, 'en', 1), { labels: false, cls: 'sm' })}</div>
+      <div><small>Grade 2 · ${g2} cells</small>${lineHTML(translate(sample, 'en', 2), { cls: 'sm' })}</div>
+    </div>
+    <h3 class="sg-h">Start with these</h3>
+    <p class="muted small">The most frequent signs. Learn a few at a time, then practise them in Practice → Contractions.</p>
+    <div class="sym-grid compact">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return symHTML(DICT[i], i); }).join('')}</div>
+    ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}</h3><span>${CONTRACTIONS[cat].items.length} · ${esc(blurb)}</span></div>
+      <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}`;
+  return { html, bind: () => dropdown($('#g2Jump'), { label: 'Jump to', options: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })), value: null, onChange: (v) => document.getElementById(v).scrollIntoView({ behavior: 'smooth', block: 'start' }) }) };
+}
+
 // ---------- reference ----------
 const REF_SECTIONS = [
-  ['alphabet', 'Alphabet'], ['numbers', 'Numbers & symbols'], ['grade2', 'Grade 2 contractions'], ['signs', 'Signs in the wild'],
+  ['alphabet', 'Alphabet'], ['numbers', 'Numbers & symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
   ['science', 'Maths & science'], ['languages', 'Languages'], ['systems', 'World systems'], ['history', 'History'],
 ];
 function alphabetSection() {
@@ -739,38 +772,62 @@ function alphabetSection() {
     <div id="alphaWrap">${ROWS.map(([range, title, letters, added, blurb]) => `
       <div class="decade"><div class="decade-head"><h3>${range} · ${title}</h3><span>${blurb}</span></div>
       <div class="alpha">${letters.split('').map((l) => `<button class="letter" data-l="${l}">${cellHTML(LETTERS[l], '', { added })}<b>${l}</b></button>`).join('')}</div></div>`).join('')}</div>
-    <div class="card cell-anatomy">${cellHTML(fromDots('123456'), 'numbered')}<div><h3>How a cell works</h3><p class="muted">Dots 1-2-3 run down the left, 4-5-6 down the right. A real cell is about 6 mm tall — one fingertip. You read by gliding, not pressing.</p></div></div>`;
+    <div class="cell-anatomy">${cellHTML(fromDots('123456'), 'numbered')}<div><h3>How a cell works</h3><p class="muted">Dots 1-2-3 run down the left, 4-5-6 down the right. A real cell is about 6 mm tall — one fingertip. You read by gliding, not pressing.</p></div></div>`;
 }
+// Full character table for a language, shown in a modal from World systems or Languages.
+function charsTable(k) {
+  if (k === 'ja') return `<p class="muted">${esc(JAPANESE.blurb)}</p>${kanaTable()}`;
+  const info = LANG_INFO[k];
+  return `<p class="muted">${esc(info.blurb)}</p>
+    <div class="group-title"><h3>Letters</h3></div>
+    <div class="sym-grid">${[...info.letters].map((l) => `<div class="sym"><span class="cells">${[...translate(l, k, 1)[0].cells].map((c) => cellHTML(c)).join('')}</span><b>${l}</b></div>`).join('')}</div>
+    <div class="group-title"><h3>Digits</h3></div>
+    <div class="sym-grid">${'1234567890'.split('').map((d) => `<div class="sym"><span class="cells">${[...unicodeOf(translate(d, k, 1))].map((c) => cellHTML(c)).join('')}</span><b>${d}</b></div>`).join('')}</div>`;
+}
+const LANG_NAMES = () => ({ ...Object.fromEntries(Object.keys(LANG_INFO).map((k) => [k, k === 'en' ? 'English (UEB)' : LANGS[k].name])), ja: '日本語 Japanese' });
 function languagesSection() {
-  return { html: '<div class="sub-head"><div id="langDD"></div></div><div id="langBody"></div>', bind: () => {
+  return { html: '<div class="picker"><div id="langDD"></div></div><div id="langBody"></div>', bind: () => {
     const render = (k) => {
       store.set('refLang', k);
       const body = $('#langBody');
-      if (k === 'ja') { body.innerHTML = `<p class="muted">${esc(JAPANESE.blurb)}</p>${JAPANESE.rows.map(([n, r]) => `<div class="group-title"><h3>${n}</h3></div><div class="sym-grid">${r.map(([p, c]) => `<div class="sym"><span class="cells">${cellHTML(c)}</span><b>${p}</b></div>`).join('')}</div>`).join('')}`; return; }
+      if (k === 'ja') { body.innerHTML = charsTable('ja'); return; }
       const info = LANG_INFO[k];
-      body.innerHTML = `<p class="muted">${esc(info.blurb)}</p>
-        <div class="sym-grid">${[...info.letters].map((l) => `<div class="sym"><span class="cells">${[...translate(l, k, 1)[0].cells].map((c) => cellHTML(c)).join('')}</span><b>${l}</b></div>`).join('')}</div>
-        <div class="group-title"><h3>Numbers</h3></div><div class="example">${lineHTML(translate('2026', k, 1))}</div>
+      body.innerHTML = `${charsTable(k)}
         <div class="group-title"><h3>Phrases</h3><span>${k === 'en' ? 'Grade 2' : 'uncontracted'}</span></div>
         <div class="example-grid">${info.phrases.map((p) => `<a class="example" href="#/translate?lang=${k}&text=${encodeURIComponent(p)}"><div class="print">${esc(p)}</div>${lineHTML(translate(p, k, k === 'en' ? 2 : 1), { cls: 'sm' })}</a>`).join('')}</div>`;
     };
     const v = store.get('refLang', 'en');
-    dropdown($('#langDD'), { label: 'Language', options: [...Object.keys(LANG_INFO).map((k) => ({ value: k, label: k === 'en' ? 'English (UEB)' : LANGS[k].name })), { value: 'ja', label: '日本語 Japanese' }], value: v, onChange: render });
+    dropdown($('#langDD'), { label: 'Language', options: Object.entries(LANG_NAMES()).map(([value, label]) => ({ value, label })), value: v, onChange: render });
     render(v);
   } };
+}
+function systemsSection() {
+  return { html: `<p class="lead-p">The braille family: the codes you’re likely to meet, plus special-purpose and tactile cousins. Tap a row to expand it.</p>
+    ${SYSTEMS.map((g) => `<div class="group-title"><h3>${esc(g.group)}</h3></div><div class="acc-list">${g.items.map(([n, w, d, chars]) => `
+      <details class="acc-item"><summary><span><b>${esc(n)}</b><small>${esc(w)}</small></span>${icon('chevron', 20)}</summary>
+      <div class="acc-body"><p>${esc(d)}</p>${chars ? `<button class="btn small-btn" data-chars="${chars}">See all characters ${icon('right', 16)}</button>` : ''}</div></details>`).join('')}</div>`).join('')}`,
+    bind: () => { $$('[data-chars]').forEach((b) => { b.onclick = () => openSheet(charsTable(b.dataset.chars), { title: LANG_NAMES()[b.dataset.chars] }); }); },
+  };
+}
+function scienceSection() {
+  const ex = (s) => `<div class="example"><div class="print">${esc(s.print)}</div>${groupsHTML(s.g)}</div>`;
+  return { html: `<p class="lead-p">UEB uses extra indicators for technical material. Each group of cells is labelled below. In Grade 2 text a grade 1 indicator ⠰ often goes before superscript ⠔ and subscript ⠢ so they aren’t read as “in” and “en”; these examples are in Grade 1 mode.</p>
+    <div class="example-grid">${SCIENCE.map(ex).join('')}</div>
+    <div class="group-title"><h3>Nemeth Code</h3><span>still used for maths in many Canadian and US schools</span></div>
+    <div class="example-grid">${NEMETH.map(ex).join('')}</div>
+    <hr class="pale">
+    <div class="group-title"><h3>Symbols used above</h3><span>UEB</span></div>
+    <div class="sym-grid">${SCIENCE_SYMBOLS.map(([c, n]) => `<div class="sym"><span class="cells">${[...c].map((x) => cellHTML(x)).join('')}</span><b>${esc(n)}</b></div>`).join('')}</div>` };
 }
 function refSection(key, sub) {
   switch (key) {
     case 'alphabet': return { html: alphabetSection() };
     case 'numbers': return { html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${groupBlock('Numbers', 'Numbers', 'number sign ⠼ + a–j')}${groupBlock('Punctuation', 'Punctuation & symbols')}${groupBlock('Indicators', 'Indicators')}` };
-    case 'grade2': return { html: `<p class="lead-p">About 180 contractions make braille shorter. Most books and public signs in Canada use Grade 2. Many cells mean different things alone versus inside a word.</p>${Object.entries(CONTRACTIONS).map(([cat, { blurb }]) => groupBlock(cat, cat, blurb)).join('')}` };
+    case 'grade2': return grade2Section();
     case 'signs': return signsSection(sub);
-    case 'science': return { html: `<p class="lead-p">UEB uses extra indicators for technical material: superscript ⠔, subscript ⠢, and operation signs starting with dot 5. In Grade 2 text a grade 1 indicator ⠰ often goes before ⠔ and ⠢. Examples are in Grade 1 mode.</p>
-      <div class="example-grid">${SCIENCE.map((s) => `<div class="example"><div class="print">${esc(s.print)}</div><div class="braille-line">${cellsHTML(s.ueb, 'md')}</div><div class="notes">${s.notes.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>`).join('')}</div>
-      <div class="group-title"><h3>Nemeth Code</h3><span>still allowed for maths in Canada and the US</span></div>
-      <div class="example-grid">${NEMETH.map((s) => `<div class="example"><div class="print">${esc(s.print)}</div><div class="braille-line">${cellsHTML(s.cells, 'md')}</div><div class="notes">${s.notes.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>`).join('')}</div>` };
+    case 'science': return scienceSection();
     case 'languages': return languagesSection();
-    case 'systems': return { html: `<p class="lead-p">The braille family: the codes you’re likely to meet, plus special-purpose and tactile cousins. Tap one for details.</p>${SYSTEMS.map((g) => `<div class="group-title"><h3>${esc(g.group)}</h3></div><div class="table-list">${g.items.map(([n, w, d]) => `<details class="sys"><summary><b>${esc(n)}</b><span class="where">${esc(w)}</span></summary><p>${esc(d)}</p></details>`).join('')}</div>`).join('')}` };
+    case 'systems': return systemsSection();
     case 'history': return { html: `<ol class="timeline">${HISTORY.map(([y, t]) => `<li><b>${y}</b>${esc(t)}</li>`).join('')}</ol>` };
   }
   return { html: '' };
@@ -781,21 +838,18 @@ views.reference = (q, sub, sub2) => {
   store.set('refSec', key);
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
+  setHead(`<div id="secDD" class="dd-title"></div><button class="icon-btn" id="searchBtn" aria-label="Search">${icon('search')}</button>`);
+  dropdown($('#secDD'), { options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
   view.innerHTML = `
-    <div class="page-head">
-      <div id="secDD" class="dd-title"></div>
-      <button class="icon-btn" id="searchBtn" aria-label="Search">${icon('search')}</button>
-    </div>
     <div class="search-wrap" id="searchWrap" hidden><input class="search" id="q" type="search" placeholder="A word (“the”), a symbol (“?”) or dot numbers (“1456”)" autocomplete="off"></div>
     <div id="results"></div>
     <div id="secBody">${sec.html}
       <div class="pager">${i > 0 ? `<a href="#/reference/${REF_SECTIONS[i - 1][0]}">← ${REF_SECTIONS[i - 1][1]}</a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a href="#/reference/${REF_SECTIONS[i + 1][0]}">${REF_SECTIONS[i + 1][1]} →</a>` : ''}</div>
     </div>`;
-  dropdown($('#secDD'), { options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
   if (sec.bind) sec.bind();
   view.onclick = (ev) => {
-    const s = ev.target.closest('.sym[data-i]'); if (s) { openSheet(symbolDetail(DICT[Number(s.dataset.i)])); return; }
-    const l = ev.target.closest('.letter[data-l]'); if (l) openSheet(letterDetail(l.dataset.l));
+    const s = ev.target.closest('.sym[data-i], .crow[data-i]'); if (s) { openSheet(symbolDetail(DICT[Number(s.dataset.i)]), { title: 'Symbol' }); return; }
+    const l = ev.target.closest('.letter[data-l]'); if (l) openSheet(letterDetail(l.dataset.l), { title: 'Letter ' + l.dataset.l });
   };
   const results = $('#results'), body = $('#secBody');
   const doSearch = () => {
@@ -821,10 +875,10 @@ views.reference = (q, sub, sub2) => {
 views.translate = (q) => {
   const LOPTS = [['en1', 'English · Grade 1', 'English'], ['en2', 'English · Grade 2', 'English'], ['fr', 'Français', 'Other languages'], ['es', 'Español', 'Other languages'], ['de', 'Deutsch', 'Other languages'], ['ru', 'Русский', 'Other languages'], ['el', 'Ελληνικά', 'Other languages']];
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
-  const initial = q.get('text') || store.get('trText', 'Welcome to Ontario. The washroom is on floor 2.');
+  const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
+  setHead('<div id="langDD" class="dd-title"></div>');
   view.innerHTML = `
-    <div class="page-head"><h1>Translate</h1></div>
-    <div class="sub-head"><div id="langDD"></div><div id="exDD"></div></div>
+    <div class="picker"><div id="exDD"></div></div>
     <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
     <div class="card tr-out" id="trOut"></div>
     <div class="tr-tools">
@@ -842,7 +896,7 @@ views.translate = (q) => {
   };
   const exLang = () => (mode.startsWith('en') ? 'en' : mode);
   const syncDD = () => {
-    dropdown($('#langDD'), { label: 'Braille', options: LOPTS.map(([v, l, g]) => ({ value: v, label: l, group: g })), value: mode, onChange: (v) => { mode = v; render(); syncDD(); } });
+    dropdown($('#langDD'), { options: LOPTS.map(([v, l, g]) => ({ value: v, label: l, group: g })), value: mode, onChange: (v) => { mode = v; render(); syncDD(); } });
     dropdown($('#exDD'), { label: 'Examples', options: LANG_INFO[exLang()].phrases.map((p) => ({ value: p, label: p })), value: null, onChange: (v) => { inp.value = v; render(); } });
   };
   inp.oninput = render;
@@ -853,7 +907,7 @@ views.translate = (q) => {
 
 // ---------- router ----------
 let cleanup = null;
-const TITLES = { '': 'Dots — learn braille', practice: 'Practice · Dots', reference: 'Reference · Dots', translate: 'Translate · Dots' };
+const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Reference · Learn Braille', translate: 'Translate · Learn Braille' };
 function route() {
   const raw = location.hash.replace(/^#\/?/, '');
   let [path, qs] = raw.split('?');
@@ -865,10 +919,10 @@ function route() {
   const key = views[name] ? name : '';
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
   closeSheet(); closeDD();
+  document.body.dataset.page = key || 'home';
   const r = views[key](q, sub, sub2);
   cleanup = typeof r === 'function' ? r : null;
   $$('[data-route]').forEach((a) => a.classList.toggle('active', a.dataset.route === key));
-  document.body.dataset.page = key || 'home';
   window.scrollTo(0, 0);
   document.title = TITLES[key];
 }
