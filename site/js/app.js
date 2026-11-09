@@ -1,10 +1,10 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=5';
+} from './braille.js?v=6';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=5';
+} from './data.js?v=6';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -294,7 +294,7 @@ views[''] = () => {
   const row = (href, title, desc, art) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><div class="hrow-art">${art}</div></a>`;
   view.innerHTML = `
     <div class="home-head">
-      <h1>Learn Braille</h1>
+      <h1 class="wordmark" aria-label="Learn Braille"><span class="wm-l">L</span>earn <span class="wm-b">B</span>ra<span class="wm-i">ı<span class="wm-dots" aria-hidden="true"><i></i><i class="on"></i><i class="on"></i><i></i></span></span>lle</h1>
       <p class="slogan">A resource for sighted folks to learn the braille writing system.</p>
     </div>
     ${progressHTML()}
