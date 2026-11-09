@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dots — learn braille</title>
+  <meta name="description" content="Learn to read braille: the alphabet, practice, a finger-sweep trainer, a full reference and real-world signage.">
+  <meta name="theme-color" content="#f4f0e8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171513" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 48'%3E%3Crect width='32' height='48' rx='8' fill='%231d1a17'/%3E%3Ccircle cx='10' cy='12' r='4.5' fill='%23f4f0e8'/%3E%3Ccircle cx='22' cy='24' r='4.5' fill='%23f4f0e8'/%3E%3Ccircle cx='10' cy='24' r='4.5' fill='%23f4f0e8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/" aria-label="Dots home">
+      <span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      Dots
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#/" data-route="">Alphabet</a>
+      <a href="#/practice" data-route="practice">Practice</a>
+      <a href="#/sweep" data-route="sweep">Sweep</a>
+      <a href="#/signs" data-route="signs">Signs</a>
+      <a href="#/reference" data-route="reference">Reference</a>
+      <a href="#/translate" data-route="translate">Translate</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle dark mode" title="Light / dark">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg>
+    </button>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <nav class="tabbar" aria-label="Main">
+    <a href="#/" data-route=""><span class="ti">⠁</span>Alphabet</a>
+    <a href="#/practice" data-route="practice"><span class="ti">⠏</span>Practice</a>
+    <a href="#/sweep" data-route="sweep"><span class="ti">⠎</span>Sweep</a>
+    <a href="#/signs" data-route="signs"><span class="ti">⠎</span>Signs</a>
+    <a href="#/reference" data-route="reference"><span class="ti">⠗</span>Reference</a>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
