@@ -762,3 +762,56 @@ body.s-sw-real .sweep-track .sc .lbl { font-size: .875rem; }
 .wm-dots { position: absolute; left: 50%; top: .1em; transform: translateX(-50%); display: grid; grid-template-columns: repeat(2, .12em); grid-auto-flow: column; grid-template-rows: repeat(2, .12em); gap: .035em; }
 .wm-dots i { border-radius: 50%; background: var(--lb-off); }
 .wm-dots i.on { background: var(--accent); }
+
+/* ===================== v7 ===================== */
+:root { --ctl-h: 40px; --seg-bg: color-mix(in srgb, var(--ink) 9%, var(--bg)); }
+/* consistent control heights */
+.seg { background: var(--seg-bg); height: var(--ctl-h); box-sizing: border-box; align-items: stretch; }
+.seg button { padding: 0 14px; display: inline-flex; align-items: center; }
+.seg button.on, .modes a.on { box-shadow: 0 1px 2px rgba(30, 20, 10, .14); }
+.modes { background: var(--seg-bg); }
+.dd-btn { height: var(--ctl-h); box-sizing: border-box; padding-top: 0; padding-bottom: 0; }
+.icon-row .small-btn, .btn.small-btn { height: var(--ctl-h); box-sizing: border-box; padding-top: 0; padding-bottom: 0; }
+.picker { min-height: var(--ctl-h); }
+
+/* softer, larger glow; small quick shake */
+@keyframes glowGood { 0% { box-shadow: 0 0 0 0 transparent; } 30% { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--good) 70%, transparent), 0 0 48px 8px color-mix(in srgb, var(--good) 30%, transparent); } 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--good) 55%, transparent), 0 0 36px 4px color-mix(in srgb, var(--good) 16%, transparent); } }
+@keyframes glowBad { 0% { box-shadow: 0 0 0 0 transparent; } 30% { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--bad) 70%, transparent), 0 0 48px 8px color-mix(in srgb, var(--bad) 28%, transparent); } 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--bad) 55%, transparent), 0 0 36px 4px color-mix(in srgb, var(--bad) 14%, transparent); } }
+@keyframes shakeSm { 20% { transform: translateX(-2px); } 40% { transform: translateX(2px); } 60% { transform: translateX(-1.5px); } 80% { transform: translateX(1px); } }
+.stage.glow-good { animation: glowGood .9s ease-out forwards; border-color: color-mix(in srgb, var(--good) 60%, var(--line)); }
+.stage.glow-bad { animation: glowBad .8s ease-out forwards, shakeSm .2s linear; border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
+.choice.wrong { animation: shakeSm .2s linear; }
+
+/* home rows: line icons */
+.hrow-ic { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); }
+.hrow > .ic:last-child { color: var(--muted); flex: none; }
+
+/* compact narrow tables (languages, kana, start-with) */
+.ctable.narrow { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); column-gap: 18px; margin-bottom: 8px; }
+.ctable.narrow .crow { grid-template-columns: minmax(28px, auto) minmax(0, 1fr) auto; padding: 6px 2px; }
+div.crow { cursor: default; }
+div.crow:hover { background: none; }
+.ctable.narrow .crow b { font-size: 1.05rem; }
+
+/* overview */
+.sg.prose p { max-width: 68ch; color: var(--ink-2); }
+.sg.prose p .cell { vertical-align: middle; margin: 0 2px; }
+.cell-anatomy .cell.xl { --s: 30px; }
+.cell-anatomy p { margin: 0 0 10px; }
+.ov-examples { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 8px; }
+.ov-ex { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 16px 10px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); min-width: 78px; }
+.ov-ex b { font-size: 1.3rem; font-weight: 500; }
+.ov-ex small { color: var(--muted); font-size: .78rem; }
+.timeline { margin-top: 14px; }
+
+/* prev / next */
+.pager { border-top: 0; padding-top: 0; margin-top: 40px; }
+.pager .btn { height: auto; padding: 10px 16px; border-radius: 14px; gap: 10px; text-align: left; }
+.pager .btn span { display: flex; flex-direction: column; line-height: 1.2; }
+.pager .btn small { color: var(--muted); font-size: .75rem; font-weight: 400; }
+.pager .btn.next { text-align: right; margin-left: auto; }
+.pager .btn.next span { align-items: flex-end; }
+.pager .pg-dir .ic { transform: rotate(180deg); }
+.pager .pg-dir { display: flex; }
+.seg.modes { height: auto; }
+.modes .ic { flex: none; width: 20px; height: 20px; }

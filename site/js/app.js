@@ -1,10 +1,10 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=6';
+} from './braille.js?v=7';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=6';
+} from './data.js?v=7';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -34,6 +34,14 @@ const P = {
   check: '<path d="m5 12 5 5 9-10"/>',
   arrow: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  alpha: '<path d="M3 19 8 5l5 14"/><path d="M5 14h6"/><path d="M15 11.5c.5-1 1.4-1.5 2.5-1.5 1.7 0 2.5 1 2.5 2.6V19"/><path d="M20 15.2c-.6-.5-1.5-.7-2.5-.7-1.5 0-2.7.8-2.7 2.2s1 2.3 2.4 2.3c1.3 0 2.3-.7 2.8-1.6"/>',
+  hash: '<path d="M5 9h15M4 15h15M10 3 8 21M16 3l-2 18"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  sign: '<path d="M12 3v18"/><path d="M5 6h12l3 3-3 3H5z"/><path d="M9 21h6"/>',
+  sigma: '<path d="M18 5H6l6 7-6 7h12"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+  map: '<path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.5v.5"/>',
   read: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   write: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   words: '<path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/>',
@@ -42,14 +50,14 @@ const P = {
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', dotNums: false, color: true, hideLetters: false, trLabels: true, swGrade: 1, swSize: 'large', swVibe: true };
+const DEFAULTS = { theme: 'auto', color: true, hideLetters: false, trLabels: true, swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
-  b.toggle('s-dotnums', S.dotNums); b.toggle('s-color', S.color); b.toggle('s-hide-letters', S.hideLetters);
+  b.toggle('s-color', S.color); b.toggle('s-hide-letters', S.hideLetters);
   b.toggle('s-tr-nolabels', !S.trLabels); b.toggle('s-sw-real', S.swSize === 'real');
 }
 function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
@@ -83,6 +91,11 @@ function kindOf(c) {
   return ['letter', 'digit', 'punct', 'contraction', 'indicator'].includes(c.kind) ? c.kind : '';
 }
 const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, cls, { kind })).join('');
+// Compact row: cells · label · dot numbers · note (a button when it opens a detail sheet).
+function crowHTML(cells, label, { kind = '', note = '', i = null } = {}) {
+  const tag = i == null ? 'div' : 'button';
+  return `<${tag} class="crow"${i == null ? '' : ` data-i="${i}"`}><span class="cells">${cellsK(cells, kind)}</span><b>${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span><span class="cnote">${esc(note)}</span></${tag}>`;
+}
 // Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
 function groupsHTML(spec, cls = 'md') {
   return `<div class="braille-line groups">${spec.split(' ').map((g) => {
@@ -169,7 +182,6 @@ function openSettings() {
   openSheet(`<div class="settings">
     <div class="set-group"><h3>General</h3>
       <div class="set-row"><span>Appearance</span>${radios('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div>
-      ${switchRow('dotNums', 'Show dot numbers', S.dotNums)}
       ${switchRow('color', 'Colour-code dots', S.color)}
       <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
@@ -290,8 +302,7 @@ function progressHTML() {
 }
 views[''] = () => {
   setTitle(''); setSub('');
-  const mini = (s, cls = 'sm') => `<span class="mrow">${cellsHTML(s, cls)}</span>`;
-  const row = (href, title, desc, art) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><div class="hrow-art">${art}</div></a>`;
+  const row = (href, title, desc, ic) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><span class="hrow-ic">${icon(ic, 26)}</span>${icon('right', 18)}</a>`;
   view.innerHTML = `
     <div class="home-head">
       <h1 class="wordmark" aria-label="Learn Braille"><span class="wm-l">L</span>earn <span class="wm-b">B</span>ra<span class="wm-i">ı<span class="wm-dots" aria-hidden="true"><i></i><i class="on"></i><i class="on"></i><i></i></span></span>lle</h1>
@@ -301,27 +312,27 @@ views[''] = () => {
 
     <h2 class="sec-h">${icon('practice', 28)} Practice</h2>
     <div class="hrows">
-      ${row('#/practice/read', 'Read', 'Name the letter, symbol or contraction', `<div class="art-read">${cellHTML(LETTERS.h, 'sm')}<span class="ok">h</span></div>`)}
-      ${row('#/practice/write', 'Write', 'Tap the dots that make it', `<div class="art-write">${[1, 1, 0, 0, 1, 0].map((o) => `<i class="${o ? 'on' : ''}"></i>`).join('')}</div>`)}
-      ${row('#/practice/words', 'Words', 'Decode whole words and type them', mini(unicodeOf(translate('cozy', 'en', 1)), 'xs2'))}
-      ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', `<div class="art-sweep">${mini(unicodeOf(translate('read', 'en', 1)), 'xs2')}<span class="line"></span></div>`)}
+      ${row('#/practice/read', 'Read', 'Name the letter, symbol or contraction', 'read')}
+      ${row('#/practice/write', 'Write', 'Tap the dots that make it', 'write')}
+      ${row('#/practice/words', 'Words', 'Decode whole words and type them', 'words')}
+      ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', 'sweep')}
     </div>
 
     <h2 class="sec-h">${icon('book', 28)} Reference</h2>
     <div class="hrows">
-      ${row('#/reference/alphabet', 'Alphabet', 'a–z in three simple rows', mini('⠁⠃⠉', 'xs2'))}
-      ${row('#/reference/numbers', 'Numbers & symbols', 'Digits, punctuation, capitals', mini('⠼⠃', 'xs2'))}
-      ${row('#/reference/grade2', 'Grade 2', 'All 180 contractions, like “the” and “and”', mini('⠮⠯', 'xs2'))}
-      ${row('#/reference/signs', 'Signs', 'Read real-world signage, by country', `<div class="mini-plate"><b>EXIT</b></div>`)}
-      ${row('#/reference/science', 'Maths & science', 'Equations, units and Nemeth', mini('⠐⠖', 'xs2'))}
-      ${row('#/reference/languages', 'Languages', 'French, Spanish, German, Russian, Greek, Japanese', mini('⠿⠻', 'xs2'))}
-      ${row('#/reference/systems', 'World systems', 'The braille family around the world', mini('⠺⠕', 'xs2'))}
-      ${row('#/reference/history', 'History', 'From night writing to UEB', mini('⠓⠊', 'xs2'))}
+      ${row('#/reference/overview', 'Overview', 'What braille is, how a cell works, and its history', 'info')}
+      ${row('#/reference/alphabet', 'Alphabet', 'a–z in three simple rows', 'alpha')}
+      ${row('#/reference/numbers', 'Numbers & symbols', 'Digits, punctuation, capitals', 'hash')}
+      ${row('#/reference/grade2', 'Grade 2', 'All 180 contractions, like “the” and “and”', 'layers')}
+      ${row('#/reference/signs', 'Signs', 'Read real-world signage, by country', 'sign')}
+      ${row('#/reference/science', 'Maths & science', 'Equations, units and Nemeth', 'sigma')}
+      ${row('#/reference/languages', 'Languages', 'French, Spanish, German, Russian, Greek, Japanese', 'globe')}
+      ${row('#/reference/systems', 'World systems', 'The braille family around the world', 'map')}
     </div>
 
     <h2 class="sec-h">${icon('translate', 28)} Translate</h2>
     <div class="hrows">
-      ${row('#/translate', 'Type anything', 'See it in braille: English Grade 1 or 2 and five other languages', mini(unicodeOf(translate('Hi!', 'en', 1)), 'xs2'))}
+      ${row('#/translate', 'Type anything', 'See it in braille: English Grade 1 or 2 and five other languages', 'translate')}
     </div>`;
 };
 
@@ -363,7 +374,7 @@ const SWEEP_SRC = { alphabet: 'Alphabet', words: 'Words', sentences: 'Sentences'
 const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
 const HELP = {
   read: 'A braille cell appears — pick what it says. The card glows green when you’re right and red (with a shake) when you’re not. On a keyboard, press 1–4. Your progress for each item goes from pale blue to dark blue, then green once you know it; ones you miss come up more often.',
-  write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Turn on dot numbers in Settings to see them on the pad.',
+  write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Dot 1 is top left and dot 4 top right; see Reference → Overview.',
   words: 'Decode the word and type it — it checks as you type. Hint reveals one cell at a time; Skip shows the answer.',
   sweep: 'Put your finger on the line and slide right. The cell under your finger is outlined, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “New line” loads different text and “Start over” goes back to the beginning. Grade, cell size and vibration are below the reading area.',
 };
@@ -478,7 +489,7 @@ function quizMode(mode, q) {
     stage.innerHTML = `
       <div class="target">${esc(item.answer)}</div>
       ${targets.length > 1 ? `<div class="build" id="build">${targets.map(() => '<span class="slot"></span>').join('')}</div>` : ''}
-      <div class="dotpad ${S.dotNums ? 'nums' : ''}" id="pad">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="dot ${d}">${d}</button>`).join('')}</div>
+      <div class="dotpad" id="pad">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="dot ${d}">${d}</button>`).join('')}</div>
       <button class="link-btn corner" id="skip">Show me</button>`;
     const pad = $('#pad');
     const want = () => new Set(toDots(targets[ci]));
@@ -539,7 +550,6 @@ function quizMode(mode, q) {
   const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; state.key && state.key(e); };
   const onSet = (e) => {
     if (e.detail === 'mastery') { Object.keys(m).forEach((k) => delete m[k]); renderMastery(); }
-    if (e.detail === 'dotNums') { const pad = $('#pad'); if (pad) pad.classList.toggle('nums', S.dotNums); }
   };
   document.addEventListener('keydown', onKey);
   window.addEventListener('settings', onSet);
@@ -720,7 +730,7 @@ function plateHTML(print, lang = 'en', grade = 2, extra = null, cls = '') {
 }
 const textList = (pairs) => `<div class="prose-list">${pairs.map(([t, p]) => `<h4>${esc(t)}</h4><p>${esc(p)}</p>`).join('')}</div>`;
 function kanaTable() {
-  return JAPANESE.rows.map(([n, r]) => `<div class="group-title"><h3>${n}</h3></div><div class="sym-grid">${r.map(([p, c]) => `<div class="sym"><span class="cells">${cellHTML(c)}</span><b>${p}</b></div>`).join('')}</div>`).join('');
+  return JAPANESE.rows.map(([n, r]) => `<div class="group-title"><h3>${n}</h3></div><div class="ctable narrow">${r.map(([p, c]) => crowHTML(c, p, { kind: 'letter' })).join('')}</div>`).join('');
 }
 function signsSection(regionKey) {
   const region = SIGN_REGIONS[regionKey] ? regionKey : (SIGN_REGIONS[store.get('signRegion')] ? store.get('signRegion') : 'ca');
@@ -799,7 +809,7 @@ function grade2Section() {
     </div>
     <h3 class="sg-h">Start with these</h3>
     <p class="muted small">The most frequent signs. Learn a few at a time, then practise them in Practice → Contractions.</p>
-    <div class="sym-grid compact">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return symHTML(DICT[i], i); }).join('')}</div>
+    <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: DICT[i].cat }); }).join('')}</div>
     ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}</h3><span>${CONTRACTIONS[cat].items.length} · ${esc(blurb)}</span></div>
       <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}`;
   return { html, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
@@ -807,8 +817,8 @@ function grade2Section() {
 
 // ---------- reference ----------
 const REF_SECTIONS = [
-  ['alphabet', 'Alphabet'], ['numbers', 'Numbers & symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
-  ['science', 'Maths & science'], ['languages', 'Languages'], ['systems', 'World systems'], ['history', 'History'],
+  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
+  ['science', 'Maths & science'], ['languages', 'Languages'], ['systems', 'World systems'],
 ];
 function alphabetSection() {
   const ROWS = [
@@ -821,7 +831,33 @@ function alphabetSection() {
     <div id="alphaWrap">${ROWS.map(([range, title, letters, added, blurb]) => `
       <div class="decade"><div class="decade-head"><h3>${range} · ${title}</h3><span>${blurb}</span></div>
       <div class="alpha">${letters.split('').map((l) => `<button class="letter" data-l="${l}">${cellHTML(LETTERS[l], '', { added })}<b>${l}</b></button>`).join('')}</div></div>`).join('')}</div>
-    <div class="cell-anatomy">${cellHTML(fromDots('123456'), 'numbered')}<div><h3>How a cell works</h3><p class="muted">Dots 1-2-3 run down the left, 4-5-6 down the right. A real cell is about 6 mm tall — one fingertip. You read by gliding, not pressing.</p></div></div>`;
+    <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>.</p>`;
+}
+function overviewSection() {
+  const ex = (l) => `<div class="ov-ex">${cellHTML(LETTERS[l], 'lg')}<b>${l}</b><small>${dotsLabel(LETTERS[l]).replace(/^dots? /, 'dots ')}</small></div>`;
+  const parts = [
+    ['ov-what', 'What braille is', `<p>Braille is a way of <b>writing</b> with raised dots that you read by touch. It isn’t a language: English, French, Japanese and many others each have their own braille. Blind and low-vision people use it to read books, labels, signs, music and maths, and to write with a braille device or a slate and stylus.</p>
+      <p>Every symbol is made inside a small <b>cell</b> of six possible dots. Which dots are raised tells you what the cell means.</p>`],
+    ['ov-cell', 'How a cell works', `<div class="cell-anatomy">${cellHTML(fromDots('123456'), 'numbered xl')}<div>
+      <p>The six spots are numbered <b>1-2-3</b> down the left column and <b>4-5-6</b> down the right. Every braille symbol is described by its raised dots, so “dots 1-2” means the top two on the left.</p>
+      <p>That gives 63 possible patterns plus the blank cell. A real cell is about 6 mm tall, small enough to feel all at once under one fingertip.</p></div></div>
+      <div class="ov-examples">${ex('a')}${ex('b')}${ex('c')}${ex('l')}</div>
+      <p class="muted small">a is dot 1 alone. b adds dot 2 below it, c adds dot 4 beside it, and l is the whole left column. The <a href="#/reference/alphabet">alphabet</a> builds on these ten-letter patterns.</p>`],
+    ['ov-context', 'One cell, several meanings', `<p>There are far more symbols than patterns, so context matters. ${cellHTML(LETTERS.b, 'sm')} is <b>b</b> on its own in a word, the word <b>“but”</b> when it stands alone in Grade 2, and the digit <b>2</b> after the number sign ${cellHTML(IND.number, 'sm')}. A capital sign ${cellHTML(IND.capital, 'sm')} makes the next letter uppercase.</p>
+      <p>See <a href="#/reference/numbers">Numbers &amp; symbols</a> for these signs.</p>`],
+    ['ov-grades', 'Grade 1 and Grade 2', `<p><b>Grade 1</b> spells every letter. <b>Grade 2</b> adds about 180 contractions, like ${cellHTML('⠮', 'sm')} for “the”, so text takes far less space. Most books and public signs in Canada use Grade 2. Learners usually start with Grade 1, then add contractions a few at a time.</p>
+      <p>See <a href="#/reference/grade2">Grade 2</a> for every contraction.</p>`],
+    ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Sweep</a>.</p>
+      <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. <a href="#/practice/write">Write</a> uses the same six-key idea.</p>`],
+    ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), Canadian bank notes, ATMs, transit handrails and many product labels. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
+    ['ov-history', 'History', `<p>Louis Braille was born in 1809 in Coupvray, France, and lost his sight after an accident in his father’s workshop at age three. At the Royal Institute for Blind Youth in Paris he met Charles Barbier’s 12-dot “night writing”, a military code for reading in the dark. In 1824, at 15, he simplified it into the six-dot cell that fits under one fingertip. Braille died in 1852; France made his system official two years later.</p>
+      <ol class="timeline">${HISTORY.map(([y, t]) => `<li><b>${y}</b>${esc(t)}</li>`).join('')}</ol>`],
+  ];
+  return {
+    jumps: parts.map(([id, t]) => ({ value: id, label: t })),
+    html: `<p class="lead-p">A primer for sighted learners: what braille is, how the six-dot cell works, and where it came from.</p>${parts.map(([id, t, h]) => `<div class="sg prose" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join('')}
+      <div class="row"><a class="btn primary" href="#/reference/alphabet">Learn the alphabet</a><a class="btn" href="#/practice/read">Start practising</a></div>`,
+  };
 }
 // Full character table for a language, shown in a modal from World systems or Languages.
 function charsTable(k) {
@@ -829,9 +865,9 @@ function charsTable(k) {
   const info = LANG_INFO[k];
   return `<p class="muted">${esc(info.blurb)}</p>
     <div class="group-title"><h3>Letters</h3></div>
-    <div class="sym-grid">${[...info.letters].map((l) => `<div class="sym"><span class="cells">${cellsK(translate(l, k, 1)[0].cells, 'letter')}</span><b>${l}</b></div>`).join('')}</div>
+    <div class="ctable narrow">${[...info.letters].map((l) => crowHTML(translate(l, k, 1)[0].cells, l, { kind: 'letter' })).join('')}</div>
     <div class="group-title"><h3>Digits</h3></div>
-    <div class="sym-grid">${'1234567890'.split('').map((d) => `<div class="sym"><span class="cells">${cellsK(unicodeOf(translate(d, k, 1)), 'digit')}</span><b>${d}</b></div>`).join('')}</div>`;
+    <div class="ctable narrow">${'1234567890'.split('').map((d) => crowHTML(unicodeOf(translate(d, k, 1)), d, { kind: 'digit' })).join('')}</div>`;
 }
 const LANG_NAMES = () => ({ ...Object.fromEntries(Object.keys(LANG_INFO).map((k) => [k, k === 'en' ? 'English (UEB)' : LANGS[k].name])), ja: '日本語 Japanese' });
 function languagesSection() {
@@ -877,13 +913,13 @@ function refSection(key, sub) {
     case 'science': return scienceSection();
     case 'languages': return languagesSection();
     case 'systems': return systemsSection();
-    case 'history': return { html: `<ol class="timeline">${HISTORY.map(([y, t]) => `<li><b>${y}</b>${esc(t)}</li>`).join('')}</ol>` };
+    case 'overview': return overviewSection();
   }
   return { html: '' };
 }
 
 views.reference = (q, sub, sub2) => {
-  const key = REF_SECTIONS.find(([k]) => k === sub) ? sub : store.get('refSec', 'alphabet');
+  const key = REF_SECTIONS.find(([k]) => k === sub) ? sub : store.get('refSec', 'overview');
   store.set('refSec', key);
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
@@ -892,7 +928,7 @@ views.reference = (q, sub, sub2) => {
   dropdown($('#secDD'), { options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
   if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
   view.innerHTML = `${sec.html}
-      <div class="pager">${i > 0 ? `<a href="#/reference/${REF_SECTIONS[i - 1][0]}">← ${REF_SECTIONS[i - 1][1]}</a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a href="#/reference/${REF_SECTIONS[i + 1][0]}">${REF_SECTIONS[i + 1][1]} →</a>` : ''}</div>`;
+      <div class="pager">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
   if (sec.bind) sec.bind();
   view.onclick = (ev) => {
     const s = ev.target.closest('.sym[data-i], .crow[data-i]'); if (s) { openSheet(symbolDetail(DICT[Number(s.dataset.i)]), { title: 'Symbol' }); return; }
@@ -922,7 +958,7 @@ function buildIndex() {
   }
   for (const [rk, r] of Object.entries(SIGN_REGIONS)) for (const w of r.signs) out.push({ title: w, sub: 'Sign · ' + r.name, cells: unicodeOf(translate(w, r.signLang || 'en', r.signLang ? 1 : 2)), sec: 'signs', act: nav('#/reference/signs/' + rk) });
   for (const g of SYSTEMS) for (const [n, w] of g.items) out.push({ title: n, sub: 'World system · ' + w, sec: 'systems', act: nav('#/reference/systems') });
-  for (const [y, t] of HISTORY) out.push({ title: String(y), sub: t, sec: 'history', act: nav('#/reference/history') });
+  for (const [y, t] of HISTORY) out.push({ title: String(y), sub: t, sec: 'overview', act: nav('#/reference/overview') });
   return out;
 }
 const curSec = () => (document.body.dataset.page === 'reference' ? store.get('refSec', 'alphabet') : document.body.dataset.page);
