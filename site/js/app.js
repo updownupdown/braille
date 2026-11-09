@@ -1,10 +1,10 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=4';
+} from './braille.js?v=5';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=4';
+} from './data.js?v=5';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -34,18 +34,22 @@ const P = {
   check: '<path d="m5 12 5 5 9-10"/>',
   arrow: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  read: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  write: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  words: '<path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/>',
+  sweep: '<circle cx="5" cy="8" r="1.6" fill="currentColor"/><circle cx="10" cy="8" r="1.6" fill="currentColor"/><circle cx="15" cy="8" r="1.6" fill="currentColor"/><path d="M3 16h15"/><path d="m15 13 3 3-3 3"/>',
 };
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', dotNums: false, hideLetters: false, trLabels: true, swGrade: 1, swSize: 'large', swVibe: true };
+const DEFAULTS = { theme: 'auto', dotNums: false, color: true, hideLetters: false, trLabels: true, swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
-  b.toggle('s-dotnums', S.dotNums); b.toggle('s-hide-letters', S.hideLetters);
+  b.toggle('s-dotnums', S.dotNums); b.toggle('s-color', S.color); b.toggle('s-hide-letters', S.hideLetters);
   b.toggle('s-tr-nolabels', !S.trLabels); b.toggle('s-sw-real', S.swSize === 'real');
 }
 function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
@@ -58,7 +62,7 @@ function cellHTML(cell, cls = '', opts = {}) {
     const added = opts.added && opts.added.includes(d) && on.has(d) ? ' added' : '';
     dots += `<i class="${on.has(d) ? 'on' : ''}${added}" data-n="${d}"></i>`;
   }
-  return `<span class="cell ${cls}" role="img" aria-label="${esc(dotsLabel(cell))}">${dots}</span>`;
+  return `<span class="cell ${cls}${opts.kind ? ' k-' + opts.kind : ''}" role="img" aria-label="${esc(dotsLabel(cell))}">${dots}</span>`;
 }
 const cellsHTML = (str, cls = '') => [...str].map((c) => (c === ' ' || c === '⠀' ? '<span class="bw space"></span>' : cellHTML(c, cls))).join('');
 function lineHTML(parts, { labels = true, cls = '' } = {}) {
@@ -68,18 +72,25 @@ function lineHTML(parts, { labels = true, cls = '' } = {}) {
     if (c.kind === 'newline') { flush(); out += '<span class="bw-break"></span>'; continue; }
     if (c.kind === 'space') { flush(); out += '<span class="bw space"></span>'; continue; }
     const lbl = c.idx === 0 ? (c.print || (c.kind === 'indicator' ? '·' : '')) : '';
-    word += `<span class="bw kind-${c.kind}" title="${esc((c.group.print || '') + ' ' + (c.note || ''))}">${cellHTML(c.cell, cls)}${labels ? `<span class="lbl">${esc(lbl)}</span>` : ''}</span>`;
+    word += `<span class="bw kind-${c.kind}" title="${esc((c.group.print || '') + ' ' + (c.note || ''))}">${cellHTML(c.cell, cls, { kind: kindOf(c) })}${labels ? `<span class="lbl">${esc(lbl)}</span>` : ''}</span>`;
   }
   flush();
   return `<div class="braille-line">${out}</div>`;
 }
+// Colour-coding kind for a translated cell (the number sign belongs with its digits).
+function kindOf(c) {
+  if (c.kind === 'indicator' && /number/.test(c.note || '')) return 'digit';
+  return ['letter', 'digit', 'punct', 'contraction', 'indicator'].includes(c.kind) ? c.kind : '';
+}
+const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, cls, { kind })).join('');
 // Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
 function groupsHTML(spec, cls = 'md') {
   return `<div class="braille-line groups">${spec.split(' ').map((g) => {
     if (g === '_') return '<span class="bw space"></span>';
     const i = g.indexOf(':');
     const cells = g.slice(0, i), label = g.slice(i + 1);
-    return `<span class="bgroup"><span class="mrow">${cellsHTML(cells, cls)}</span><span class="lbl">${esc(label)}</span></span>`;
+    const kind = /^[a-z]$/i.test(label) ? 'letter' : /^[0-9.,#]+$/.test(label) ? 'digit' : /^(cap|caps)$/.test(label) ? 'indicator' : 'math';
+    return `<span class="bgroup"><span class="mrow">${cellsK(cells, kind, cls)}</span><span class="lbl">${esc(label)}</span></span>`;
   }).join('')}</div>`;
 }
 
@@ -145,23 +156,27 @@ function bindRadios(root, fn) {
 }
 const switchRow = (name, label, checked) => `<label class="set-row switch"><span>${label}</span><input type="checkbox" data-set="${name}" ${checked ? 'checked' : ''}></label>`;
 
-// ---------- header context ----------
-const headCtx = $('#headCtx');
-const setHead = (html) => { headCtx.innerHTML = html; };
+// ---------- header + sticky control row ----------
+const headTitle = $('#headTitle');
+const subbar = $('#subbar');
+const setTitle = (t) => { headTitle.textContent = t; };
+const setSub = (html) => { subbar.innerHTML = html; subbar.hidden = !html; syncHeadH(); };
+function syncHeadH() { requestAnimationFrame(() => document.documentElement.style.setProperty('--head-h', $('.top').offsetHeight + 'px')); }
 
 // ---------- settings modal ----------
+const COLOR_KEY = [['letter', 'Letters (Grade 1)'], ['digit', 'Numbers'], ['contraction', 'Contractions (Grade 2)'], ['punct', 'Punctuation'], ['indicator', 'Indicators'], ['math', 'Maths signs']];
 function openSettings() {
   openSheet(`<div class="settings">
-    <div class="set-group"><div class="set-row"><span class="set-title">Appearance</span>${radios('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div></div>
-    <div class="set-group"><h3>Alphabet & practice</h3>${switchRow('dotNums', 'Show dot numbers', S.dotNums)}${switchRow('hideLetters', 'Hide letters in the alphabet', S.hideLetters)}</div>
-    <div class="set-group"><h3>Sweep</h3>
-      <div class="set-row"><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
-      <div class="set-row"><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
-      ${canVibrate ? switchRow('swVibe', 'Vibrate on dots', S.swVibe) : ''}
+    <div class="set-group"><h3>General</h3>
+      <div class="set-row"><span>Appearance</span>${radios('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div>
+      ${switchRow('dotNums', 'Show dot numbers', S.dotNums)}
+      ${switchRow('color', 'Colour-code dots', S.color)}
+      <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
+    <div class="set-group"><h3>Alphabet</h3>${switchRow('hideLetters', 'Hide letters under cells', S.hideLetters)}</div>
     <div class="set-group"><h3>Translate</h3>${switchRow('trLabels', 'Print labels under cells', S.trLabels)}</div>
     <div class="set-group"><h3>Progress</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
-    <div class="set-group about"><h3>About Learn Braille</h3><p>A personal braille learning site. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
+    <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p><p class="muted small">Sweep settings are on the Sweep page.</p></div>
   </div>`, { title: 'Settings' });
   bindRadios($('.settings', sheet), (k, v) => setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v));
   $$('[data-set]', sheet).forEach((i) => { i.onchange = () => setS(i.dataset.set, i.checked); });
@@ -203,7 +218,7 @@ function letterDetail(l) {
 function symbolDetail(e) {
   const cells = [...e.cells];
   return `<div class="detail">
-    <div class="detail-top"><div class="row" style="gap:6px">${cells.map((c) => cellHTML(c, cells.length > 2 ? 'lg numbered' : 'xl numbered')).join('')}</div></div>
+    <div class="detail-top"><div class="row" style="gap:6px">${cells.map((c) => cellHTML(c, cells.length > 2 ? 'lg numbered' : 'xl numbered', { kind: e.kind })).join('')}</div></div>
     <h2>${esc(e.print)}</h2>
     <dl>
       <dt>Type</dt><dd>${esc(e.cat)}</dd>
@@ -233,54 +248,80 @@ const INDICATORS = [
 ];
 for (const [p, d, n] of INDICATORS) DICT.push({ print: p, cells: cellsOf(d), cat: 'Indicator', note: n, group: 'Indicators' });
 for (const [cat, { blurb, items }] of Object.entries(CONTRACTIONS)) for (const [p, d, n] of items) DICT.push({ print: p, cells: cellsOf(d), cat, note: n || '', blurb, group: cat });
-const symHTML = (e, i) => `<button class="sym" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c)).join('')}</span><b>${esc(e.print)}</b>${e.note && e.note.length < 26 ? `<small>${esc(e.note)}</small>` : ''}</button>`;
+const KIND_OF_GROUP = { Letters: 'letter', Numbers: 'digit', Punctuation: 'punct', Indicators: 'indicator' };
+for (const e of DICT) e.kind = KIND_OF_GROUP[e.group] || 'contraction';
+const SEC_OF_GROUP = { Letters: 'alphabet', Numbers: 'numbers', Punctuation: 'numbers', Indicators: 'numbers' };
+const symHTML = (e, i) => `<button class="sym" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c, '', { kind: e.kind })).join('')}</span><b>${esc(e.print)}</b>${e.note && e.note.length < 26 ? `<small>${esc(e.note)}</small>` : ''}</button>`;
 const groupBlock = (g, title, blurb) => `<div class="group-title"><h3>${title}</h3>${blurb ? `<span>${esc(blurb)}</span>` : ''}</div><div class="sym-grid">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === g).map(([e, i]) => symHTML(e, i)).join('')}</div>`;
 
 const view = $('#view');
 const views = {};
-const mastery = () => store.get('mastery', {});
+const mastery = () => {
+  const m = store.get('mastery', {});
+  // v4 stored one score per item; keep it as the Read score.
+  if (Object.keys(m).some((k) => !/^[rw]:/.test(k))) {
+    for (const k of Object.keys(m)) if (!/^[rw]:/.test(k)) { m['r:' + k] = m[k]; delete m[k]; }
+    store.set('mastery', m);
+  }
+  return m;
+};
 const level = (score) => Math.min(4, score); // 0 untried · 1–3 blues · 4+ known (green)
 
 // ---------- home ----------
-views[''] = () => {
-  setHead('');
+function progressHTML() {
   const m = mastery();
-  const known = 'abcdefghijklmnopqrstuvwxyz'.split('').filter((l) => (m[l] || 0) >= 4).length;
+  const groups = [['Letters', CATS.letters.sets.az[1]()], ['Numbers', CATS.symbols.sets.num[1]()], ['Punctuation', CATS.symbols.sets.punct[1]()],
+    ['Maths & money', CATS.symbols.sets.signs[1]()], ['Indicators', CATS.symbols.sets.ind[1]()], ['Contractions', CATS.contractions.sets.all[1]()]];
+  const known = (pre, items) => items.filter((x) => (m[pre + x.key] || 0) >= 4).length;
+  const letters = groups[0][1];
+  const strip = (pre) => `<div class="pstrip">${letters.map((x) => `<span data-l="${level(m[pre + x.key] || 0)}">${x.answer}</span>`).join('')}</div>`;
+  const r = known('r:', letters), w = known('w:', letters);
+  return `<details class="progress-card"><summary>
+      <span class="pc-title">Your progress</span>
+      <span class="pc-sum"><b>${r}</b>/26 read · <b>${w}</b>/26 written</span>${icon('chevron', 20)}</summary>
+    <div class="pc-body">
+      <table class="ptable"><thead><tr><th></th><th>Read</th><th>Write</th></tr></thead><tbody>
+      ${groups.map(([n, items]) => `<tr><td>${n}</td><td><b>${known('r:', items)}</b>/${items.length}</td><td><b>${known('w:', items)}</b>/${items.length}</td></tr>`).join('')}
+      </tbody></table>
+      <h4>Letters you read</h4>${strip('r:')}
+      <h4>Letters you write</h4>${strip('w:')}
+      <p class="muted small"><span class="legend"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i></span> learning → known. An item counts as known after a few correct answers in a row.</p>
+    </div></details>`;
+}
+views[''] = () => {
+  setTitle(''); setSub('');
   const mini = (s, cls = 'sm') => `<span class="mrow">${cellsHTML(s, cls)}</span>`;
-  const tile = (href, title, desc, art, cls = '') => `<a class="tile ${cls}" href="${href}"><div class="art">${art}</div><div class="tile-text"><b>${title}</b><span>${desc}</span></div></a>`;
+  const row = (href, title, desc, art) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><div class="hrow-art">${art}</div></a>`;
   view.innerHTML = `
     <div class="home-head">
-      <div class="home-brand">
-        <span class="logo big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
-        <div><h1>Learn Braille</h1><p class="muted">Six dots, one fingertip. Start with the alphabet, then read the world around you.</p></div>
-      </div>
-      <a class="progress-card" href="#/practice/read?cat=letters&set=az">
-        <div class="pbar"><i style="width:${(known / 26) * 100}%"></i></div>
-        <span><b>${known}</b> of 26 letters known</span>
-      </a>
+      <h1>Learn Braille</h1>
+      <p class="slogan">A resource for sighted folks to learn the braille writing system.</p>
+    </div>
+    ${progressHTML()}
+
+    <h2 class="sec-h">${icon('practice', 28)} Practice</h2>
+    <div class="hrows">
+      ${row('#/practice/read', 'Read', 'Name the letter, symbol or contraction', `<div class="art-read">${cellHTML(LETTERS.h, 'sm')}<span class="ok">h</span></div>`)}
+      ${row('#/practice/write', 'Write', 'Tap the dots that make it', `<div class="art-write">${[1, 1, 0, 0, 1, 0].map((o) => `<i class="${o ? 'on' : ''}"></i>`).join('')}</div>`)}
+      ${row('#/practice/words', 'Words', 'Decode whole words and type them', mini(unicodeOf(translate('cozy', 'en', 1)), 'xs2'))}
+      ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', `<div class="art-sweep">${mini(unicodeOf(translate('read', 'en', 1)), 'xs2')}<span class="line"></span></div>`)}
     </div>
 
-    <h2 class="tile-h">${icon('practice', 20)} Practice</h2>
-    <div class="tiles">
-      ${tile('#/practice/read', 'Read', 'Name the letter', `<div class="art-read">${cellHTML(LETTERS.h, 'md')}<div class="opts"><span>e</span><span class="ok">h</span><span>j</span></div></div>`)}
-      ${tile('#/practice/write', 'Write', 'Tap the dots', `<div class="art-write">${[1, 1, 0, 0, 1, 0].map((o) => `<i class="${o ? 'on' : ''}"></i>`).join('')}</div>`)}
-      ${tile('#/practice/words', 'Words', 'Decode whole words', `<div class="art-words"><div>${mini(unicodeOf(translate('cozy', 'en', 1)))}</div><span class="caret">cozy</span></div>`)}
-      ${tile('#/practice/sweep', 'Sweep', 'Glide a finger along a line', `<div class="art-sweep"><div class="row-cells">${mini(unicodeOf(translate('read', 'en', 1)))}</div><span class="line"></span><span class="ring"></span></div>`)}
+    <h2 class="sec-h">${icon('book', 28)} Reference</h2>
+    <div class="hrows">
+      ${row('#/reference/alphabet', 'Alphabet', 'a–z in three simple rows', mini('⠁⠃⠉', 'xs2'))}
+      ${row('#/reference/numbers', 'Numbers & symbols', 'Digits, punctuation, capitals', mini('⠼⠃', 'xs2'))}
+      ${row('#/reference/grade2', 'Grade 2', 'All 180 contractions, like “the” and “and”', mini('⠮⠯', 'xs2'))}
+      ${row('#/reference/signs', 'Signs', 'Read real-world signage, by country', `<div class="mini-plate"><b>EXIT</b></div>`)}
+      ${row('#/reference/science', 'Maths & science', 'Equations, units and Nemeth', mini('⠐⠖', 'xs2'))}
+      ${row('#/reference/languages', 'Languages', 'French, Spanish, German, Russian, Greek, Japanese', mini('⠿⠻', 'xs2'))}
+      ${row('#/reference/systems', 'World systems', 'The braille family around the world', mini('⠺⠕', 'xs2'))}
+      ${row('#/reference/history', 'History', 'From night writing to UEB', mini('⠓⠊', 'xs2'))}
     </div>
 
-    <h2 class="tile-h">${icon('book', 20)} Reference</h2>
-    <div class="tiles">
-      ${tile('#/reference/alphabet', 'Alphabet', 'a–z in three simple rows', `<div class="art-alpha">${mini('⠁⠃⠉⠙⠑', 'xs2')}<br>${mini('⠅⠇⠍⠝⠕', 'xs2')}<br>${mini('⠥⠧⠭⠽⠵', 'xs2')}</div>`)}
-      ${tile('#/reference/grade2', 'Grade 2', 'Contractions like “the”', `<div class="art-g2"><span>${cellHTML('⠮', 'md')}<b>the</b></span><span>${cellHTML('⠯', 'md')}<b>and</b></span></div>`)}
-      ${tile('#/reference/signs', 'Signs', 'Read real-world signage', `<div class="art-sign"><div class="mini-plate"><b>EXIT</b>${mini(unicodeOf(translate('Exit', 'en', 2)), 'xs')}</div></div>`)}
-      ${tile('#/reference/numbers', 'Numbers & symbols', 'Digits, punctuation, capitals', `<div class="art-g2"><span>${mini('⠼⠃', 'md')}<b>2</b></span><span>${cellHTML('⠦', 'md')}<b>?</b></span></div>`)}
-      ${tile('#/reference/languages', 'Languages', 'French, Spanish & more', `<div class="art-g2"><span>${cellHTML('⠿', 'md')}<b>é</b></span><span>${cellHTML('⠻', 'md')}<b>ñ</b></span></div>`)}
-      ${tile('#/reference/science', 'Maths & more', 'Science, world systems, history', `<div class="art-g2"><span>${mini('⠐⠖', 'md')}<b>+</b></span><span>${mini('⠐⠶', 'md')}<b>=</b></span></div>`)}
-    </div>
-
-    <h2 class="tile-h">${icon('translate', 20)} Translate</h2>
-    <div class="tiles one">
-      ${tile('#/translate', 'Type anything', 'See it in braille — English Grade 1 or 2 and five other languages', `<div class="art-tr"><span class="tr-word">Hi!</span>${icon('arrow', 20)}${mini(unicodeOf(translate('Hi!', 'en', 1)))}</div>`, 'wide')}
+    <h2 class="sec-h">${icon('translate', 28)} Translate</h2>
+    <div class="hrows">
+      ${row('#/translate', 'Type anything', 'See it in braille: English Grade 1 or 2 and five other languages', mini(unicodeOf(translate('Hi!', 'en', 1)), 'xs2'))}
     </div>`;
 };
 
@@ -301,7 +342,7 @@ const CATS = {
   } },
   contractions: { name: 'Contractions', sets: {
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
-    all: ['All contractions', () => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)())],
+    all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
   } },
 };
 const WORD_SETS = {
@@ -324,14 +365,15 @@ const HELP = {
   read: 'A braille cell appears — pick what it says. The card glows green when you’re right and red (with a shake) when you’re not. On a keyboard, press 1–4. Your progress for each item goes from pale blue to dark blue, then green once you know it; ones you miss come up more often.',
   write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Turn on dot numbers in Settings to see them on the pad.',
   words: 'Decode the word and type it — it checks as you type. Hint reveals one cell at a time; Skip shows the answer.',
-  sweep: 'Put your finger on the line and slide right. The cell under your finger lights up, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. Use the buttons to load a new line or start over; grade and real-size cells are in Settings.',
+  sweep: 'Put your finger on the line and slide right. The cell under your finger is outlined, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “New line” loads different text and “Start over” goes back to the beginning. Grade, cell size and vibration are below the reading area.',
 };
 
 views.practice = (q, sub) => {
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
   store.set('pmode', mode);
-  setHead(`<div id="modeDD" class="dd-title"></div><button class="icon-btn" id="helpBtn" aria-label="How this works">${icon('help')}</button>`);
-  dropdown($('#modeDD'), { options: Object.entries(MODES).map(([k, v]) => ({ value: k, label: v })), value: mode, onChange: (v) => { location.hash = '#/practice/' + v; } });
+  setTitle('Practice');
+  setSub(`<div class="seg radios modes" role="radiogroup">${Object.entries(MODES).map(([k, v]) => `<a role="radio" aria-checked="${k === mode}" class="${k === mode ? 'on' : ''}" href="#/practice/${k}">${icon(k, 20)}<span>${v}</span></a>`).join('')}</div>
+    <button class="icon-btn plain" id="helpBtn" aria-label="How this works">${icon('help')}</button>`);
   $('#helpBtn').onclick = () => openSheet(`<p>${esc(HELP[mode])}</p>`, { title: MODES[mode] });
   view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
   return mode === 'sweep' ? sweepMode(q) : quizMode(mode, q);
@@ -355,8 +397,9 @@ function quizMode(mode, q) {
     const it = CATS[state.cat].sets[state.set][1]();
     return mode === 'read' ? mergeByCells(it) : it;
   };
-  const score = (k) => m[k] || 0;
-  const bump = (k, d) => { m[k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m); };
+  const pre = mode === 'write' ? 'w:' : 'r:';
+  const score = (k) => m[pre + k] || 0;
+  const bump = (k, d) => { m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m); };
 
   function renderPicker() {
     if (mode === 'words') {
@@ -436,7 +479,7 @@ function quizMode(mode, q) {
       <div class="target">${esc(item.answer)}</div>
       ${targets.length > 1 ? `<div class="build" id="build">${targets.map(() => '<span class="slot"></span>').join('')}</div>` : ''}
       <div class="dotpad ${S.dotNums ? 'nums' : ''}" id="pad">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="dot ${d}">${d}</button>`).join('')}</div>
-      <button class="link-btn" id="skip">Show me</button>`;
+      <button class="link-btn corner" id="skip">Show me</button>`;
     const pad = $('#pad');
     const want = () => new Set(toDots(targets[ci]));
     const paint = () => [1, 2, 3, 4, 5, 6].forEach((d) => $(`[data-d="${d}"]`, pad).classList.toggle('on', on.has(d)));
@@ -511,9 +554,9 @@ function sweepMode(q) {
   let custom = store.get('swCustom', 'Welcome to Canada');
   $('#picker').innerHTML = `<div id="srcDD"></div>
     <div class="icon-row">
-      <button class="icon-btn" id="editBtn" aria-label="Edit text">${icon('edit')}</button>
-      <button class="icon-btn" id="shuffleBtn" aria-label="New line">${icon('shuffle')}</button>
-      <button class="icon-btn" id="restart" aria-label="Start over">${icon('restart')}</button>
+      <button class="btn small-btn" id="editBtn">${icon('edit', 18)} Edit text</button>
+      <button class="btn small-btn" id="shuffleBtn">${icon('shuffle', 18)} New line</button>
+      <button class="btn small-btn" id="restart">${icon('restart', 18)} Start over</button>
     </div>`;
   $('#modeBody').innerHTML = `
     <div class="sweep-box" id="box" tabindex="0" aria-label="Braille line. Arrow keys move cell by cell.">
@@ -522,7 +565,14 @@ function sweepMode(q) {
       <div class="reader" id="reader"></div>
       <div class="finger" id="finger"></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
+    </div>
+    <div class="sweep-settings" id="swSet">
+      <div class="set-row"><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
+      <div class="set-row"><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
+      <label class="set-row switch ${canVibrate ? '' : 'disabled'}"><span>Vibrate on dots${canVibrate ? '' : '<small>Not available here: only Android phones let websites vibrate. iPhones, iPads and computers don’t.</small>'}</span><input type="checkbox" data-set="swVibe" ${canVibrate && S.swVibe ? 'checked' : ''} ${canVibrate ? '' : 'disabled'}></label>
     </div>`;
+  bindRadios($('#swSet'), (k, v) => setS(k, k === 'swGrade' ? Number(v) : v));
+  $('#swSet [data-set]').onchange = (e) => setS('swVibe', e.target.checked);
   const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
   let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
   let lastKey = '', curIdx = -1, raf = 0, edgeRaf = 0, active = false;
@@ -550,7 +600,7 @@ function sweepMode(q) {
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
       ? `<div class="sc space" data-i="${i}"></div>`
-      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell)}<span class="lbl">${esc(c.idx === 0 ? (c.print || '·') : '')}</span></div>`).join('');
+      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}<span class="lbl">${esc(c.idx === 0 ? (c.print || '·') : '')}</span></div>`).join('');
     requestAnimationFrame(() => { measure(); reset(); });
   }
   function measure() {
@@ -701,11 +751,11 @@ function signsSection(regionKey) {
   if (R.money) parts.push(['sg-money', 'Feel your money', `<p>Canadian notes carry raised cell-shaped clusters in the top corner. Count them:</p><div class="money">${[5, 10, 20, 50, 100].map((v, i) => `<div class="note"><span>${cellHTML(fromDots('123456'), 'sm').repeat(i + 1)}</span><b>$${v}</b></div>`).join('')}</div>`]);
   if (R.tips) parts.push(['sg-tips', 'Field tips', textList(R.tips)]);
   return {
-    html: `<div class="picker"><div id="regionDD"></div><div id="jumpDD"></div></div>
+    jumps: parts.map(([id, t]) => ({ value: id, label: t })),
+    html: `<div class="picker"><div id="regionDD"></div></div>
       ${parts.map(([id, t, h]) => `<div class="sg" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join('')}`,
     bind: () => {
       dropdown($('#regionDD'), { label: 'Region', options: Object.entries(SIGN_REGIONS).map(([k, r]) => ({ value: k, label: r.name })), value: region, onChange: (v) => { location.hash = '#/reference/signs/' + v; } });
-      dropdown($('#jumpDD'), { label: 'Jump to', options: parts.map(([id, t]) => ({ value: id, label: t })), value: null, onChange: (v) => { const el = document.getElementById(v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
       $$('.plate').forEach((p) => p.addEventListener('click', () => p.classList.toggle('decoded')));
     },
   };
@@ -736,14 +786,13 @@ function grade2Section() {
   const cats = Object.entries(CONTRACTIONS);
   const row = (e, i) => {
     const note = e.cat === 'Shortforms' ? (SHORT_SPELL[e.print] || '') : (e.note || (G2_EXAMPLE[e.print] ? 'e.g. ' + G2_EXAMPLE[e.print] : ''));
-    return `<button class="crow" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c)).join('')}</span><b>${esc(e.print)}</b><span class="cdots">${[...e.cells].map((c) => toDots(c).join('')).join(' ')}</span><span class="cnote">${esc(note)}</span></button>`;
+    return `<button class="crow" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c, '', { kind: 'contraction' })).join('')}</span><b>${esc(e.print)}</b><span class="cdots">${[...e.cells].map((c) => toDots(c).join('')).join(' ')}</span><span class="cnote">${esc(note)}</span></button>`;
   };
   const sample = 'The children went to the park with their father.';
   const g1 = unicodeOf(translate(sample, 'en', 1)).replace(/ /g, '').length;
   const g2 = unicodeOf(translate(sample, 'en', 2)).replace(/ /g, '').length;
   const html = `
     <p class="lead-p">Grade 2 uses about 180 contractions to make braille shorter. Most books and public signs in Canada use it. Many cells mean different things alone versus inside a word, so each table notes where a sign may go.</p>
-    <div class="picker"><div id="g2Jump"></div></div>
     <div class="g2-compare">
       <div><small>Grade 1 · ${g1} cells</small>${lineHTML(translate(sample, 'en', 1), { labels: false, cls: 'sm' })}</div>
       <div><small>Grade 2 · ${g2} cells</small>${lineHTML(translate(sample, 'en', 2), { cls: 'sm' })}</div>
@@ -753,7 +802,7 @@ function grade2Section() {
     <div class="sym-grid compact">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return symHTML(DICT[i], i); }).join('')}</div>
     ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}</h3><span>${CONTRACTIONS[cat].items.length} · ${esc(blurb)}</span></div>
       <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}`;
-  return { html, bind: () => dropdown($('#g2Jump'), { label: 'Jump to', options: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })), value: null, onChange: (v) => document.getElementById(v).scrollIntoView({ behavior: 'smooth', block: 'start' }) }) };
+  return { html, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
 }
 
 // ---------- reference ----------
@@ -780,9 +829,9 @@ function charsTable(k) {
   const info = LANG_INFO[k];
   return `<p class="muted">${esc(info.blurb)}</p>
     <div class="group-title"><h3>Letters</h3></div>
-    <div class="sym-grid">${[...info.letters].map((l) => `<div class="sym"><span class="cells">${[...translate(l, k, 1)[0].cells].map((c) => cellHTML(c)).join('')}</span><b>${l}</b></div>`).join('')}</div>
+    <div class="sym-grid">${[...info.letters].map((l) => `<div class="sym"><span class="cells">${cellsK(translate(l, k, 1)[0].cells, 'letter')}</span><b>${l}</b></div>`).join('')}</div>
     <div class="group-title"><h3>Digits</h3></div>
-    <div class="sym-grid">${'1234567890'.split('').map((d) => `<div class="sym"><span class="cells">${[...unicodeOf(translate(d, k, 1))].map((c) => cellHTML(c)).join('')}</span><b>${d}</b></div>`).join('')}</div>`;
+    <div class="sym-grid">${'1234567890'.split('').map((d) => `<div class="sym"><span class="cells">${cellsK(unicodeOf(translate(d, k, 1)), 'digit')}</span><b>${d}</b></div>`).join('')}</div>`;
 }
 const LANG_NAMES = () => ({ ...Object.fromEntries(Object.keys(LANG_INFO).map((k) => [k, k === 'en' ? 'English (UEB)' : LANGS[k].name])), ja: '日本語 Japanese' });
 function languagesSection() {
@@ -817,7 +866,7 @@ function scienceSection() {
     <div class="example-grid">${NEMETH.map(ex).join('')}</div>
     <hr class="pale">
     <div class="group-title"><h3>Symbols used above</h3><span>UEB</span></div>
-    <div class="sym-grid">${SCIENCE_SYMBOLS.map(([c, n]) => `<div class="sym"><span class="cells">${[...c].map((x) => cellHTML(x)).join('')}</span><b>${esc(n)}</b></div>`).join('')}</div>` };
+    <div class="sym-grid">${SCIENCE_SYMBOLS.map(([c, n]) => `<div class="sym"><span class="cells">${cellsK(c, 'math')}</span><b>${esc(n)}</b></div>`).join('')}</div>` };
 }
 function refSection(key, sub) {
   switch (key) {
@@ -838,47 +887,98 @@ views.reference = (q, sub, sub2) => {
   store.set('refSec', key);
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
-  setHead(`<div id="secDD" class="dd-title"></div><button class="icon-btn" id="searchBtn" aria-label="Search">${icon('search')}</button>`);
+  setTitle('Reference');
+  setSub(`<div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
   dropdown($('#secDD'), { options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
-  view.innerHTML = `
-    <div class="search-wrap" id="searchWrap" hidden><input class="search" id="q" type="search" placeholder="A word (“the”), a symbol (“?”) or dot numbers (“1456”)" autocomplete="off"></div>
-    <div id="results"></div>
-    <div id="secBody">${sec.html}
-      <div class="pager">${i > 0 ? `<a href="#/reference/${REF_SECTIONS[i - 1][0]}">← ${REF_SECTIONS[i - 1][1]}</a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a href="#/reference/${REF_SECTIONS[i + 1][0]}">${REF_SECTIONS[i + 1][1]} →</a>` : ''}</div>
-    </div>`;
+  if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
+  view.innerHTML = `${sec.html}
+      <div class="pager">${i > 0 ? `<a href="#/reference/${REF_SECTIONS[i - 1][0]}">← ${REF_SECTIONS[i - 1][1]}</a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a href="#/reference/${REF_SECTIONS[i + 1][0]}">${REF_SECTIONS[i + 1][1]} →</a>` : ''}</div>`;
   if (sec.bind) sec.bind();
   view.onclick = (ev) => {
     const s = ev.target.closest('.sym[data-i], .crow[data-i]'); if (s) { openSheet(symbolDetail(DICT[Number(s.dataset.i)]), { title: 'Symbol' }); return; }
     const l = ev.target.closest('.letter[data-l]'); if (l) openSheet(letterDetail(l.dataset.l), { title: 'Letter ' + l.dataset.l });
   };
-  const results = $('#results'), body = $('#secBody');
-  const doSearch = () => {
-    const raw = $('#q').value.trim();
-    body.hidden = !!raw;
-    if (!raw) { results.innerHTML = ''; return; }
-    const s = raw.toLowerCase();
-    const isDots = /^[1-6][1-6\s-]*$/.test(s), isBraille = /^[⠀-⣿]+$/.test(raw);
-    const hits = DICT.map((e, n) => [e, n]).filter(([e]) => {
-      if (isDots) return [...e.cells].map((c) => toDots(c).join('')).join(' ').includes(s.replace(/-/g, ''));
-      if (isBraille) return e.cells.includes(raw);
-      return e.print.toLowerCase().includes(s) || (e.note || '').toLowerCase().includes(s);
-    }).sort(([a], [b]) => (a.print.toLowerCase() === s ? -1 : 0) - (b.print.toLowerCase() === s ? -1 : 0));
-    const tr = !isDots && !isBraille && /[a-z]/i.test(raw) ? `<div class="example" style="margin-top:12px"><div class="small muted">“${esc(raw)}” in Grade 2</div>${lineHTML(translate(raw, 'en', 2))}</div>` : '';
-    results.innerHTML = (hits.length ? `<div class="sym-grid">${hits.slice(0, 60).map(([e, n]) => symHTML(e, n)).join('')}</div>` : '<p class="muted">No symbol matches.</p>') + tr;
-  };
-  $('#q').oninput = doSearch;
-  $('#searchBtn').onclick = () => { const w = $('#searchWrap'); w.hidden = !w.hidden; if (!w.hidden) $('#q').focus(); else { $('#q').value = ''; doSearch(); } };
   return () => { view.onclick = null; };
 };
+
+// ---------- global search ----------
+let INDEX = null;
+function buildIndex() {
+  const out = [];
+  const nav = (h) => () => { closeSearch(); location.hash = h; };
+  DICT.forEach((e, i) => out.push({
+    title: e.print, sub: e.group === 'Letters' ? 'Letter' : e.cat + (e.note && e.note.length < 40 ? ' · ' + e.note : ''), cells: e.cells, kind: e.kind,
+    sec: SEC_OF_GROUP[e.group] || 'grade2', dict: e,
+    act: () => openSheet(e.group === 'Letters' ? letterDetail(e.print) : symbolDetail(e), { title: e.group === 'Letters' ? 'Letter ' + e.print : 'Symbol' }),
+  }));
+  REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Reference section', sec: k, page: true, act: nav('#/reference/' + k) }));
+  Object.entries(MODES).forEach(([k, t]) => out.push({ title: t, sub: 'Practice mode', sec: 'practice', page: true, act: nav('#/practice/' + k) }));
+  SCIENCE_SYMBOLS.forEach(([c, n]) => out.push({ title: n, sub: 'Maths & science symbol', cells: c, kind: 'math', sec: 'science', act: nav('#/reference/science') }));
+  for (const k of ['fr', 'es', 'de', 'ru', 'el']) {
+    for (const l of LANG_INFO[k].letters) {
+      if (/[a-z]/.test(l)) continue;
+      out.push({ title: l, sub: LANGS[k].name + ' letter', cells: translate(l, k, 1)[0].cells, kind: 'letter', sec: 'languages', act: () => openSheet(charsTable(k), { title: LANG_NAMES()[k] }) });
+    }
+  }
+  for (const [rk, r] of Object.entries(SIGN_REGIONS)) for (const w of r.signs) out.push({ title: w, sub: 'Sign · ' + r.name, cells: unicodeOf(translate(w, r.signLang || 'en', r.signLang ? 1 : 2)), sec: 'signs', act: nav('#/reference/signs/' + rk) });
+  for (const g of SYSTEMS) for (const [n, w] of g.items) out.push({ title: n, sub: 'World system · ' + w, sec: 'systems', act: nav('#/reference/systems') });
+  for (const [y, t] of HISTORY) out.push({ title: String(y), sub: t, sec: 'history', act: nav('#/reference/history') });
+  return out;
+}
+const curSec = () => (document.body.dataset.page === 'reference' ? store.get('refSec', 'alphabet') : document.body.dataset.page);
+function searchResults(raw) {
+  INDEX = INDEX || buildIndex();
+  const s = raw.trim().toLowerCase();
+  const isDots = /^[1-6][1-6\s-]*$/.test(s), isBraille = /^[⠀-⣿]+$/.test(raw.trim());
+  const here = curSec();
+  const scored = [];
+  for (const e of INDEX) {
+    let sc = 0;
+    const t = e.title.toLowerCase();
+    if (isDots) { if (e.cells && [...e.cells].map((c) => toDots(c).join('')).join(' ').includes(s.replace(/-/g, ''))) sc = 50; }
+    else if (isBraille) { if (e.cells && e.cells.includes(raw.trim())) sc = e.cells === raw.trim() ? 100 : 50; }
+    else if (t === s) sc = 100; else if (t.startsWith(s)) sc = 60; else if (s.length > 1 && t.includes(s)) sc = 35; else if (s.length > 2 && e.sub.toLowerCase().includes(s)) sc = 12;
+    if (!sc) continue;
+    if (e.sec === here) sc += 25;
+    if (e.page) sc += 5;
+    scored.push([sc, e]);
+  }
+  return scored.sort((a, b) => b[0] - a[0]).slice(0, 60).map(([, e]) => e);
+}
+const searchBar = $('#searchBar'), searchPanel = $('#searchPanel');
+function openSearch() {
+  searchBar.hidden = false; syncHeadH();
+  const q = $('#gq'); q.focus(); if (q.value) renderSearch();
+}
+function closeSearch() { searchBar.hidden = true; searchPanel.hidden = true; $('#gq').value = ''; syncHeadH(); }
+let RESULTS = [];
+function renderSearch() {
+  const raw = $('#gq').value;
+  if (!raw.trim()) { searchPanel.hidden = true; return; }
+  RESULTS = searchResults(raw);
+  const secName = Object.fromEntries([...REF_SECTIONS, ['practice', 'Practice']]);
+  const tr = /[a-z]/i.test(raw) && !/^[1-6\s-]+$/.test(raw) ? `<a class="sr tr" href="#/translate?lang=en&text=${encodeURIComponent(raw)}"><span class="sr-cells">${lineHTML(translate(raw, 'en', 2), { labels: false, cls: 'sm' })}</span><span class="sr-text"><b>Translate “${esc(raw)}”</b><small>English Grade 2</small></span></a>` : '';
+  searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr" data-r="${i}"><span class="sr-cells">${e.cells ? cellsK(e.cells, e.kind || '', 'sm') : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word, a symbol, or dot numbers like 1456.</p>'}${tr}</div>`;
+  searchPanel.hidden = false;
+}
+$('#gq').addEventListener('input', renderSearch);
+$('#gq').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSearch(); if (e.key === 'Enter') { const b = $('.sr', searchPanel); if (b) b.click(); } });
+$('#searchClose').onclick = closeSearch;
+searchPanel.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-r]'); if (b) { const r = RESULTS[Number(b.dataset.r)]; r.act(); return; }
+  if (e.target.closest('a.sr')) { closeSearch(); return; }
+  if (e.target === searchPanel) closeSearch();
+});
+$('#searchBtn').onclick = () => (searchBar.hidden ? openSearch() : closeSearch());
 
 // ---------- translate ----------
 views.translate = (q) => {
   const LOPTS = [['en1', 'English · Grade 1', 'English'], ['en2', 'English · Grade 2', 'English'], ['fr', 'Français', 'Other languages'], ['es', 'Español', 'Other languages'], ['de', 'Deutsch', 'Other languages'], ['ru', 'Русский', 'Other languages'], ['el', 'Ελληνικά', 'Other languages']];
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
-  setHead('<div id="langDD" class="dd-title"></div>');
+  setTitle('Translate');
+  setSub('<div id="langDD" class="dd-strong"></div><div id="exDD" class="dd-right"></div>');
   view.innerHTML = `
-    <div class="picker"><div id="exDD"></div></div>
     <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
     <div class="card tr-out" id="trOut"></div>
     <div class="tr-tools">
@@ -918,7 +1018,7 @@ function route() {
   const q = new URLSearchParams(qs || '');
   const key = views[name] ? name : '';
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
-  closeSheet(); closeDD();
+  closeSheet(); closeDD(); if (!searchBar.hidden) closeSearch();
   document.body.dataset.page = key || 'home';
   const r = views[key](q, sub, sub2);
   cleanup = typeof r === 'function' ? r : null;
@@ -930,5 +1030,7 @@ window.addEventListener('hashchange', route);
 window.addEventListener('scroll', () => $('.top').classList.toggle('scrolled', scrollY > 4), { passive: true });
 $$('[data-icon]').forEach((el) => { el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)); });
 $('#settingsBtn').onclick = openSettings;
+window.addEventListener('resize', syncHeadH);
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 applySettings();
 route();

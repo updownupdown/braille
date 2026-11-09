@@ -27,3 +27,7 @@ site/            static site (deployed as-is)
 Run locally with any static server, e.g. `python3 -m http.server -d site`.
 
 The Grade 2 translator follows the main UEB contraction rules but is simplified; treat it as a learning aid, not a transcription tool.
+
+## Install as an app
+
+The site is a Progressive Web App (`site/manifest.webmanifest`, `site/sw.js`). On Android, Chrome offers "Install app"; on iPhone, use Share → Add to Home Screen. Once installed it works offline.

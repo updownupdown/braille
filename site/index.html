@@ -11,22 +11,37 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Learn Braille">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="#/" aria-label="Learn Braille home">
-      <span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
-    </a>
-    <div class="ctx" id="headCtx"></div>
-    <nav class="nav" aria-label="Main">
-      <a href="#/" data-route="">Home</a>
-      <a href="#/practice" data-route="practice">Practice</a>
-      <a href="#/reference" data-route="reference">Reference</a>
-      <a href="#/translate" data-route="translate">Translate</a>
-    </nav>
-    <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings" data-icon="settings"></button>
+    <div class="top-row">
+      <a class="brand" href="#/" aria-label="Learn Braille home">
+        <span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </a>
+      <span class="head-title" id="headTitle"></span>
+      <nav class="nav" aria-label="Main">
+        <a href="#/" data-route="">Home</a>
+        <a href="#/practice" data-route="practice">Practice</a>
+        <a href="#/reference" data-route="reference">Reference</a>
+        <a href="#/translate" data-route="translate">Translate</a>
+      </nav>
+      <button class="icon-btn plain" id="searchBtn" aria-label="Search" title="Search" data-icon="search"></button>
+      <button class="icon-btn plain" id="settingsBtn" aria-label="Settings" title="Settings" data-icon="settings"></button>
+    </div>
+    <div class="search-bar" id="searchBar" hidden>
+      <input id="gq" type="search" placeholder="Search letters, contractions, signs, dots (1456)…" autocomplete="off" spellcheck="false">
+      <button class="icon-btn plain" id="searchClose" aria-label="Close search" data-icon="close"></button>
+    </div>
+    <div class="subbar" id="subbar" hidden></div>
   </header>
+  <div class="search-panel" id="searchPanel" hidden></div>
 
   <main id="view" tabindex="-1"></main>
 
@@ -40,6 +55,6 @@
   <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 
-  <script type="module" src="js/app.js?v=4"></script>
+  <script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>
