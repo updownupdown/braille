@@ -6,12 +6,11 @@ A small, dependency-free website for learning to read braille, starting with Uni
 
 ## What's inside
 
-- **Alphabet** — a–z laid out as the three “decades” braille is built from, with details per letter.
-- **Practice** — read cells (multiple choice), write cells on a tap-pad or with Perkins-style keys (F D S / J K L), and decode words. Progress per symbol is saved in your browser.
-- **Finger sweep** — drag across a strip of braille; the text slides under a fixed “fingertip”, each raised dot clicks (and vibrates on Android) as it passes, and a loupe shows what you're on.
-- **Signs** — how braille signage works in Canada/Ontario, the US, UK, EU, Japan and Australia, with decodable example signs and an elevator panel.
-- **Reference** — searchable dictionary of every Grade 1 symbol and Grade 2 contraction, maths & science (UEB and Nemeth), six languages, a catalog of world braille systems, and history.
+- **Home** — visual tiles into every section, plus letters-known progress.
+- **Practice** — Read (pick the letter), Write (tap-pad or Perkins-style F D S / J K L keys), Words (decode), and **Sweep**: slide a finger along a line of braille; the cell under your finger is read 1:1, dots click (and vibrate on Android) as you cross them, and the right edge keeps the line scrolling. Progress per symbol goes pale blue → dark blue → green (known).
+- **Reference** — Alphabet, Numbers & symbols, Grade 2 contractions, Signs in the wild (Ontario first, plus US, UK, EU, Japan, Australia), Maths & science, Languages, World systems, History, with search by word, symbol or dot numbers.
 - **Translate** — English Grade 1/2, French, Spanish, German, Russian and Greek.
+- **Settings** (top right) — theme, alphabet, sweep, signs and translate options.
 
 ## Structure
 
