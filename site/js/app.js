@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=10';
+} from './braille.js?v=11';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=10';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=10';
+} from './data.js?v=11';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=11';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -62,14 +62,14 @@ const P = {
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', color: true, swGrade: 1, swSize: 'large', swVibe: true };
+const DEFAULTS = { theme: 'auto', color: true, dotFill: 'outline', swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
-  b.toggle('s-color', S.color); b.toggle('s-sw-real', S.swSize === 'real');
+  b.toggle('s-color', S.color); b.toggle('s-dotfill', S.dotFill === 'fill'); b.toggle('s-sw-real', S.swSize === 'real');
 }
 function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
 
@@ -83,13 +83,13 @@ function cellHTML(cell, cls = '', opts = {}) {
   }
   return `<span class="cell ${cls}${opts.kind ? ' k-' + opts.kind : ''}" role="img" aria-label="${esc(dotsLabel(cell))}">${dots}</span>`;
 }
-const cellsHTML = (str, cls = '') => [...str].map((c) => (c === ' ' || c === '⠀' ? '<span class="bw space"></span>' : cellHTML(c, cls))).join('');
+const cellsHTML = (str, cls = '') => [...str].map((c) => (c === ' ' || c === '⠀' ? '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>' : cellHTML(c, cls))).join('');
 function lineHTML(parts, { labels = true, cls = '' } = {}) {
   let out = '', word = '';
   const flush = () => { if (word) out += `<span class="bword">${word}</span>`; word = ''; };
   for (const c of toCells(parts)) {
     if (c.kind === 'newline') { flush(); out += '<span class="bw-break"></span>'; continue; }
-    if (c.kind === 'space') { flush(); out += '<span class="bw space"></span>'; continue; }
+    if (c.kind === 'space') { word += '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'; flush(); continue; }
     const lbl = c.idx === 0 ? (c.print || (c.kind === 'indicator' ? '·' : '')) : '';
     word += `<span class="bw kind-${c.kind}" title="${esc((c.group.print || '') + ' ' + (c.note || ''))}">${cellHTML(c.cell, cls, { kind: kindOf(c) })}${labels ? `<span class="lbl">${esc(lbl)}</span>` : ''}</span>`;
   }
@@ -139,11 +139,11 @@ sheet.addEventListener('click', (e) => { if (e.target.closest('a[href^="#"]')) c
 let openDD = null;
 function closeDD() { if (openDD) { openDD.classList.remove('open'); openDD = null; } }
 document.addEventListener('click', (e) => { if (openDD && !openDD.contains(e.target)) closeDD(); });
-function dropdown(el, { label = '', options, value, onChange }) {
+function dropdown(el, { label = '', options, value, onChange, plain = false }) {
   const cur = options.find((o) => o.value === value);
   let lastGroup = null;
   el.classList.add('dd');
-  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox">${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>${icon('chevron', 18)}</button>
+  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox">${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
     <div class="dd-menu" role="listbox">${options.map((o) => {
       const g = o.group && o.group !== lastGroup ? `<div class="dd-group">${esc(o.group)}</div>` : '';
       lastGroup = o.group || lastGroup;
@@ -166,7 +166,7 @@ function dropdown(el, { label = '', options, value, onChange }) {
     const b = e.target.closest('.dd-opt'); if (!b) return;
     e.stopPropagation(); closeDD();
     const v = options.find((o) => String(o.value) === b.dataset.v).value;
-    dropdown(el, { label, options, value: v, onChange });
+    dropdown(el, { label, options, value: plain ? null : v, onChange, plain });
     onChange(v);
   };
 }
@@ -196,6 +196,7 @@ function openSettings() {
   openSheet(`<div class="settings">
     <div class="set-group"><h3>General</h3>
       <div class="set-row"><span>Appearance</span>${radios('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div>
+      <div class="set-row"><span>Unraised dots</span>${radios('dotFill', [['outline', 'Outline'], ['fill', 'Filled']], S.dotFill)}</div>
       ${switchRow('color', 'Colour-code dots', S.color)}
       <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
@@ -644,7 +645,7 @@ function sweepMode(q) {
     const grade = src === 'signs' ? 2 : S.swGrade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
-      ? `<div class="sc space" data-i="${i}"></div>`
+      ? `<div class="sc space" data-i="${i}"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`
       : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}<span class="lbl">${esc(c.idx === 0 ? (c.print || '·') : '')}</span></div>`).join('');
     requestAnimationFrame(() => { measure(); reset(); });
   }
@@ -1032,15 +1033,26 @@ views.games = (q, sub) => {
     return;
   }
   setTitle(g.name);
-  setSub(`<a class="back-link" href="#/games">${icon('right', 18)} Games</a>`);
   helpBtn.hidden = false;
   helpBtn.onclick = () => openSheet(`<div class="help">${g.help.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`, { title: g.name });
   let lvl = gameStore.get('lvl.' + sub, g.levels ? g.levels[0][0] : null);
   if (g.levels && !g.levels.some(([k]) => k === lvl)) lvl = g.levels[0][0];
-  view.innerHTML = `<div class="game-wrap game-${sub}">${g.levels ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}<div class="game" id="game"></div></div>`;
-  let stop = g.run($('#game'), lvl, { dropdown });
-  if (g.levels) bindRadios($('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); if (stop) stop(); stop = g.run($('#game'), lvl, { dropdown }); });
-  return () => { if (stop) stop(); };
+  const top = g.levels && sub !== 'trivia';
+  setSub(`<div class="g-sub"><a class="back-link" href="#/games">${icon('right', 18)} Games</a>${top ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}</div>`);
+  view.innerHTML = `<div class="game-wrap game-${sub}">${g.levels && !top ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}<div class="game" id="game"></div></div>`;
+  const gameEl = $('#game');
+  // Stats and buttons share one row at the bottom, to save height.
+  const arrange = () => {
+    const st = $(':scope > .g-stats', gameEl), ac = $(':scope > .g-actions', gameEl);
+    if (!st && !ac) return;
+    const foot = document.createElement('div'); foot.className = 'g-foot';
+    if (st) foot.append(st); if (ac) foot.append(ac);
+    gameEl.append(foot);
+  };
+  const mo = new MutationObserver(arrange); mo.observe(gameEl, { childList: true });
+  let stop = g.run(gameEl, lvl, { dropdown }); arrange();
+  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); if (stop) stop(); stop = g.run(gameEl, lvl, { dropdown }); });
+  return () => { mo.disconnect(); if (stop) stop(); };
 };
 
 // ---------- global search ----------
@@ -1139,7 +1151,7 @@ views.translate = (q) => {
   const exLang = () => (mode.startsWith('en') ? 'en' : mode);
   const syncDD = () => {
     dropdown($('#langDD'), { options: LOPTS.map(([v, l, g]) => ({ value: v, label: l, group: g })), value: mode, onChange: (v) => { mode = v; render(); syncDD(); } });
-    dropdown($('#exDD'), { label: 'Examples', options: LANG_INFO[exLang()].phrases.map((p) => ({ value: p, label: p })), value: null, onChange: (v) => { inp.value = v; render(); } });
+    dropdown($('#exDD'), { label: 'Examples', plain: true, options: LANG_INFO[exLang()].phrases.map((p) => ({ value: p, label: p })), value: null, onChange: (v) => { inp.value = v; render(); } });
   };
   inp.oninput = render;
   $('#trCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#trOut').dataset.uni); $('#trCopy').textContent = 'Copied ✓'; setTimeout(() => ($('#trCopy').textContent = 'Copy braille'), 1400); } catch {} };

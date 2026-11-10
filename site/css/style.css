@@ -1161,3 +1161,74 @@ body.s-sw-real .sweep-track .sc.cur .cell { border-radius: 2px; box-shadow: 0 0 
   .cheatsheet .cell { --s: 6px; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ===================== v11 ===================== */
+/* Braille geometry, in units of the dot pitch d (centre to centre inside a cell):
+   dot diameter 0.6d, cell to cell 2.5d, line to line 4d, a space is one blank cell.
+   With dot size --s: d = s / 0.6, so the gap inside a cell is 2s/3 and each cell carries
+   0.75s of side padding (1.5s edge to edge between neighbours). Containers of consecutive
+   cells therefore use no gap of their own. */
+.cell { --gap: calc(var(--s) * 2 / 3); padding: calc(var(--s) * .35) calc(var(--s) * .75); }
+.braille-line, .bword, .sym .cells, .crow .cells, .sr-cells, .plate .braille-line, .plate .bword, .quiz-opt .braille-line, .hero-demo .word, .mrow, .an-cells, .stage .prompt-cells { column-gap: 0; }
+.braille-line { row-gap: 0; }
+.braille-line:not(:has(.lbl)) .cell { padding-block: calc(var(--s) * 1.17); }
+.bw.space, .mrow .bw.space, .sweep-track .sc.space, body.s-sw-real .sweep-track .sc.space { width: auto; }
+.space .cell { visibility: hidden; }
+.sweep-track, .sweep-box.real .sweep-track, body.s-sw-real .sweep-track { gap: 0; }
+body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0 1.125mm; }
+.ag-msg { gap: 12px 17px; }
+/* exceptions: one cell per key, tile or card (wordle, keyboards, maze, memory, hangman blanks) keep their own spacing */
+
+/* unraised dots: outline (default) or filled */
+body.s-dotfill { --dot-off: #e3dbd3; }
+:root[data-theme="dark"] body.s-dotfill { --dot-off: #37312b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.s-dotfill { --dot-off: #37312b; } }
+body.s-dotfill .cell i:not(.on) { background: var(--off); box-shadow: none; }
+body.s-dotfill :is(.cell.ghost, .cell.blank) i:not(.on) { background: transparent; }
+
+/* header + footer: nearly opaque, with their borders back */
+.top, .top.scrolled, .top:has(.subbar:not([hidden])) { background: color-mix(in srgb, var(--bg) 93%, transparent); border-bottom: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .tabbar { background: color-mix(in srgb, var(--bg) 93%, transparent); border-top: 1px solid var(--line); }
+  .tabbar a.active { box-shadow: none; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+}
+
+/* games: level picker beside the back link; content centred; stats + buttons at the bottom */
+.g-sub { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.g-sub .picker { margin: 0; display: flex; }
+.g-sub .seg { flex: none; }
+body[data-page="games"] main { padding-bottom: 14px; }
+.game-wrap { display: flex; flex-direction: column; min-height: calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - env(safe-area-inset-bottom) - 24px); }
+.game-wrap > .game { flex: 1; display: flex; flex-direction: column; }
+.game::before { content: ''; margin-top: auto; order: -1; }
+.game > :is(.g-pick, .ta-bar, .ag-chips) { order: -2; }
+.game > .g-foot { order: 1; margin-top: auto; }
+.g-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding-top: 18px; }
+.g-foot:not(:has(.g-stats)) { justify-content: center; }
+.g-foot .g-stats, .g-foot .g-actions { margin: 0; }
+.game > .g-msg { margin-top: 12px; }
+
+/* memory: plain backs, sized to fit the screen */
+.mem-grid { --cols: 4; --rows: 3; gap: 10px; max-width: 520px; width: min(100%, calc((100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - env(safe-area-inset-bottom) - 130px - (var(--rows) - 1) * 10px) / var(--rows) * .75 * var(--cols) + (var(--cols) - 1) * 10px)); }
+.mem-grid.n8 { --rows: 4; }
+.mem-grid.n10 { --cols: 5; --rows: 4; }
+@media (max-width: 480px) { .mem-grid.n10 { --cols: 4; --rows: 5; } }
+.mem-back { background: var(--seg-bg); box-shadow: 0 2px 6px rgba(40, 28, 16, .14); }
+.mem-back::after { content: ''; position: absolute; inset: 6px; border-radius: 7px; border: 1.5px solid color-mix(in srgb, var(--seg-bg) 78%, var(--ink)); }
+.mem-face { box-shadow: 0 2px 6px rgba(40, 28, 16, .1); }
+.mem-face .cell { --s: clamp(7px, 2.4vw, 11px); }
+
+/* learn: more air between and within sections */
+.sg, .ref-section { margin-bottom: 60px; }
+.sg-h { margin-bottom: 18px; }
+.group-title { margin: 40px 0 16px; }
+.decade { margin-bottom: 48px; }
+.decade-p { margin-bottom: 18px; }
+.ex-block { margin-top: 36px; }
+body[data-page="reference"] .lead-p { margin-bottom: 32px; }
+.sg > p + p, .sg.prose p { margin-bottom: 16px; }
+.crow, .ctable.narrow .crow { padding-top: 10px; padding-bottom: 10px; }
+#exDD .dd-v { display: inline; font-size: .95rem; }
+@media (max-width: 520px) { .tr-out .cell { --s: 7px; } body.s-tr-large .tr-out .cell { --s: 10px; } }
+.braille-line.groups .bw.space { width: 14px; }
+@media (max-width: 520px) { .card.tr-out { padding: 16px 12px; } }

@@ -1,7 +1,7 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=10';
-import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=10';
-import { WORDS } from './data.js?v=10';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=11';
+import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=11';
+import { WORDS } from './data.js?v=11';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -28,7 +28,7 @@ function line(text, { grade = 1, labels = false, cls = '' } = {}) {
   let out = '', word = '';
   const flush = () => { if (word) out += `<span class="bword">${word}</span>`; word = ''; };
   for (const c of toCells(translate(text, 'en', grade))) {
-    if (c.kind === 'space') { flush(); out += '<span class="bw space"></span>'; continue; }
+    if (c.kind === 'space') { word += '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'; flush(); continue; }
     if (c.kind === 'newline') continue;
     const l = labels && c.idx === 0 ? (c.print || '') : '';
     word += `<span class="bw">${cell(c.cell, cls)}${labels ? `<span class="lbl">${esc(l)}</span>` : ''}</span>`;
