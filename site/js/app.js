@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=16';
+} from './braille.js?v=17';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=16';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=16';
+} from './data.js?v=17';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=17';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -342,48 +342,80 @@ function progressHTML() {
       <div class="row"><a class="btn primary" href="#/practice">Practice</a><a class="btn" href="#/practice/read?cat=review&set=today">Daily review</a></div>
     </div></details>`;
 }
+// Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
+const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
+const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'The 180 contractions', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
+const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'hangman', 'anagrams', 'time', 'maze', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
-  const row = (href, title, desc, ic) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><span class="hrow-ic">${icon(ic, 26)}</span></a>`;
+  const m = mastery(), misses = store.get('misses', {});
+  const seen = store.get('learnSeen', []);
+  const pVisited = store.get('pvisited', false);
+  const played = gameStore.get('played', []), lastGame = gameStore.get('last', null);
+  const isNew = !seen.length && !pVisited && !played.length;
+  const card = (href, k, t, d, go = false) => `<a class="hcard ${go ? 'go' : ''}" href="${href}"><span class="k">${k}</span><b>${t}</b><span class="d">${d}</span></a>`;
+  const tile = (href, t, ic, cls = '') => `<a class="hct" href="${href}"><span class="hrow-ic ${cls}">${icon(ic, 20)}</span><b>${t}</b></a>`;
+  const head = (ic, t, href, prog) => `<div class="hsec-h"><h2 class="sec-h">${icon(ic, 26)} ${t}</h2><a href="${href}">See all</a></div>${prog ? `<div class="hprog"><span class="bar"><i style="width:${Math.round(prog[0] * 100)}%"></i></span><span>${prog[1]}</span></div>` : ''}`;
+  const carousel = (items) => `<div class="hcar" role="list">${items.join('')}</div>`;
+
+  // Learn
+  const secs = REF_SECTIONS.filter(([k]) => k !== 'cheatsheet');
+  const secName = (k) => REF_SECTIONS.find(([x]) => x === k)[1];
+  const nextSec = secs.find(([k]) => !seen.includes(k));
+  const lastSec = store.get('refSec', null);
+  let lA, lB;
+  if (!seen.length) { lA = card('#/reference/overview', 'Start here', 'Overview', SEC_DESC.overview, true); lB = card('#/reference/alphabet', 'Then', 'Alphabet', 'a–j first'); }
+  else {
+    lA = card(`#/reference/${lastSec}`, 'Continue', secName(lastSec), SEC_DESC[lastSec]);
+    lB = nextSec ? card(`#/reference/${nextSec[0]}`, 'Up next', nextSec[1], SEC_DESC[nextSec[0]], true) : card('#/reference/cheatsheet', 'All read', 'Cheat Sheet', SEC_DESC.cheatsheet, true);
+  }
+  const lUsed = [!seen.length ? 'overview' : lastSec, !seen.length ? 'alphabet' : (nextSec ? nextSec[0] : 'cheatsheet')];
+  const learn = `${head('book', 'Learn', '#/reference', seen.length ? [Math.min(1, seen.length / secs.length), `${Math.min(seen.length, secs.length)} of ${secs.length} sections`] : null)}
+    <div class="hsplit">${lA}${lB}</div>
+    ${carousel(REF_SECTIONS.filter(([k]) => !lUsed.includes(k)).map(([k, t]) => tile(`#/reference/${k}`, t, SEC_ICON[k])))}`;
+
+  // Practice
+  const az = 'abcdefghijklmnopqrstuvwxyz';
+  const knownL = [...az].filter((l) => (m['r:' + l] || 0) >= 4).length;
+  const pmode = store.get('pmode', 'read'), psel = store.get('psel', { cat: 'letters', set: 'aj' });
+  const pset = CATS[psel.cat] && CATS[psel.cat].sets[psel.set];
+  const missTop = Object.entries(misses).filter(([k]) => /^[rw]:[a-z]$/.test(k)).sort((x, y) => y[1] - x[1]).map(([k]) => k[2]).filter((l, i, a) => a.indexOf(l) === i && (m['r:' + l] || 0) < 4).slice(0, 5);
+  const nextSet = [['aj', 'abcdefghij'], ['kt', 'klmnopqrst'], ['uz', 'uvwxyz']].find(([, ls]) => [...ls].some((l) => (m['r:' + l] || 0) < 4));
+  let pA, pB;
+  if (!pVisited) { pA = card('#/practice/read?cat=letters&set=aj', 'Get started', 'Read a–j', 'Ten letters, top dots only', true); pB = card('#/practice/write?cat=letters&set=aj', 'Or', 'Write a–j', 'Tap the dots'); }
+  else {
+    const label = pmode === 'sweep' ? 'Sweep' : `${MODES[pmode]} · ${pset ? pset[0] : 'a–j'}`;
+    const items = pmode !== 'sweep' && pset ? pset[1]() : [];
+    const pre = pmode === 'write' ? 'w:' : 'r:';
+    pA = card(pmode === 'sweep' ? '#/practice/sweep' : `#/practice/${pmode}?cat=${psel.cat}&set=${psel.set}`, 'Continue', label, items.length ? `${items.filter((x) => (m[pre + x.key] || 0) >= 4).length} of ${items.length} known` : 'Pick up where you left off');
+    pB = missTop.length ? card('#/practice/read?cat=review&set=today', 'Needs work', missTop.join(', '), '15-item daily review', true)
+      : nextSet ? card(`#/practice/read?cat=letters&set=${nextSet[0]}`, 'Up next', `Read ${CATS.letters.sets[nextSet[0]][0]}`, 'Learn the next letters', true)
+      : card('#/practice/read?cat=contractions&set=k0', 'Up next', 'Grade 2', 'Start the contractions', true);
+  }
+  const practice = `${head('practice', 'Practice', '#/practice', pVisited ? [knownL / 26, `${knownL} of 26 letters`] : null)}
+    <div class="hsplit">${pA}${pB}</div>
+    ${carousel([...Object.entries(MODES).map(([k, t]) => tile(`#/practice/${k}`, t, k)), tile('#/practice/read?cat=review&set=today', 'Daily Review', 'restart')])}`;
+
+  // Games
+  const nextGame = GAME_ORDER.find((k) => !played.includes(k) && k !== lastGame) || GAME_ORDER.find((k) => k !== lastGame);
+  let gA, gB;
+  if (!played.length) { gA = card('#/games/memory', 'Easy first', 'Memory', 'Pair cells and letters', true); gB = card('#/games/wordle', 'Or', 'Braille Wordle', 'With letters shown'); }
+  else { gA = card(`#/games/${lastGame}`, 'Resume', GAMES[lastGame].name, GAMES[lastGame].desc); gB = card(`#/games/${nextGame}`, 'Try next', GAMES[nextGame].name, GAMES[nextGame].desc, true); }
+  const gUsed = !played.length ? ['memory', 'wordle'] : [lastGame, nextGame];
+  const games = `${head('games', 'Games', '#/games', played.length ? [played.length / GAME_ORDER.length, `${played.length} of ${GAME_ORDER.length} played`] : null)}
+    <div class="hsplit">${gA}${gB}</div>
+    ${carousel(Object.entries(GAMES).filter(([k]) => !gUsed.includes(k)).map(([k, g]) => tile(`#/games/${k}`, g.name, g.icon, `gc-${k}`)))}`;
+
   view.innerHTML = `
     <div class="home-head">
       <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
-      <p class="slogan">A resource for sighted folks to learn the braille writing system.</p>
+      <p class="slogan">${isNew ? 'A resource for sighted folks to learn the braille writing system.' : 'Welcome back.'}</p>
     </div>
-    ${progressHTML()}
-
-    <h2 class="sec-h">${icon('book', 28)} Learn</h2>
-    <div class="hrows">
-      ${row('#/reference/overview', 'Overview', 'What braille is, how a cell works, and its history', 'info')}
-      ${row('#/reference/alphabet', 'Alphabet', 'a–z in three simple rows', 'alpha')}
-      ${row('#/reference/numbers', 'Numbers & symbols', 'Digits, punctuation, capitals', 'hash')}
-      ${row('#/reference/grade2', 'Grade 2', 'All 180 contractions, like “the” and “and”', 'layers')}
-      ${row('#/reference/signs', 'Signs', 'Read real-world signage, by country', 'sign')}
-      ${row('#/reference/science', 'Maths & science', 'Equations, units and Nemeth', 'sigma')}
-      ${row('#/reference/languages', 'Languages', 'French, Spanish, German, Russian, Greek, Japanese', 'globe')}
-      ${row('#/reference/systems', 'World systems', 'The braille family around the world', 'map')}
-    </div>
-
-    <h2 class="sec-h">${icon('practice', 28)} Practice</h2>
-    <div class="hrows">
-      ${row('#/practice/read', 'Read', 'Name the letter, symbol or contraction', 'read')}
-      ${row('#/practice/write', 'Write', 'Tap the dots that make it', 'write')}
-      ${row('#/practice/words', 'Words', 'Decode whole words and type them', 'words')}
-      ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', 'sweep')}
-    </div>
-
-    <h2 class="sec-h">${icon('games', 28)} Games</h2>
-    <div class="hrows">
-      ${row('#/games/wordle', 'Braille Wordle', 'Guess the five-letter word in six tries', 'grid')}
-      ${row('#/games/agent', 'Secret Agent', 'Decode braille messages to crack a case', 'key')}
-      ${row('#/games/rain', 'Braille Rain', 'Type falling letters before they land', 'rain')}
-      ${row('#/games', 'All games', 'Eleven games, from easy to hard', 'games')}
-    </div>
-
-    <h2 class="sec-h">${icon('translate', 28)} Translate</h2>
-    <div class="hrows">
-      ${row('#/translate', 'Type anything', 'See it in braille: English Grade 1 or 2 and five other languages', 'translate')}
-    </div>`;
+    ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
+    <section class="hsec">${learn}</section>
+    <section class="hsec">${practice}</section>
+    <section class="hsec">${games}</section>
+    <a class="htr" href="#/translate"><span class="hrow-ic">${icon('translate', 22)}</span><div><b>Translate</b><span>Type anything and see it in braille</span></div><span class="btn">Open</span></a>`;
 };
 
 // ---------- practice data ----------
@@ -456,7 +488,7 @@ const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_
 
 views.practice = (q, sub) => {
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
-  store.set('pmode', mode);
+  store.set('pmode', mode); store.set('pvisited', true);
   setTitle('Practice');
   setSub(`<div class="seg radios modes" role="radiogroup">${Object.entries(MODES).map(([k, v]) => `<a role="radio" aria-checked="${k === mode}" class="${k === mode ? 'on' : ''}" href="#/practice/${k}">${icon(k, 20)}<span>${v}</span></a>`).join('')}</div>`);
   helpBtn.hidden = false;
@@ -1087,6 +1119,7 @@ function refSection(key, sub) {
 views.reference = (q, sub, sub2) => {
   const key = REF_SECTIONS.find(([k]) => k === sub) ? sub : store.get('refSec', 'overview');
   store.set('refSec', key);
+  { const seen = store.get('learnSeen', []); if (!seen.includes(key)) store.set('learnSeen', [...seen, key]); }
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
   setTitle('Learn');
@@ -1114,6 +1147,8 @@ views.games = (q, sub) => {
     return;
   }
   setTitle(g.name);
+  gameStore.set('last', sub);
+  { const pl = gameStore.get('played', []); if (!pl.includes(sub)) gameStore.set('played', [...pl, sub]); }
   helpBtn.hidden = false;
   helpBtn.onclick = () => openSheet(`<div class="help">${g.help.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`, { title: g.name });
   let lvl = gameStore.get('lvl.' + sub, g.levels ? g.levels[0][0] : null);
