@@ -249,37 +249,13 @@ body.s-hide-letters .letter b { visibility: hidden; }
 
 /* ---------- sweep ---------- */
 .sweep-intro { max-width: 640px; }
-.sweep-box { position: relative; user-select: none; -webkit-user-select: none; touch-action: none; overflow: hidden; height: clamp(260px, calc(100dvh - 210px - var(--tabbar-h)), 460px); border-radius: 26px; background: var(--surface); border: 1px solid var(--line); cursor: crosshair; margin: 0 -4px; }
-.sweep-track { position: absolute; left: 0; top: calc(50% - 46px); display: flex; align-items: flex-start; gap: 20px; will-change: transform; }
-.sweep-track .sc { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: none; }
-.sweep-track .sc.space { width: 36px; }
-.sweep-track .cell { --s: 18px; }
-.sweep-track .sc .lbl { font-size: .95rem; color: var(--muted); height: 1.3em; transition: opacity .2s; }
-.sweep-track .sc.kind-contraction .lbl { color: var(--accent); }
 
-.sweep-track .sc.cur .lbl { color: var(--ink); }
-.sweep-box.real .sweep-track, body.s-sw-real .sweep-track { gap: 2.4mm; top: calc(50% - 20px); }
-body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0; }
-body.s-sw-real .sweep-track .sc.space { width: 4mm; }
-body.s-sw-real .sweep-track .sc .lbl { font-size: .7rem; }
-body.s-sw-real .reader { top: calc(50% - 50px); height: 90px; }
-body.s-sw-hidden .sweep-track .sc .lbl { opacity: 0; }
-body.s-sw-after .sweep-track .sc .lbl { opacity: 0; }
-body.s-sw-after .sweep-track .sc.passed .lbl { opacity: 1; }
-.edge { position: absolute; top: 0; bottom: 0; width: min(90px, 18%); pointer-events: none; opacity: .5; }
-.edge.left { left: 0; background: linear-gradient(to right, var(--surface-2), transparent); }
-.edge.right { right: 0; background: linear-gradient(to left, var(--surface-2), transparent); }
-.reader { position: absolute; top: calc(50% - 70px); height: 150px; width: 2px; margin-left: -1px; background: var(--accent); opacity: .35; pointer-events: none; }
-.finger { position: absolute; top: calc(50% + 80px); width: 56px; height: 56px; margin-left: -28px; border-radius: 50%; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); pointer-events: none; opacity: .5; transition: opacity .2s; }
-.sweep-box.active .finger { opacity: .85; }
-body.s-sw-real .finger { top: calc(50% + 40px); }
 .loupe { position: absolute; top: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 10px 16px 10px 12px; border-radius: 18px; background: var(--ink); color: var(--bg); pointer-events: none; min-width: 120px; }
 .loupe .cell { --s: 13px; --on: var(--bg); --off: color-mix(in srgb, var(--bg) 25%, transparent); }
 .loupe .lp { display: flex; flex-direction: column; line-height: 1.15; }
 .loupe .lp b { font-size: 1.6rem; font-weight: 500; }
 .loupe .lp span { font-size: .78rem; opacity: .7; white-space: nowrap; }
 .loupe.hidden-print .lp b { filter: blur(7px); }
-.sweep-hint { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: .8rem; color: var(--muted); padding: 8px; pointer-events: none; transition: opacity .3s; }
 .sweep-controls { display: grid; gap: 14px; margin-top: 16px; }
 .sweep-controls .row { gap: 10px 18px; }
 .word-reveal { min-height: 1.6em; font-size: 1.2rem; text-align: center; margin-top: 14px; color: var(--ink-2); }
@@ -458,9 +434,7 @@ footer.foot { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; color:
 .practice-wrap { max-width: 720px; margin: 0 auto; display: block; }
 .practice-wrap.mode-sweep { max-width: none; }
 
-/* sweep */
 .word-reveal { position: absolute; left: 0; right: 0; bottom: 34px; text-align: center; font-size: 1.1rem; color: var(--ink-2); pointer-events: none; margin: 0; min-height: 0; }
-.sweep-hint { bottom: 6px; }
 
 /* sheet + settings */
 .sheet-head { display: flex; align-items: center; justify-content: space-between; margin: -6px 0 14px; }
@@ -559,9 +533,6 @@ body[data-page="home"] .top { min-height: 56px; }
 .legend small { color: var(--muted); font-size: .8rem; margin-left: 4px; }
 .mastery span { min-width: 28px; width: auto; padding: 0 6px; }
 
-/* sweep: letters always appear after you pass them */
-.sweep-track .sc .lbl { opacity: 0; }
-.sweep-track .sc.passed .lbl { opacity: 1; }
 .loupe { display: none; }
 
 /* settings sheet */
@@ -736,19 +707,12 @@ body.s-sw-real.s-dotnums .sweep-track .cell i::after { display: none; }
 .link-btn.corner { position: absolute; top: 12px; right: 14px; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: .85rem; }
 .icon-row .small-btn { padding: 7px 12px; gap: 5px; font-size: .88rem; }
 @media (max-width: 480px) { .icon-row .small-btn { padding: 7px 10px; font-size: .82rem; } .icon-row .small-btn .ic { display: none; } }
-.sweep-track .sc .lbl { font-size: 1.2rem; }
-body.s-sw-real .sweep-track .sc .lbl { font-size: .875rem; }
-.sweep-track .sc.cur .cell { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
-.sweep-settings { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
-.sweep-settings .set-row.switch span { display: flex; flex-direction: column; gap: 2px; }
-.sweep-settings small { color: var(--muted); font-size: .8rem; }
 .set-row.switch.disabled { cursor: default; color: var(--muted); }
 .set-row.switch input:disabled { opacity: .5; cursor: not-allowed; }
 
 /* bottom menu */
 @media (max-width: 760px) { .tabbar a { font-size: .83rem; } }
 .btn[hidden] { display: none; }
-.sweep-box { height: clamp(240px, calc(100dvh - 300px - var(--tabbar-h)), 440px); }
 
 /* logo + wordmark */
 :root { --lb-l: #2f68a8; --lb-b: #3f8a5c; --lb-off: #d9d1c4; }
@@ -866,17 +830,8 @@ body[data-page="home"] .brand { display: flex; align-items: center; gap: 10px; }
 .mode-words #modeBody { min-height: calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - 130px); display: flex; flex-direction: column; justify-content: center; padding-bottom: 20px; }
 .mode-words .stage { min-height: 0; }
 
-/* sweep */
-.sweep-top { position: absolute; z-index: 3; top: 12px; left: 14px; right: 14px; display: flex; align-items: center; gap: 8px; }
-.sw-prog { flex: 1; max-width: 220px; height: 6px; border-radius: 999px; background: var(--seg-bg); overflow: hidden; margin-right: auto; }
-.sw-prog i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; }
 .link-btn.pillish { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: .85rem; display: inline-flex; align-items: center; gap: 4px; background: var(--surface); color: var(--ink-2); touch-action: manipulation; }
 .link-btn.pillish .ic { width: 16px; height: 16px; }
-.sweep-track .sc.cur .cell { outline: 0; background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 6px; }
-.finger, body.s-sw-real .finger { top: auto; bottom: 26px; }
-.reader { top: calc(50% - 70px); height: auto; bottom: 82px; }
-body.s-sw-real .reader { top: calc(50% - 50px); height: auto; }
-.sweep-settings { padding: 0; background: none; border: 0; border-radius: 0; margin-top: 20px; }
 
 /* signs: framed light plates, not inverted */
 .plate, .plate.light { background: var(--surface); color: var(--ink); border-radius: 14px; padding: 22px 20px 20px;
@@ -933,13 +888,6 @@ body:not(.s-dotnums) .crow .cdots, body:not(.s-dotnums) .dots-info { display: no
 @media (hover: hover) { .plate:hover { box-shadow: 0 2px 4px rgba(40, 28, 16, .1), 0 14px 34px rgba(40, 28, 16, .12); } }
 .anatomy .plate { width: 260px; }
 
-/* sweep: recessed box, neutral highlight, thin edges */
-.sweep-box { --sw-bg: color-mix(in srgb, var(--surface) 55%, var(--surface-2)); background: var(--sw-bg); box-shadow: inset 0 2px 6px rgba(40, 28, 16, .09), inset 0 0 22px rgba(40, 28, 16, .05); }
-.edge { width: 26px; opacity: 1; }
-.edge.left { background: linear-gradient(to right, var(--sw-bg) 20%, transparent); }
-.edge.right { background: linear-gradient(to left, var(--sw-bg) 20%, transparent); }
-.sweep-track .sc.cur .cell { background: color-mix(in srgb, var(--ink) 8%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 8%, transparent); }
-.sw-prog { max-width: none; margin: 0 4px; }
 
 /* practice: spare space goes above and below the card */
 body[data-page="practice"] main { padding-bottom: 14px; }
@@ -982,11 +930,6 @@ div.crow { cursor: default; }
 .help p { margin: 0 0 12px; }
 .help p:last-child { margin-bottom: 0; }
 
-/* sweep: recessed all round */
-.sweep-box { --sw-bg: color-mix(in srgb, var(--surface-2) 92%, var(--ink)); box-shadow: inset 0 0 22px rgba(40, 28, 16, .16), inset 0 0 5px rgba(40, 28, 16, .1); border-color: transparent; }
-.edge { width: 18px; }
-.sweep-track .sc.cur .cell { background: var(--bg); box-shadow: 0 0 0 4px var(--bg); }
-body.s-sw-real .sweep-track .sc.cur .cell { border-radius: 2px; box-shadow: 0 0 0 2px var(--bg); }
 
 /* alphabet headings */
 .decade-head { align-items: center; margin-bottom: 2px; }
@@ -1174,8 +1117,6 @@ body.s-sw-real .sweep-track .sc.cur .cell { border-radius: 2px; box-shadow: 0 0 
 .braille-line:not(:has(.lbl)) .cell { padding-block: calc(var(--s) * 1.17); }
 .bw.space, .mrow .bw.space, .sweep-track .sc.space, body.s-sw-real .sweep-track .sc.space { width: auto; }
 .space .cell { visibility: hidden; }
-.sweep-track, .sweep-box.real .sweep-track, body.s-sw-real .sweep-track { gap: 0; }
-body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0 1.125mm; }
 .ag-msg { gap: 12px 17px; }
 /* exceptions: one cell per key, tile or card (wordle, keyboards, maze, memory, hangman blanks) keep their own spacing */
 
@@ -1469,13 +1410,47 @@ body.kb-open .mode-words .stage .answer-input { margin-top: 10px; }
 .htr .btn { flex: none; padding: 8px 16px; }
 @media (min-width: 700px) { .hcar { margin: 10px 0 0; padding: 2px 0 6px; scroll-padding-inline: 0; } .hct { width: 128px; } }
 
-/* ---------- v17: tighter sweep box ---------- */
-/* Finger circle sits 0.8 × its diameter below where it was; the reader line runs down to meet its top. */
-.sweep-box { height: 345px; }
-.sweep-track { top: 82px; }
-.reader { top: 60px; bottom: auto; height: 181px; }
-.finger { top: 241px; }
+
+
+/* ---------- sweep box: all its styles in one place ---------- */
+.sweep-box { --sw-bg: color-mix(in srgb, var(--surface) 65%, var(--surface-2)); position: relative; height: 345px; margin: 0 -4px; overflow: hidden; border-radius: 26px; background: var(--sw-bg); border: 1px solid var(--line); user-select: none; -webkit-user-select: none; touch-action: none; cursor: crosshair; }
+/* Even inner shadow on all four sides, drawn above the cells and edge fades so nothing covers it. */
+.sweep-box::after { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 14px rgba(40, 28, 16, .1); }
+:root[data-theme="dark"] .sweep-box::after { box-shadow: inset 0 0 16px rgba(0, 0, 0, .4); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sweep-box::after { box-shadow: inset 0 0 16px rgba(0, 0, 0, .4); } }
+.sweep-box .edge { position: absolute; top: 0; bottom: 0; width: 18px; pointer-events: none; }
+.sweep-box .edge.left { left: 0; background: linear-gradient(to right, var(--sw-bg), transparent); }
+.sweep-box .edge.right { right: 0; background: linear-gradient(to left, var(--sw-bg), transparent); }
+.sweep-top { position: absolute; z-index: 3; top: 12px; left: 14px; right: 14px; display: flex; align-items: center; gap: 8px; }
+.sw-prog { flex: 1; height: 6px; margin: 0 4px; border-radius: 999px; background: var(--seg-bg); overflow: hidden; }
+.sw-prog i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; }
+.sweep-hint { position: absolute; left: 0; right: 0; bottom: 6px; padding: 8px; text-align: center; font-size: .8rem; color: var(--muted); pointer-events: none; transition: opacity .3s; }
+
+/* Track of cells; letters appear once you have passed them. */
+.sweep-track { position: absolute; left: 0; top: 82px; display: flex; align-items: flex-start; gap: 0; will-change: transform; }
+.sweep-track .sc { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: none; }
+.sweep-track .cell { --s: 18px; border-radius: 6px; transition: background .15s, box-shadow .15s; }
+.sweep-track .sc .lbl { height: 1.3em; font-size: 1.2rem; color: var(--muted); opacity: 0; transition: opacity .2s; }
+.sweep-track .sc.passed .lbl { opacity: 1; }
+.sweep-track .sc.cur .lbl { color: var(--ink); }
+.sweep-track .sc.kind-contraction .lbl { color: var(--accent); }
+/* Current cell: a soft accent tile behind the dots. */
+.sweep-track .sc.cur .cell { background: var(--accent-soft); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* Reader line from the cells down to the top of the finger circle. */
+.reader { position: absolute; top: 60px; height: 181px; width: 2px; margin-left: -1px; background: var(--accent); opacity: .35; pointer-events: none; }
+.finger { position: absolute; top: 241px; width: 56px; height: 56px; margin-left: -28px; border-radius: 50%; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); opacity: .5; pointer-events: none; transition: opacity .2s; }
+.sweep-box.active .finger { opacity: .85; }
+
+/* Real size */
 body.s-sw-real .sweep-box { height: 275px; }
 body.s-sw-real .sweep-track { top: 92px; }
+body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0 1.125mm; border-radius: 2px; }
+body.s-sw-real .sweep-track .sc.cur .cell { box-shadow: 0 0 0 2px var(--accent-soft); }
+body.s-sw-real .sweep-track .sc .lbl { font-size: .875rem; }
 body.s-sw-real .reader { top: 66px; height: 119px; }
 body.s-sw-real .finger { top: 185px; }
+
+.sweep-settings { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.sweep-settings .set-row.switch span { display: flex; flex-direction: column; gap: 2px; }
+.sweep-settings small { color: var(--muted); font-size: .8rem; }

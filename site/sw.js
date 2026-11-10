@@ -1,6 +1,6 @@
 // Learn Braille service worker: app shell cached for offline use, refreshed in the background.
-const CACHE = 'learn-braille-v20';
-const SHELL = ['./', './index.html', './css/style.css?v=20', './js/app.js?v=20', './js/braille.js?v=20', './js/data.js?v=20', './js/games.js?v=20', './js/gamedata.js?v=20',
+const CACHE = 'learn-braille-v21';
+const SHELL = ['./', './index.html', './css/style.css?v=21', './js/app.js?v=21', './js/braille.js?v=21', './js/data.js?v=21', './js/games.js?v=21', './js/gamedata.js?v=21',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
