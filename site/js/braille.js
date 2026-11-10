@@ -92,7 +92,7 @@ export const CONTRACTIONS = {
     items: [['child', '16'], ['shall', '146'], ['this', '1456'], ['which', '156'], ['out', '1256'], ['still', '34']],
   },
   'Lower groupsigns': {
-    blurb: 'Cells using only the lower dots (2, 3, 5, 6). Position in the word matters.',
+    blurb: 'Cells using only the lower four dots. Position in the word matters.',
     items: [
       ['ea', '2', 'inside a word only · tea'], ['bb', '23', 'inside only · rabbit'], ['cc', '25', 'inside only · accept'],
       ['ff', '235', 'inside only · coffee'], ['gg', '2356', 'inside only · egg'], ['en', '26', 'anywhere in a word · ten'],
@@ -105,7 +105,7 @@ export const CONTRACTIONS = {
     items: [['be', '23', 'alone'], ['enough', '26', 'alone'], ['were', '2356', 'alone'], ['his', '236', 'alone'], ['in', '35', 'alone'], ['was', '356', 'alone']],
   },
   'Initial-letter contractions': {
-    blurb: 'A prefix cell (dots 5, 45 or 456) plus the word’s first letter or groupsign.',
+    blurb: 'A prefix cell from the right column plus the word’s first letter or groupsign.',
     items: [
       ['day', '5 145'], ['ever', '5 15'], ['father', '5 124'], ['here', '5 125'], ['know', '5 13'], ['lord', '5 123'],
       ['mother', '5 134'], ['name', '5 1345'], ['one', '5 135'], ['part', '5 1234'], ['question', '5 12345'],
@@ -117,7 +117,7 @@ export const CONTRACTIONS = {
     ],
   },
   'Final-letter groupsigns': {
-    blurb: 'Word endings: dots 46 or 56 plus a letter. Never at the start of a word.',
+    blurb: 'Word endings: a prefix cell plus a letter. Never at the start of a word.',
     items: [
       ['ound', '46 145'], ['ance', '46 15'], ['sion', '46 1345'], ['less', '46 234'], ['ount', '46 2345'],
       ['ence', '56 15'], ['ong', '56 1245'], ['ful', '56 123'], ['tion', '56 1345'], ['ness', '56 234'],

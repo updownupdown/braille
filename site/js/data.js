@@ -1,5 +1,5 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=9';
+import { cellsOf } from './braille.js?v=10';
 
 export const SIGN_WORDS = [
   'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',
@@ -52,13 +52,13 @@ export const LANG_INFO = {
   },
   fr: {
     title: 'Français — Code braille français uniformisé',
-    blurb: 'Used in France, Quebec and across French Canada. Accented letters get their own cells (é is a full cell ⠿). Numbers use a dot-6 sign ⠠ and “Antoine” digits — letters a–j with dot 6 added. On bilingual federal signs across Canada you will often see this beside or below the English.',
+    blurb: 'Used in France, Quebec and across French Canada. Accented letters get their own cells (é is a full cell ⠿). Numbers use a one-dot number sign ⠠ and “Antoine” digits — letters a–j with the lower-right dot added. On bilingual federal signs across Canada you will often see this beside or below the English.',
     phrases: ['Bonjour', 'Merci', 'Sortie', 'Toilettes', 'Ascenseur', 'Étage 2'],
     letters: 'abcdefghijklmnopqrstuvwxyzéàèùâêîôûëïüçœ',
   },
   es: {
     title: 'Español',
-    blurb: 'Spanish braille keeps the same a–z and number system as English, adds accented vowels and ñ, and uses dots 4-6 ⠨ as the capital sign. The period is a single dot 3 ⠄.',
+    blurb: 'Spanish braille keeps the same a–z and number system as English, adds accented vowels and ñ, and uses ⠨ as the capital sign. The period is a single dot ⠄.',
     phrases: ['Hola', 'Gracias', 'Salida', '¿Dónde está el baño?', 'Ascensor'],
     letters: 'abcdefghijklmnñopqrstuvwxyzáéíóúü',
   },
@@ -88,7 +88,7 @@ const JROWS = [['', ''], ['k', '6'], ['s', '56'], ['t', '35'], ['n', '3'], ['h',
 const JNAMES = { si: 'shi', ti: 'chi', tu: 'tsu', hu: 'fu' };
 const jcell = (d) => String.fromCharCode(0x2800 + [...d].reduce((v, n) => v | (1 << (Number(n) - 1)), 0));
 export const JAPANESE = {
-  blurb: 'Japanese braille (tenji 点字) is built on kana syllables, not letters. The five vowels use dots 1, 2 and 4; each consonant row adds its own dots to the vowel shape. Kanji are written by their reading.',
+  blurb: 'Japanese braille (tenji 点字) is built on kana syllables, not letters. The five vowels use only the top dots; each consonant row adds its own dots to the vowel shape. Kanji are written by their reading.',
   rows: [
     ...JROWS.map(([c, add]) => [c ? c + '-' : 'vowels', Object.entries(JV).map(([v, d]) => [JNAMES[c + v] || c + v, jcell(d + add)])]),
     ['y-, w-, n', [['ya', jcell('34')], ['yu', jcell('346')], ['yo', jcell('345')], ['wa', jcell('3')], ['wo', jcell('35')], ['n', jcell('356')]]],
@@ -106,8 +106,8 @@ export const SYSTEMS = [
     ['Computer Braille Code', 'US (until UEB)', 'A one-cell-per-character code for programming and web addresses; UEB now handles these itself.'],
   ]},
   { group: 'Other Latin-script languages', items: [
-    ['French (Code braille français uniformisé)', 'France, Quebec, French Canada, Belgium, Switzerland, Africa', 'Intégral (uncontracted) and abrégé (contracted). Accented letters have their own cells and numbers use “Antoine” digits after a dot-6 sign.', 'fr'],
-    ['Spanish', 'Spain, Latin America', 'Mostly uncontracted. Accented vowels and ñ have their own cells; dots 4-6 mark capitals; the period is dot 3.', 'es'],
+    ['French (Code braille français uniformisé)', 'France, Quebec, French Canada, Belgium, Switzerland, Africa', 'Intégral (uncontracted) and abrégé (contracted). Accented letters have their own cells and numbers use “Antoine” digits after a one-dot number sign.', 'fr'],
+    ['Spanish', 'Spain, Latin America', 'Mostly uncontracted. Accented vowels and ñ have their own cells; ⠨ marks capitals; the period is a single dot.', 'es'],
     ['German (Deutsche Blindenschrift)', 'Germany, Austria, Switzerland', 'Basisschrift (uncontracted, formerly Vollschrift) and Kurzschrift (contracted). Umlauts and ß have their own cells; capitals are traditionally not marked.', 'de'],
     ['Italian, Portuguese, Dutch, Nordic and others', 'Europe & beyond', 'Each adapts the same a–z base from French braille, adding its own accented letters and punctuation.'],
   ]},
@@ -124,7 +124,7 @@ export const SYSTEMS = [
   ]},
   { group: 'Special-purpose codes', items: [
     ['Music braille', 'International', 'Notes, durations, octaves and dynamics in 6-dot cells. Louis Braille included music in his 1829 method.'],
-    ['8-dot / computer braille', 'Refreshable displays', 'Adds dots 7 and 8 below the cell, giving 256 patterns — one per character. Unicode’s braille block (U+2800–U+28FF) contains all of them.'],
+    ['8-dot / computer braille', 'Refreshable displays', 'Adds a fourth row of two dots below the cell, giving 256 patterns — one per character. Unicode’s braille block (U+2800–U+28FF) contains all of them.'],
     ['Gardner–Salinas braille', 'Science', 'An 8-dot code for maths and science notation, developed in the 1990s.'],
     ['IPA braille', 'Linguistics', 'Phonetic symbols for writing pronunciation.'],
     ['Chess and other notations', 'Hobbies', 'Specialist codes published by braille authorities.'],
@@ -179,8 +179,8 @@ export const SIGN_REGIONS = {
     facts: [
       ['Code', 'French braille — the same code used in France (Code braille français uniformisé). Accented letters have their own cells: é is a full cell ⠿, à is ⠷, è is ⠮.'],
       ['Where', 'Quebec, francophone communities across Canada, and the French half of bilingual federal signs.'],
-      ['Numbers', 'French braille marks numbers with a single dot 6 ⠠ followed by “Antoine” digits — a–j with dot 6 added, so 1 is ⠡ and 2 is ⠣. Some signs may use the English ⠼ style instead, so be ready for both.'],
-      ['Capitals', 'Dots 4-6 ⠨ mark a capital letter.'],
+      ['Numbers', 'French braille marks numbers with a single dot ⠠ followed by “Antoine” digits — a–j with the lower-right dot added, so 1 is ⠡ and 2 is ⠣. Some signs may use the English ⠼ style instead, so be ready for both.'],
+      ['Capitals', '⠨ marks a capital letter.'],
       ['Rules', 'The same national standard (CSA B651) and provincial building codes as in English Canada decide where tactile signs go.'],
     ],
     signs: ['Sortie', 'Toilettes', 'Hommes', 'Femmes', 'Escalier', 'Ascenseur', 'Accueil', 'Entrée', 'Salle 101'],

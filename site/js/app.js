@@ -1,10 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=9';
+} from './braille.js?v=10';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=9';
+} from './data.js?v=10';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=10';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -45,19 +46,30 @@ const P = {
   read: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   write: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   words: '<path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/>',
+  games: '<rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7 10.5v4M5 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="18" cy="13.8" r=".9" fill="currentColor"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  gallows: '<path d="M4 21h10M7 21V3h9v3"/><circle cx="16" cy="8.5" r="2.5"/><path d="M16 11v5M16 13l-2.5 2M16 13l2.5 2"/>',
+  key: '<circle cx="8" cy="15" r="4.5"/><path d="m11.5 11.5 8-8M16.5 6.5l2.5 2.5M14 9l2 2"/>',
+  rain: '<circle cx="6" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="10" r="1.5" fill="currentColor"/><circle cx="18" cy="4" r="1.5" fill="currentColor"/><circle cx="8" cy="15" r="1.5" fill="currentColor"/><path d="M3 21h18"/>',
+  timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M19 6l-1.5 1.5"/>',
+  mirror: '<path d="M12 3v18" stroke-dasharray="2 2.5"/><circle cx="7" cy="8" r="1.6" fill="currentColor"/><circle cx="7" cy="13" r="1.6" fill="currentColor"/><circle cx="17" cy="8" r="1.6" fill="currentColor"/><circle cx="17" cy="13" r="1.6" fill="currentColor"/><circle cx="4" cy="8" r="1.6"/><circle cx="20" cy="8" r="1.6"/>',
+  cards: '<rect x="3" y="5" width="10" height="14" rx="2"/><rect x="11" y="3" width="10" height="14" rx="2" fill="var(--bg, #fff)"/>',
+  maze: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h6v6M15 3v6h-3M21 15h-6v6M9 21v-3"/>',
+  bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
+  print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
   sweep: '<circle cx="5" cy="8" r="1.6" fill="currentColor"/><circle cx="10" cy="8" r="1.6" fill="currentColor"/><circle cx="15" cy="8" r="1.6" fill="currentColor"/><path d="M3 16h15"/><path d="m15 13 3 3-3 3"/>',
 };
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', color: true, dotNums: false, swGrade: 1, swSize: 'large', swVibe: true };
+const DEFAULTS = { theme: 'auto', color: true, swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
-  b.toggle('s-color', S.color); b.toggle('s-dotnums', S.dotNums); b.toggle('s-sw-real', S.swSize === 'real');
+  b.toggle('s-color', S.color); b.toggle('s-sw-real', S.swSize === 'real');
 }
 function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
 
@@ -92,9 +104,11 @@ function kindOf(c) {
 const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, cls, { kind })).join('');
 // Compact row: cells · label · dot numbers · note (a button when it opens a detail sheet).
 function crowHTML(cells, label, { kind = '', note = '', i = null, added = null } = {}) {
-  const tag = i == null ? 'div' : 'button';
-  return `<${tag} class="crow"${i == null ? '' : ` data-i="${i}"`}><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span><span class="cnote">${esc(note)}</span></${tag}>`;
+  const tag = 'div';
+  return `<${tag} class="crow"><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span><span class="cnote">${esc(note)}</span></${tag}>`;
 }
+// Tables holding any multi-cell symbol collapse to one column sooner, so every row in a section lines up.
+function markMulti(root = document) { $$('.ctable', root).forEach((t) => t.classList.toggle('multi', !!t.querySelector('.cells .cell + .cell'))); }
 // Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
 function groupsHTML(spec, cls = 'md') {
   return `<div class="braille-line groups">${spec.split(' ').map((g) => {
@@ -111,7 +125,7 @@ const sheet = $('#sheet');
 const backdrop = $('#sheetBackdrop');
 function openSheet(html, { title = '' } = {}) {
   sheet.innerHTML = `<div class="sheet-head"><h2>${esc(title)}</h2><button class="icon-btn close" aria-label="Close">${icon('close', 20)}</button></div><div class="sheet-body">${html}</div>`;
-  sheet.hidden = false; backdrop.hidden = false;
+  sheet.hidden = false; backdrop.hidden = false; markMulti(sheet);
   sheet.scrollTop = 0;
   $('.close', sheet).onclick = closeSheet;
   $('.close', sheet).focus({ preventScroll: true });
@@ -185,7 +199,6 @@ function openSettings() {
       ${switchRow('color', 'Colour-code dots', S.color)}
       <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
-    <div class="set-group"><h3>Learn</h3>${switchRow('dotNums', 'Show dot numbers in Learn', S.dotNums)}</div>
     <div class="set-group"><h3>Progress</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
     <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
   </div>`, { title: 'Settings' });
@@ -255,7 +268,7 @@ const INDICATORS = [
   ['capital passage', '6 6 6', 'Three or more words in capitals, ended by the terminator.'], ['capitals terminator', '6 3', 'Ends a capital word or passage.'],
   ['number sign', '3456', 'Letters a–j that follow are digits 1–0.'], ['grade 1 symbol', '56', 'Read the next cell as a plain letter, not a contraction.'],
   ['grade 1 word', '56 56', 'Read the next word uncontracted.'], ['grade 1 passage', '56 56 56', 'Uncontracted passage.'],
-  ['italic', '46 23', 'Italic symbol (italic word: 46 2).'], ['bold', '45 23', 'Bold symbol.'],
+  ['italic', '46 23', 'Italic symbol (a different sign marks a whole italic word).'], ['bold', '45 23', 'Bold symbol.'],
 ];
 for (const [p, d, n] of INDICATORS) DICT.push({ print: p, cells: cellsOf(d), cat: 'Indicator', note: n, group: 'Indicators' });
 for (const [cat, { blurb, items }] of Object.entries(CONTRACTIONS)) for (const [p, d, n] of items) DICT.push({ print: p, cells: cellsOf(d), cat, note: n || '', blurb, group: cat });
@@ -304,12 +317,12 @@ function progressHTML() {
     <div class="pc-body">
       <table class="ptable"><thead><tr><th></th><th>Read</th><th>Write</th></tr></thead><tbody>${rows}</tbody></table>
       <p class="muted small">Something counts as learned after a few correct answers in a row. Tap a tally to practise it.</p>
-      <a class="btn primary" href="#/practice">Practice</a>
+      <div class="row"><a class="btn primary" href="#/practice">Practice</a><a class="btn" href="#/practice/read?cat=review&set=today">Daily review</a></div>
     </div></details>`;
 }
 views[''] = () => {
   setTitle(''); setSub('');
-  const row = (href, title, desc, ic) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><span class="hrow-ic">${icon(ic, 26)}</span>${icon('right', 18)}</a>`;
+  const row = (href, title, desc, ic) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><span class="hrow-ic">${icon(ic, 26)}</span></a>`;
   view.innerHTML = `
     <div class="home-head">
       <p class="slogan">A resource for sighted folks to learn the braille writing system.</p>
@@ -336,6 +349,14 @@ views[''] = () => {
       ${row('#/reference/systems', 'World systems', 'The braille family around the world', 'map')}
     </div>
 
+    <h2 class="sec-h">${icon('games', 28)} Games</h2>
+    <div class="hrows">
+      ${row('#/games/wordle', 'Braille Wordle', 'Guess the five-letter word in six tries', 'grid')}
+      ${row('#/games/agent', 'Secret Agent', 'Decode braille messages to crack a case', 'key')}
+      ${row('#/games/rain', 'Braille Rain', 'Type falling letters before they land', 'rain')}
+      ${row('#/games', 'All games', 'Eleven games, from easy to hard', 'games')}
+    </div>
+
     <h2 class="sec-h">${icon('translate', 28)} Translate</h2>
     <div class="hrows">
       ${row('#/translate', 'Type anything', 'See it in braille: English Grade 1 or 2 and five other languages', 'translate')}
@@ -357,11 +378,29 @@ const CATS = {
     signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1] }))],
     ind: ['Indicators', () => INDICATORS.map(([p, d]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p }))],
   } },
+  review: { name: 'Review', sets: { today: ['Today’s mix', () => reviewItems()] } },
   contractions: { name: 'Grade 2', sets: {
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
     all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
   } },
 };
+// Daily review: the 15 items you miss most (then the least practised), fixed for the day.
+function reviewItems() {
+  const all = new Map();
+  for (const [c, cat] of Object.entries(CATS)) if (c !== 'review') for (const [k, [, f]] of Object.entries(cat.sets)) for (const it of f()) all.set(it.key, it);
+  const today = new Date().toISOString().slice(0, 10);
+  let r = store.get('review', null);
+  if (!r || r.date !== today || !r.keys.every((k) => all.has(k))) {
+    const ms = store.get('misses', {}), m = mastery();
+    const miss = (k) => (ms['r:' + k] || 0) + (ms['w:' + k] || 0);
+    const sc = (k) => (m['r:' + k] || 0) + (m['w:' + k] || 0);
+    const tried = [...all.keys()].filter((k) => miss(k) > 0).sort((a, b) => miss(b) - miss(a) || sc(a) - sc(b));
+    const rest = shuffle([...all.keys()].filter((k) => !tried.includes(k) && /^[a-z]$/.test(k))).sort((a, b) => sc(a) - sc(b));
+    r = { date: today, keys: [...tried, ...rest].slice(0, 15) };
+    store.set('review', r);
+  }
+  return r.keys.map((k) => all.get(k));
+}
 const WORD_SETS = {
   simple: { name: 'Simple', grade: 1, list: WORDS },
   signs: { name: 'Signs', grade: 2, list: SIGN_WORDS.map((w) => w.toLowerCase()) },
@@ -379,11 +418,12 @@ function mergeByCells(items) {
 const SWEEP_SRC = { words: 'Words', sentences: 'Sentences', signs: 'Signs' };
 const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
 const HELP = {
-  read: 'A braille cell appears — pick what it says. The card glows green when you’re right and red (with a shake) when you’re not. On a keyboard, press 1–4. Your progress for each item goes from pale blue to dark blue, then green once you know it; ones you miss come up more often.',
-  write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Dot 1 is top left and dot 4 top right; see Learn → Overview.',
-  words: 'Decode the word and type it — it checks as you type. Hint reveals one cell at a time; Skip shows the answer.',
-  sweep: 'Put your finger on the line and slide right. The cell under your finger is shaded, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “Again” goes back to the start of the line and “Next” loads a new one. Grade and cell size are below the reading area.',
+  read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'On a keyboard, press 1–4 to choose.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
+  write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.', 'On a keyboard, F D S are the left column from top to bottom, and J K L the right column, like a Perkins brailler.'],
+  words: ['Decode the word and type it. It checks as you type.', 'Hint reveals one cell at a time. Skip shows the answer.'],
+  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger near the right edge and the line keeps scrolling. On a laptop, move the mouse or use the arrow keys.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
+const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('');
 
 views.practice = (q, sub) => {
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
@@ -391,7 +431,7 @@ views.practice = (q, sub) => {
   setTitle('Practice');
   setSub(`<div class="seg radios modes" role="radiogroup">${Object.entries(MODES).map(([k, v]) => `<a role="radio" aria-checked="${k === mode}" class="${k === mode ? 'on' : ''}" href="#/practice/${k}">${icon(k, 20)}<span>${v}</span></a>`).join('')}</div>`);
   helpBtn.hidden = false;
-  helpBtn.onclick = () => openSheet(`<p>${esc(HELP[mode])}</p>`, { title: MODES[mode] });
+  helpBtn.onclick = () => openSheet(`<div class="help">${helpHTML(mode)}</div>`, { title: MODES[mode] });
   view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
   return mode === 'sweep' ? sweepMode(q) : quizMode(mode, q);
 };
@@ -416,13 +456,17 @@ function quizMode(mode, q) {
   };
   const pre = mode === 'write' ? 'w:' : 'r:';
   const score = (k) => m[pre + k] || 0;
-  const bump = (k, d) => { m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m); };
+  const bump = (k, d) => {
+    m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m);
+    if (d < 0) { const ms = store.get('misses', {}); ms[pre + k] = (ms[pre + k] || 0) + 1; store.set('misses', ms); }
+  };
 
   function renderPicker() {
     if (mode === 'words') {
       picker.innerHTML = radios('wset', Object.entries(WORD_SETS).map(([k, s]) => [k, s.name]), state.wset);
     } else {
       picker.innerHTML = radios('cat', Object.entries(CATS).map(([k, c]) => [k, c.name]), state.cat) + '<div id="setDD"></div>';
+      if (state.cat === 'review') return;
       dropdown($('#setDD'), { options: Object.entries(CATS[state.cat].sets).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
     }
   }
@@ -574,7 +618,7 @@ function sweepMode(q) {
       <div class="sweep-track" id="track"></div>
       <div class="reader" id="reader"></div>
       <div class="finger" id="finger"></div>
-      <div class="sweep-top"><button class="link-btn pillish" id="restart">${icon('restart', 16)} Again</button>
+      <div class="sweep-top"><button class="link-btn pillish" id="restart">${icon('restart', 16)} Restart</button>
         <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>
@@ -789,7 +833,7 @@ function grade2Section() {
   const cats = Object.entries(CONTRACTIONS);
   const row = (e, i) => {
     const note = e.cat === 'Shortforms' ? (SHORT_SPELL[e.print] || '') : (e.note || (G2_EXAMPLE[e.print] ? 'e.g. ' + G2_EXAMPLE[e.print] : ''));
-    return `<button class="crow" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c, '', { kind: 'contraction' })).join('')}</span><b>${esc(e.print)}</b><span class="cdots">${[...e.cells].map((c) => toDots(c).join('')).join(' ')}</span><span class="cnote">${esc(note)}</span></button>`;
+    return crowHTML(e.cells, e.print, { kind: 'contraction', note });
   };
   const sample = 'The children went to the park with their father.';
   const g1 = unicodeOf(translate(sample, 'en', 1)).replace(/ /g, '').length;
@@ -812,18 +856,18 @@ function grade2Section() {
 // ---------- reference ----------
 const REF_SECTIONS = [
   ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
-  ['science', 'Maths & science'], ['languages', 'Languages'], ['systems', 'World systems'],
+  ['science', 'Maths & science'], ['languages', 'Languages'], ['systems', 'World systems'], ['cheatsheet', 'Cheat sheet'],
 ];
 function alphabetSection() {
   const ROWS = [
-    ['a–j', 'the foundation', 'abcdefghij', null, 'Only the top four dots. Learn these ten and the rest follow.', 'aj'],
-    ['k–t', 'add the lower-left dot', 'klmnopqrst', [3], 'Same shapes as a–j, with one more dot below on the left.', 'kt'],
-    ['u–z', 'add both bottom dots', 'uvxyz', [3, 6], 'Same shapes again, with both bottom dots.', 'uz'],
-    ['w', 'the latecomer', 'w', [6], 'French had no w in 1824. It’s j plus the lower-right dot.', 'uz'],
+    ['a–j', 'The foundation', 'abcdefghij', null, 'Only the top four dots are used. Learn these ten and the rest follow.', 'aj'],
+    ['k–t', 'Add the lower-left dot', 'klmnopqrst', [3], 'The same shapes as a–j, with one more dot below on the left.', 'kt'],
+    ['u–z', 'Add both bottom dots', 'uvxyz', [3, 6], 'The same shapes again, with both bottom dots.', 'uz'],
+    ['w', 'The latecomer', 'w', [6], 'French had no w in 1824, so it was added later. It’s j plus the lower-right dot.', 'uz'],
   ];
-  return `<p class="lead-p">The alphabet is ten shapes, repeated. Each new row adds dots (in blue) to the first. Tap any letter for details.</p>
+  return `<p class="lead-p">The alphabet is ten shapes, repeated. Each new row adds dots (in blue) to the first.</p>
     <div id="alphaWrap">${ROWS.map(([range, title, letters, added, blurb, set]) => `
-      <div class="decade"><div class="decade-head"><h3>${range} · ${title}</h3><span>${blurb}</span>${letters.length > 1 ? practiseLink(`#/practice/read?cat=letters&set=${set}`) : ''}</div>
+      <div class="decade"><div class="decade-head"><h3 class="range">${range}</h3>${letters.length > 1 ? practiseLink(`#/practice/read?cat=letters&set=${set}`) : ''}</div><p class="decade-p">${title}. ${blurb}</p>
       <div class="ctable narrow">${letters.split('').map((l) => crowHTML(LETTERS[l], l, { kind: 'letter', i: 'abcdefghijklmnopqrstuvwxyz'.indexOf(l), added })).join('')}</div></div>`).join('')}</div>
     ${exBlock([['hello', 'Letters are simply written one after another.'], ['braille', ''], ['jazz quiz', 'A space is an empty cell.']])}
     <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>. Mixing up d, f, h and j? Try <a href="#/practice/read?cat=letters&set=mirror">mirror pairs</a>.</p>`;
@@ -881,6 +925,20 @@ function numbersSection() {
     html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${parts.map(([id, , h]) => `<div class="sg" id="${id}">${h}</div>`).join('')}`,
   };
 }
+function cheatSection() {
+  const t = (title, rows) => `<div class="cs-block"><h3>${title}</h3><div class="ctable narrow">${rows.join('')}</div></div>`;
+  const P = (ch) => crowHTML(UEB_PUNCT[ch][0], ch, { kind: 'punct', note: UEB_PUNCT[ch][1] });
+  const W = (w) => { const e = DICT.find((x) => x.print === w && x.group !== 'Letters'); return crowHTML(e.cells, w, { kind: 'contraction' }); };
+  return { html: `<div class="cs-head"><p class="lead-p">Everything a beginner needs on one page. Print it, or save it as a PDF.</p><button class="btn primary" id="csPrint">${icon('print', 18)} Print</button></div>
+    <div class="cheatsheet">
+      <h2 class="cs-title">Braille cheat sheet <small>Unified English Braille</small></h2>
+      ${t('Letters', [...'abcdefghijklmnopqrstuvwxyz'].map((l) => crowHTML(LETTERS[l], l, { kind: 'letter' })))}
+      ${t('Numbers', ['1234567890'.split('').map((d) => crowHTML(IND.number + LETTERS['jabcdefghi'[Number(d)]], d, { kind: 'digit' }))].flat())}
+      ${t('Signs', [crowHTML(IND.capital, 'capital', { kind: 'indicator' }), crowHTML(IND.number, 'number', { kind: 'digit' }), P('.'), P(','), P('?'), P('!'), P("'"), P('-')])}
+      ${t('Common words (Grade 2)', ['and', 'for', 'of', 'the', 'with', 'but', 'can', 'do', 'it', 'that', 'you', 'ing', 'st', 'sh', 'th', 'ch'].map(W))}
+      <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>
+    </div>`, bind: () => { $('#csPrint').onclick = () => window.print(); } };
+}
 // Full character table for a language, shown in a modal from World systems or Languages.
 function charsTable(k) {
   if (k === 'ja') return `<p class="muted">${esc(JAPANESE.blurb)}</p>${kanaTable()}`;
@@ -897,11 +955,12 @@ function languagesSection() {
     const render = (k) => {
       store.set('refLang', k);
       const body = $('#langBody');
-      if (k === 'ja') { body.innerHTML = charsTable('ja'); return; }
+      if (k === 'ja') { body.innerHTML = charsTable('ja'); markMulti(body); return; }
       const info = LANG_INFO[k];
       body.innerHTML = `${charsTable(k)}
         <div class="group-title"><h3>Phrases</h3><span>${k === 'en' ? 'Grade 2' : 'uncontracted'}</span></div>
         <div class="example-grid">${info.phrases.map((p) => `<a class="example" href="#/translate?lang=${k}&text=${encodeURIComponent(p)}"><div class="print">${esc(p)}</div>${lineHTML(translate(p, k, k === 'en' ? 2 : 1), { cls: 'sm' })}</a>`).join('')}</div>`;
+      markMulti(body);
     };
     const v = store.get('refLang', 'en');
     dropdown($('#langDD'), { label: 'Language', options: Object.entries(LANG_NAMES()).map(([value, label]) => ({ value, label })), value: v, onChange: render });
@@ -938,6 +997,7 @@ function refSection(key, sub) {
     case 'languages': return languagesSection();
     case 'systems': return systemsSection();
     case 'overview': return overviewSection();
+    case 'cheatsheet': return cheatSection();
   }
   return { html: '' };
 }
@@ -954,12 +1014,33 @@ views.reference = (q, sub, sub2) => {
   view.innerHTML = `${sec.html}
       <div class="pager">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
   if (sec.bind) sec.bind();
+  markMulti(view);
   view.onclick = (ev) => {
-    const s = ev.target.closest('.sym[data-i], .crow[data-i]');
-    if (s) { const e = DICT[Number(s.dataset.i)]; if (e.group === 'Letters') openSheet(letterDetail(e.print), { title: 'Letter ' + e.print }); else openSheet(symbolDetail(e), { title: 'Symbol' }); return; }
     const l = ev.target.closest('.letter[data-l]'); if (l) openSheet(letterDetail(l.dataset.l), { title: 'Letter ' + l.dataset.l });
   };
   return () => { view.onclick = null; };
+};
+
+// ---------- games ----------
+views.games = (q, sub) => {
+  const g = GAMES[sub];
+  if (!g) {
+    setTitle('Games'); setSub('');
+    const row = (k) => { const x = GAMES[k]; return `<a class="hrow" href="#/games/${k}"><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div><span class="g-badge">${x.range}</span><span class="hrow-ic">${icon(x.icon, 26)}</span></a>`; };
+    view.innerHTML = `<p class="lead-p">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
+      ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${t}</h2><div class="hrows">${ks.map(row).join('')}</div>`).join('')}`;
+    return;
+  }
+  setTitle(g.name);
+  setSub(`<a class="back-link" href="#/games">${icon('right', 18)} Games</a>`);
+  helpBtn.hidden = false;
+  helpBtn.onclick = () => openSheet(`<div class="help">${g.help.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`, { title: g.name });
+  let lvl = gameStore.get('lvl.' + sub, g.levels ? g.levels[0][0] : null);
+  if (g.levels && !g.levels.some(([k]) => k === lvl)) lvl = g.levels[0][0];
+  view.innerHTML = `<div class="game-wrap game-${sub}">${g.levels ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}<div class="game" id="game"></div></div>`;
+  let stop = g.run($('#game'), lvl, { dropdown });
+  if (g.levels) bindRadios($('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); if (stop) stop(); stop = g.run($('#game'), lvl, { dropdown }); });
+  return () => { if (stop) stop(); };
 };
 
 // ---------- global search ----------
@@ -974,6 +1055,7 @@ function buildIndex() {
   }));
   REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Learn section', sec: k, page: true, act: nav('#/reference/' + k) }));
   Object.entries(MODES).forEach(([k, t]) => out.push({ title: t, sub: 'Practice mode', sec: 'practice', page: true, act: nav('#/practice/' + k) }));
+  Object.entries(GAMES).forEach(([k, g]) => out.push({ title: g.name, sub: 'Game · ' + g.desc, sec: 'games', page: true, act: nav('#/games/' + k) }));
   SCIENCE_SYMBOLS.forEach(([c, n]) => out.push({ title: n, sub: 'Maths & science symbol', cells: c, kind: 'math', sec: 'science', act: nav('#/reference/science') }));
   for (const k of ['fr', 'es', 'de', 'ru', 'el']) {
     for (const l of LANG_INFO[k].letters) {
@@ -1017,9 +1099,9 @@ function renderSearch() {
   const raw = $('#gq').value;
   if (!raw.trim()) { searchPanel.hidden = true; return; }
   RESULTS = searchResults(raw);
-  const secName = Object.fromEntries([...REF_SECTIONS, ['practice', 'Practice']]);
+  const secName = Object.fromEntries([...REF_SECTIONS, ['practice', 'Practice'], ['games', 'Games']]);
   const tr = /[a-z]/i.test(raw) && !/^[1-6\s-]+$/.test(raw) ? `<a class="sr tr" href="#/translate?lang=en&text=${encodeURIComponent(raw)}"><span class="sr-cells">${lineHTML(translate(raw, 'en', 2), { labels: false, cls: 'sm' })}</span><span class="sr-text"><b>Translate “${esc(raw)}”</b><small>English Grade 2</small></span></a>` : '';
-  searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr" data-r="${i}"><span class="sr-cells">${e.cells ? cellsK(e.cells, e.kind || '', 'sm') : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word, a symbol, or dot numbers like 1456.</p>'}${tr}</div>`;
+  searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr" data-r="${i}"><span class="sr-cells">${e.cells ? cellsK(e.cells, e.kind || '', 'sm') : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word or a symbol.</p>'}${tr}</div>`;
   searchPanel.hidden = false;
 }
 $('#gq').addEventListener('input', renderSearch);
@@ -1066,7 +1148,7 @@ views.translate = (q) => {
 
 // ---------- router ----------
 let cleanup = null;
-const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Learn · Learn Braille', translate: 'Translate · Learn Braille' };
+const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Learn · Learn Braille', translate: 'Translate · Learn Braille', games: 'Games · Learn Braille' };
 function route() {
   const raw = location.hash.replace(/^#\/?/, '');
   let [path, qs] = raw.split('?');

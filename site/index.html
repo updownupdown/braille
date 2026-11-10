@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,6 +31,7 @@
         <a href="#/" data-route="">Home</a>
         <a href="#/practice" data-route="practice">Practice</a>
         <a href="#/reference" data-route="reference">Learn</a>
+        <a href="#/games" data-route="games">Games</a>
         <a href="#/translate" data-route="translate">Translate</a>
       </nav>
       <button class="icon-btn plain" id="helpBtn" aria-label="How this works" title="How this works" data-icon="help" hidden></button>
@@ -38,7 +39,7 @@
       <button class="icon-btn plain" id="settingsBtn" aria-label="Settings" title="Settings" data-icon="settings"></button>
     </div>
     <div class="search-bar" id="searchBar" hidden>
-      <input id="gq" type="search" placeholder="Search letters, contractions, signs, dots (1456)…" autocomplete="off" spellcheck="false">
+      <input id="gq" type="search" placeholder="Search letters, contractions, signs, games…" autocomplete="off" spellcheck="false">
       <button class="icon-btn plain" id="searchClose" aria-label="Close search" data-icon="close"></button>
     </div>
     <div class="subbar" id="subbar" hidden></div>
@@ -51,12 +52,13 @@
     <a href="#/" data-route="" data-icon="home">Home</a>
     <a href="#/practice" data-route="practice" data-icon="practice">Practice</a>
     <a href="#/reference" data-route="reference" data-icon="book">Learn</a>
+    <a href="#/games" data-route="games" data-icon="games">Games</a>
     <a href="#/translate" data-route="translate" data-icon="translate">Translate</a>
   </nav>
 
   <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 
-  <script type="module" src="js/app.js?v=9"></script>
+  <script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>
