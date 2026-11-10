@@ -1429,24 +1429,21 @@ body.kb-open .mode-words .stage .answer-input { margin-top: 10px; }
 /* Track of cells; letters appear once you have passed them. */
 .sweep-track { position: absolute; left: 0; top: 82px; display: flex; align-items: flex-start; gap: 0; will-change: transform; }
 .sweep-track .sc { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: none; }
-.sweep-track .cell { --s: 18px; border-radius: 6px; transition: background .15s, box-shadow .15s; }
+.sweep-track .cell { --s: 18px; }
 .sweep-track .sc .lbl { height: 1.3em; font-size: 1.2rem; color: var(--muted); opacity: 0; transition: opacity .2s; }
 .sweep-track .sc.passed .lbl { opacity: 1; }
 .sweep-track .sc.cur .lbl { color: var(--ink); }
 .sweep-track .sc.kind-contraction .lbl { color: var(--accent); }
-/* Current cell: a soft accent tile behind the dots. */
-.sweep-track .sc.cur .cell { background: var(--accent-soft); box-shadow: 0 0 0 4px var(--accent-soft); }
 
 /* Reader line from the cells down to the top of the finger circle. */
-.reader { position: absolute; top: 60px; height: 181px; width: 2px; margin-left: -1px; background: var(--accent); opacity: .35; pointer-events: none; }
+.reader { position: absolute; top: 60px; height: 181px; width: 2px; margin-left: -1px; background: var(--accent); opacity: .26; pointer-events: none; }
 .finger { position: absolute; top: 241px; width: 56px; height: 56px; margin-left: -28px; border-radius: 50%; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); opacity: .5; pointer-events: none; transition: opacity .2s; }
 .sweep-box.active .finger { opacity: .85; }
 
 /* Real size */
 body.s-sw-real .sweep-box { height: 275px; }
 body.s-sw-real .sweep-track { top: 92px; }
-body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0 1.125mm; border-radius: 2px; }
-body.s-sw-real .sweep-track .sc.cur .cell { box-shadow: 0 0 0 2px var(--accent-soft); }
+body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0 1.125mm; }
 body.s-sw-real .sweep-track .sc .lbl { font-size: .875rem; }
 body.s-sw-real .reader { top: 66px; height: 119px; }
 body.s-sw-real .finger { top: 185px; }
@@ -1454,3 +1451,7 @@ body.s-sw-real .finger { top: 185px; }
 .sweep-settings { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
 .sweep-settings .set-row.switch span { display: flex; flex-direction: column; gap: 2px; }
 .sweep-settings small { color: var(--muted); font-size: .8rem; }
+.sw-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sw-opts > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: .92rem; color: var(--ink-2); }
+.sw-opts .radios { display: flex; }
+.sw-opts .radios button { flex: 1; min-width: 0; padding-inline: 6px; }

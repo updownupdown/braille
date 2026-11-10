@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=21';
+} from './braille.js?v=22';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=21';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=21';
+} from './data.js?v=22';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=22';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -69,7 +69,22 @@ const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}"
 // ---------- settings ----------
 const DEFAULTS = { theme: 'auto', color: true, dotFill: 'outline', swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
-const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
+// Haptics: the Vibration API on Android; on iPhone (no Vibration API) toggling a hidden iOS switch control gives a light tap (iOS 18+).
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const canVibrate = matchMedia('(pointer: coarse)').matches && ('vibrate' in navigator || isIOS);
+let iosTick = null;
+const buzz = (n) => {
+  if ('vibrate' in navigator) { const pat = []; for (let i = 0; i < n; i++) pat.push(30, 40); try { navigator.vibrate(pat); } catch {} return; }
+  if (!isIOS) return;
+  if (!iosTick) {
+    iosTick = document.createElement('label');
+    iosTick.setAttribute('aria-hidden', 'true');
+    iosTick.style.cssText = 'position:fixed;left:-200px;top:0;opacity:0;pointer-events:none;';
+    iosTick.innerHTML = '<input type="checkbox" switch tabindex="-1">';
+    document.body.append(iosTick);
+  }
+  iosTick.click();
+};
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
@@ -693,8 +708,8 @@ function sweepMode(q) {
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>
     <div class="sweep-settings" id="swSet">
-      <div class="set-row"><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
-      <div class="set-row"><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
+      <div class="sw-opts"><div><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
+        <div><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div></div>
       ${canVibrate ? `<label class="set-row switch"><span>Vibrate on dots</span><input type="checkbox" data-set="swVibe" ${S.swVibe ? 'checked' : ''}></label>` : ''}
     </div>`;
   bindRadios($('#picker'), (k, v) => { src = v; store.set('swSrc', v); text = textFor(); build(); });
@@ -758,6 +773,12 @@ function sweepMode(q) {
     let idx = -1;
     for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
     $$('.sc', track).forEach((el, i) => el.classList.toggle('passed', lefts[i] + widths[i] < pos));
+    // From the middle of the current cell, its letter fades in blurred and sharpens by the cell's right edge.
+    if (idx !== curIdx && curIdx >= 0 && track.children[curIdx]) { const l = $('.lbl', track.children[curIdx]); if (l) l.style.cssText = ''; }
+    if (idx >= 0 && cells[idx].kind !== 'space') {
+      const l = $('.lbl', track.children[idx]), f = (pos - lefts[idx]) / widths[idx];
+      if (l) l.style.cssText = f < 0.5 ? '' : `opacity:1;filter:blur(${((1 - f) / 0.5 * 6).toFixed(2)}px)`;
+    }
     if (idx !== curIdx) {
       $$('.sc.cur', track).forEach((e) => e.classList.remove('cur'));
       if (idx >= 0 && cells[idx].kind !== 'space') track.children[idx].classList.add('cur');
@@ -770,7 +791,7 @@ function sweepMode(q) {
       if (key !== lastKey) {
         lastKey = key;
         const dots = toDots(c.cell).filter((d) => (col === 0 ? d <= 3 : d >= 4 && d <= 6));
-        if (dots.length) { const pat = []; dots.forEach(() => pat.push(14, 18)); try { navigator.vibrate(pat); } catch {} }
+        if (dots.length) buzz(dots.length);
       }
     }
   }
