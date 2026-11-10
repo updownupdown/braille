@@ -1,10 +1,10 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=7';
+} from './braille.js?v=8';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=7';
+} from './data.js?v=8';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -50,15 +50,14 @@ const P = {
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', color: true, hideLetters: false, trLabels: true, swGrade: 1, swSize: 'large', swVibe: true };
+const DEFAULTS = { theme: 'auto', color: true, dotNums: false, swGrade: 1, swSize: 'large', swVibe: true };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 const canVibrate = 'vibrate' in navigator && matchMedia('(pointer: coarse)').matches;
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
-  b.toggle('s-color', S.color); b.toggle('s-hide-letters', S.hideLetters);
-  b.toggle('s-tr-nolabels', !S.trLabels); b.toggle('s-sw-real', S.swSize === 'real');
+  b.toggle('s-color', S.color); b.toggle('s-dotnums', S.dotNums); b.toggle('s-sw-real', S.swSize === 'real');
 }
 function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
 
@@ -171,6 +170,7 @@ const switchRow = (name, label, checked) => `<label class="set-row switch"><span
 
 // ---------- header + sticky control row ----------
 const headTitle = $('#headTitle');
+const helpBtn = $('#helpBtn');
 const subbar = $('#subbar');
 const setTitle = (t) => { headTitle.textContent = t; };
 const setSub = (html) => { subbar.innerHTML = html; subbar.hidden = !html; syncHeadH(); };
@@ -185,10 +185,9 @@ function openSettings() {
       ${switchRow('color', 'Colour-code dots', S.color)}
       <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
-    <div class="set-group"><h3>Alphabet</h3>${switchRow('hideLetters', 'Hide letters under cells', S.hideLetters)}</div>
-    <div class="set-group"><h3>Translate</h3>${switchRow('trLabels', 'Print labels under cells', S.trLabels)}</div>
+    <div class="set-group"><h3>Reference</h3>${switchRow('dotNums', 'Show dot numbers in Reference', S.dotNums)}</div>
     <div class="set-group"><h3>Progress</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
-    <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p><p class="muted small">Sweep settings are on the Sweep page.</p></div>
+    <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
   </div>`, { title: 'Settings' });
   bindRadios($('.settings', sheet), (k, v) => setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v));
   $$('[data-set]', sheet).forEach((i) => { i.onchange = () => setS(i.dataset.set, i.checked); });
@@ -210,13 +209,13 @@ function letterDetail(l) {
   const c = LETTERS[l];
   const idx = 'abcdefghijklmnopqrstuvwxyz'.indexOf(l);
   let row;
-  if (idx < 10) row = 'First row (a–j): only the top four dots — 1, 2, 4, 5. Every other row is built from this one.';
-  else if (idx < 20) row = `Second row (k–t): ${'abcdefghij'[idx - 10]} plus dot 3.`;
-  else if (l === 'w') row = 'W is the odd one out: French had no w when braille was invented, so it was added later. It’s j plus dot 6.';
-  else row = `Third row: ${'abcdefghij'['uvxyz'.indexOf(l)]} plus dots 3 and 6.`;
+  if (idx < 10) row = 'First row (a–j): only the top four dots. Every other row is built from this one.';
+  else if (idx < 20) row = `Second row (k–t): ${'abcdefghij'[idx - 10]} plus the lower-left dot.`;
+  else if (l === 'w') row = 'W is the odd one out: French had no w when braille was invented, so it was added later. It’s j plus the lower-right dot.';
+  else row = `Third row: ${'abcdefghij'['uvxyz'.indexOf(l)]} plus both bottom dots.`;
   const m = mirrorLetter(l);
   return `<div class="detail">
-    <div class="detail-top">${cellHTML(c, 'xl numbered')}<div><div class="big">${l}</div><div class="muted">${dotsLabel(c)}</div></div></div>
+    <div class="detail-top">${cellHTML(c, 'xl')}<div><div class="big">${l}</div><div class="muted dots-info">${dotsLabel(c)}</div></div></div>
     <p>${row}</p>
     <dl>
       ${DIGIT_OF[l] ? `<dt>As a number</dt><dd>After ${cellHTML(IND.number, 'sm')} it means <b>${DIGIT_OF[l]}</b></dd>` : ''}
@@ -224,17 +223,17 @@ function letterDetail(l) {
       <dt>Capital</dt><dd>${cellHTML(IND.capital, 'sm')}${cellHTML(c, 'sm')} = ${l.toUpperCase()}</dd>
       ${m ? `<dt>Don’t confuse</dt><dd>${cellHTML(LETTERS[m], 'sm')} <b>${m}</b> is its mirror image</dd>` : ''}
     </dl>
-    <div class="row"><a class="btn primary" href="#/practice/read?cat=letters&set=${idx < 10 ? 'aj' : idx < 20 ? 'kt' : 'uz'}">Practise this row</a><a class="btn" href="#/practice/sweep?src=alphabet">Sweep the alphabet</a></div>
+    <div class="row"><a class="btn primary" href="#/practice/read?cat=letters&set=${idx < 10 ? 'aj' : idx < 20 ? 'kt' : 'uz'}">Practise this row</a></div>
   </div>`;
 }
 function symbolDetail(e) {
   const cells = [...e.cells];
   return `<div class="detail">
-    <div class="detail-top"><div class="row" style="gap:6px">${cells.map((c) => cellHTML(c, cells.length > 2 ? 'lg numbered' : 'xl numbered', { kind: e.kind })).join('')}</div></div>
+    <div class="detail-top"><div class="row" style="gap:6px">${cells.map((c) => cellHTML(c, cells.length > 2 ? 'lg' : 'xl', { kind: e.kind })).join('')}</div></div>
     <h2>${esc(e.print)}</h2>
     <dl>
       <dt>Type</dt><dd>${esc(e.cat)}</dd>
-      <dt>Dots</dt><dd>${cells.map((c) => toDots(c).join('') || '—').join(' · ')}</dd>
+      <dt class="dots-info">Dots</dt><dd class="dots-info">${cells.map((c) => toDots(c).join('') || '—').join(' · ')}</dd>
       ${e.note ? `<dt>Note</dt><dd>${esc(e.note)}</dd>` : ''}
       ${e.blurb ? `<dt>Rule</dt><dd>${esc(e.blurb)}</dd>` : ''}
     </dl>
@@ -264,7 +263,8 @@ const KIND_OF_GROUP = { Letters: 'letter', Numbers: 'digit', Punctuation: 'punct
 for (const e of DICT) e.kind = KIND_OF_GROUP[e.group] || 'contraction';
 const SEC_OF_GROUP = { Letters: 'alphabet', Numbers: 'numbers', Punctuation: 'numbers', Indicators: 'numbers' };
 const symHTML = (e, i) => `<button class="sym" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c, '', { kind: e.kind })).join('')}</span><b>${esc(e.print)}</b>${e.note && e.note.length < 26 ? `<small>${esc(e.note)}</small>` : ''}</button>`;
-const groupBlock = (g, title, blurb) => `<div class="group-title"><h3>${title}</h3>${blurb ? `<span>${esc(blurb)}</span>` : ''}</div><div class="sym-grid">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === g).map(([e, i]) => symHTML(e, i)).join('')}</div>`;
+const practiseLink = (href) => `<a class="gt-link" href="${href}">Practise ${icon('right', 16)}</a>`;
+const groupBlock = (g, title, blurb, href) => `<div class="group-title"><h3>${title}</h3>${blurb ? `<span>${esc(blurb)}</span>` : ''}${href ? practiseLink(href) : ''}</div><div class="sym-grid">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === g).map(([e, i]) => symHTML(e, i)).join('')}</div>`;
 
 const view = $('#view');
 const views = {};
@@ -280,24 +280,29 @@ const mastery = () => {
 const level = (score) => Math.min(4, score); // 0 untried · 1–3 blues · 4+ known (green)
 
 // ---------- home ----------
+const PROG_GROUPS = () => [
+  ['Letters', CATS.letters.sets.az[1](), 'letters', 'az'], ['Numbers', CATS.symbols.sets.num[1](), 'symbols', 'num'],
+  ['Punctuation', CATS.symbols.sets.punct[1](), 'symbols', 'punct'], ['Maths & money', CATS.symbols.sets.signs[1](), 'symbols', 'signs'],
+  ['Indicators', CATS.symbols.sets.ind[1](), 'symbols', 'ind'], ['Contractions', CATS.contractions.sets.all[1](), 'contractions', 'all'],
+];
 function progressHTML() {
   const m = mastery();
-  const groups = [['Letters', CATS.letters.sets.az[1]()], ['Numbers', CATS.symbols.sets.num[1]()], ['Punctuation', CATS.symbols.sets.punct[1]()],
-    ['Maths & money', CATS.symbols.sets.signs[1]()], ['Indicators', CATS.symbols.sets.ind[1]()], ['Contractions', CATS.contractions.sets.all[1]()]];
+  const groups = PROG_GROUPS();
   const known = (pre, items) => items.filter((x) => (m[pre + x.key] || 0) >= 4).length;
-  const letters = groups[0][1];
-  const strip = (pre) => `<div class="pstrip">${letters.map((x) => `<span data-l="${level(m[pre + x.key] || 0)}">${x.answer}</span>`).join('')}</div>`;
-  const r = known('r:', letters), w = known('w:', letters);
+  let got = 0, all = 0;
+  const tally = (mode, pre, items, cat, set) => {
+    const k = known(pre, items); got += k; all += items.length;
+    return `<a class="tally" href="#/practice/${mode}?cat=${cat}&set=${set}"><span class="t-num"><b>${k}</b> / ${items.length}</span><span class="t-bar"><i style="width:${(k / items.length) * 100}%"></i></span></a>`;
+  };
+  const rows = groups.map(([n, items, cat, set]) => `<tr><th scope="row">${n}</th><td>${tally('read', 'r:', items, cat, set)}</td><td>${tally('write', 'w:', items, cat, set)}</td></tr>`).join('');
   return `<details class="progress-card"><summary>
       <span class="pc-title">Your progress</span>
-      <span class="pc-sum"><b>${r}</b>/26 read · <b>${w}</b>/26 written</span>${icon('chevron', 20)}</summary>
+      <span class="pc-bar" aria-hidden="true"><i style="width:${(got / all) * 100}%"></i></span>
+      <span class="pc-sum"><b>${got}</b> / ${all}</span>${icon('chevron', 20)}</summary>
     <div class="pc-body">
-      <table class="ptable"><thead><tr><th></th><th>Read</th><th>Write</th></tr></thead><tbody>
-      ${groups.map(([n, items]) => `<tr><td>${n}</td><td><b>${known('r:', items)}</b>/${items.length}</td><td><b>${known('w:', items)}</b>/${items.length}</td></tr>`).join('')}
-      </tbody></table>
-      <h4>Letters you read</h4>${strip('r:')}
-      <h4>Letters you write</h4>${strip('w:')}
-      <p class="muted small"><span class="legend"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i></span> learning → known. An item counts as known after a few correct answers in a row.</p>
+      <table class="ptable"><thead><tr><th></th><th>Read</th><th>Write</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="muted small">Something counts as learned after a few correct answers in a row. Tap a tally to practise it.</p>
+      <a class="btn primary" href="#/practice">Practice</a>
     </div></details>`;
 }
 views[''] = () => {
@@ -305,7 +310,6 @@ views[''] = () => {
   const row = (href, title, desc, ic) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><span class="hrow-ic">${icon(ic, 26)}</span>${icon('right', 18)}</a>`;
   view.innerHTML = `
     <div class="home-head">
-      <h1 class="wordmark" aria-label="Learn Braille"><span class="wm-l">L</span>earn <span class="wm-b">B</span>ra<span class="wm-i">ı<span class="wm-dots" aria-hidden="true"><i></i><i class="on"></i><i class="on"></i><i></i></span></span>lle</h1>
       <p class="slogan">A resource for sighted folks to learn the braille writing system.</p>
     </div>
     ${progressHTML()}
@@ -341,17 +345,17 @@ const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETT
 const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d]) => ({ key: 'c' + w, cells: cellsOf(d), answer: w }));
 const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
 const CATS = {
-  letters: { name: 'Letters', sets: {
+  letters: { name: 'ABC', sets: {
     aj: ['a–j', L('abcdefghij')], kt: ['k–t', L('klmnopqrst')], uz: ['u–z', L('uvwxyz')],
     az: ['All letters', L('abcdefghijklmnopqrstuvwxyz')], mirror: ['Mirror pairs', L('dfeihjrw'), 'd/f, e/i, h/j, r/w'],
   } },
-  symbols: { name: 'Symbols', sets: {
+  symbols: { name: '!?#', sets: {
     num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d }))],
     punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1] }))],
     signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1] }))],
     ind: ['Indicators', () => INDICATORS.map(([p, d]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p }))],
   } },
-  contractions: { name: 'Contractions', sets: {
+  contractions: { name: 'Grade 2', sets: {
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
     all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
   } },
@@ -370,22 +374,22 @@ function mergeByCells(items) {
   }
   return [...map.values()];
 }
-const SWEEP_SRC = { alphabet: 'Alphabet', words: 'Words', sentences: 'Sentences', signs: 'Sign words', custom: 'Your own text' };
+const SWEEP_SRC = { words: 'Words', sentences: 'Sentences', signs: 'Signs' };
 const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
 const HELP = {
   read: 'A braille cell appears — pick what it says. The card glows green when you’re right and red (with a shake) when you’re not. On a keyboard, press 1–4. Your progress for each item goes from pale blue to dark blue, then green once you know it; ones you miss come up more often.',
   write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Dot 1 is top left and dot 4 top right; see Reference → Overview.',
   words: 'Decode the word and type it — it checks as you type. Hint reveals one cell at a time; Skip shows the answer.',
-  sweep: 'Put your finger on the line and slide right. The cell under your finger is outlined, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “New line” loads different text and “Start over” goes back to the beginning. Grade, cell size and vibration are below the reading area.',
+  sweep: 'Put your finger on the line and slide right. The cell under your finger is shaded, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “Again” goes back to the start of the line and “Next” loads a new one. Grade, cell size and vibration are below the reading area.',
 };
 
 views.practice = (q, sub) => {
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
   store.set('pmode', mode);
   setTitle('Practice');
-  setSub(`<div class="seg radios modes" role="radiogroup">${Object.entries(MODES).map(([k, v]) => `<a role="radio" aria-checked="${k === mode}" class="${k === mode ? 'on' : ''}" href="#/practice/${k}">${icon(k, 20)}<span>${v}</span></a>`).join('')}</div>
-    <button class="icon-btn plain" id="helpBtn" aria-label="How this works">${icon('help')}</button>`);
-  $('#helpBtn').onclick = () => openSheet(`<p>${esc(HELP[mode])}</p>`, { title: MODES[mode] });
+  setSub(`<div class="seg radios modes" role="radiogroup">${Object.entries(MODES).map(([k, v]) => `<a role="radio" aria-checked="${k === mode}" class="${k === mode ? 'on' : ''}" href="#/practice/${k}">${icon(k, 20)}<span>${v}</span></a>`).join('')}</div>`);
+  helpBtn.hidden = false;
+  helpBtn.onclick = () => openSheet(`<p>${esc(HELP[mode])}</p>`, { title: MODES[mode] });
   view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
   return mode === 'sweep' ? sweepMode(q) : quizMode(mode, q);
 };
@@ -398,11 +402,11 @@ function quizMode(mode, q) {
   const m = mastery();
   const picker = $('#picker'), body = $('#modeBody');
   body.innerHTML = `<div class="card stage" id="stage"></div>
-    <div class="below-stage">
-      <div class="stats-row"><div class="stats"><span>Streak <b id="sStreak">0</b></span><span>Correct <b id="sRight">0</b>/<b id="sTotal">0</b></span></div>
-      ${mode === 'words' ? '' : '<span class="legend" title="Learning → known"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i><small>known</small></span>'}</div>
+    ${mode === 'words' ? '' : `<div class="below-stage">
       <div class="mastery" id="mastery"></div>
-    </div>`;
+      <div class="stats-row"><div class="stats"><span>Streak <b id="sStreak">0</b></span><span>Correct <b id="sRight">0</b>/<b id="sTotal">0</b></span></div>
+      <span class="legend" title="Learning → known"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i><small>known</small></span></div>
+    </div>`}`;
   const stage = $('#stage');
   const items = () => {
     const it = CATS[state.cat].sets[state.set][1]();
@@ -427,9 +431,8 @@ function quizMode(mode, q) {
   });
   function restart() { state.last = null; renderMastery(); next(); }
   function renderMastery() {
-    const el = $('#mastery');
-    if (mode === 'words') { el.innerHTML = ''; return; }
-    el.innerHTML = items().map((x) => `<span data-l="${level(score(x.key))}" title="${esc(x.answer)}">${esc(x.answer.length > 4 ? x.answer.slice(0, 3) + '…' : x.answer)}</span>`).join('');
+    if (mode === 'words') return;
+    $('#mastery').innerHTML = items().map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
   }
   function nextItem() {
     const it = items();
@@ -447,6 +450,7 @@ function quizMode(mode, q) {
       if (item.key) bump(item.key, ok ? 1 : -1);
     }
     state.firstTry = false;
+    if (mode === 'words') return;
     $('#sStreak').textContent = state.streak; $('#sRight').textContent = state.right; $('#sTotal').textContent = state.total;
     renderMastery();
   }
@@ -561,19 +565,15 @@ function quizMode(mode, q) {
 function sweepMode(q) {
   let src = q.get('src') || store.get('swSrc', 'words');
   if (!SWEEP_SRC[src]) src = 'words';
-  let custom = store.get('swCustom', 'Welcome to Canada');
-  $('#picker').innerHTML = `<div id="srcDD"></div>
-    <div class="icon-row">
-      <button class="btn small-btn" id="editBtn">${icon('edit', 18)} Edit text</button>
-      <button class="btn small-btn" id="shuffleBtn">${icon('shuffle', 18)} New line</button>
-      <button class="btn small-btn" id="restart">${icon('restart', 18)} Start over</button>
-    </div>`;
+  $('#picker').innerHTML = radios('src', Object.entries(SWEEP_SRC), src);
   $('#modeBody').innerHTML = `
     <div class="sweep-box" id="box" tabindex="0" aria-label="Braille line. Arrow keys move cell by cell.">
       <div class="edge left"></div><div class="edge right"></div>
       <div class="sweep-track" id="track"></div>
       <div class="reader" id="reader"></div>
       <div class="finger" id="finger"></div>
+      <div class="sweep-top"><span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span>
+        <button class="link-btn pillish" id="restart">${icon('restart', 16)} Again</button><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>
     <div class="sweep-settings" id="swSet">
@@ -581,6 +581,7 @@ function sweepMode(q) {
       <div class="set-row"><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
       <label class="set-row switch ${canVibrate ? '' : 'disabled'}"><span>Vibrate on dots${canVibrate ? '' : '<small>Not available here: only Android phones let websites vibrate. iPhones, iPads and computers don’t.</small>'}</span><input type="checkbox" data-set="swVibe" ${canVibrate && S.swVibe ? 'checked' : ''} ${canVibrate ? '' : 'disabled'}></label>
     </div>`;
+  bindRadios($('#picker'), (k, v) => { src = v; store.set('swSrc', v); text = textFor(); build(); });
   bindRadios($('#swSet'), (k, v) => setS(k, k === 'swGrade' ? Number(v) : v));
   $('#swSet [data-set]').onchange = (e) => setS('swVibe', e.target.checked);
   const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
@@ -588,23 +589,11 @@ function sweepMode(q) {
   let lastKey = '', curIdx = -1, raf = 0, edgeRaf = 0, active = false;
 
   const textFor = () => {
-    if (src === 'alphabet') return 'abcdefghijklmnopqrstuvwxyz'.split('').join(' ');
     if (src === 'words') return shuffle(WORDS).slice(0, 8).join(' ');
     if (src === 'sentences') return pick(SENTENCES);
-    if (src === 'signs') return shuffle(SIGN_WORDS).slice(0, 6).join(' ');
-    return custom;
+    return shuffle(SIGN_WORDS).slice(0, 6).join(' ');
   };
   let text = textFor();
-  const syncHead = () => {
-    dropdown($('#srcDD'), { options: Object.entries(SWEEP_SRC).map(([k, v]) => ({ value: k, label: v })), value: src, onChange: (v) => { src = v; store.set('swSrc', v); syncHead(); if (v === 'custom') { text = custom; build(); editText(); } else { text = textFor(); build(); } } });
-    $('#editBtn').hidden = src !== 'custom';
-    $('#shuffleBtn').hidden = !['words', 'sentences', 'signs'].includes(src);
-  };
-  function editText() {
-    openSheet(`<textarea class="tr-input" id="swText" maxlength="200">${esc(custom)}</textarea><div class="row" style="margin-top:12px"><button class="btn primary" id="swLoad">Read this</button></div>`, { title: 'Your text' });
-    $('#swText').focus();
-    $('#swLoad').onclick = () => { custom = $('#swText').value.trim() || custom; store.set('swCustom', custom); text = custom; closeSheet(); build(); };
-  }
   function build() {
     const grade = src === 'signs' ? 2 : S.swGrade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
@@ -628,6 +617,7 @@ function sweepMode(q) {
     reader.style.left = headX + 'px'; finger.style.left = headX + 'px';
     box.classList.toggle('active', active);
     const pos = headX - offset;
+    $('#swProg').style.width = (totalW ? Math.max(0, Math.min(1, (pos - (lefts[0] || 0)) / (totalW - (lefts[0] || 0)))) * 100 : 0) + '%';
     let idx = -1;
     for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
     $$('.sc', track).forEach((el, i) => el.classList.toggle('passed', lefts[i] + widths[i] < pos));
@@ -688,11 +678,11 @@ function sweepMode(q) {
   }
   $('#restart').onclick = () => { headX = Math.round(W * 0.1); animateTo(startOffset()); };
   $('#shuffleBtn').onclick = () => { text = textFor(); build(); };
-  $('#editBtn').onclick = editText;
+  $('.sweep-top', box).addEventListener('pointerdown', (e) => e.stopPropagation());
   const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
   const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); };
   window.addEventListener('resize', onResize); window.addEventListener('settings', onSet);
-  syncHead(); build();
+  build();
   return () => { active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); };
 }
 
@@ -740,7 +730,7 @@ function signsSection(regionKey) {
   const grade = R.signLang ? 1 : 2;
   const parts = [];
   if (region === 'jp') parts.push(['sg-kana', 'Kana braille', `<p class="lead-p">${esc(JAPANESE.blurb)}</p>${kanaTable()}`]);
-  else parts.push(['sg-read', 'Read these signs', `<div class="sign-gallery">${R.signs.map((s) => plateHTML(s, lang, grade)).join('')}${(R.bilingual || []).map(([en, fr]) => plateHTML(en, 'en', 2, [fr, 'fr'], 'light')).join('')}</div><p class="muted small">Tap a sign to see what each cell means. ${esc(R.note || 'Shown in UEB Grade 2, the way new signs are made.')}</p>`]);
+  else parts.push(['sg-read', 'Read these signs', `<div class="sign-gallery">${R.signs.map((s) => plateHTML(s, lang, grade)).join('')}${(R.bilingual || []).map(([en, fr]) => plateHTML(en, 'en', 2, [fr, 'fr'])).join('')}</div><p class="muted small">Tap a sign to see what each cell means. ${esc(R.note || 'Shown in UEB Grade 2, the way new signs are made.')}</p>`]);
   parts.push(['sg-how', 'How it works here', textList(R.facts)]);
   if (R.room) parts.push(['sg-anatomy', 'Anatomy of a room sign', `<div class="anatomy">${plateHTML(R.room, lang, grade)}<ol>
       <li>Raised capitals or a pictogram you can feel.</li>
@@ -810,7 +800,7 @@ function grade2Section() {
     <h3 class="sg-h">Start with these</h3>
     <p class="muted small">The most frequent signs. Learn a few at a time, then practise them in Practice → Contractions.</p>
     <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: DICT[i].cat }); }).join('')}</div>
-    ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}</h3><span>${CONTRACTIONS[cat].items.length} · ${esc(blurb)}</span></div>
+    ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}</h3><span>${CONTRACTIONS[cat].items.length} · ${esc(blurb)}</span>${practiseLink(`#/practice/read?cat=contractions&set=k${ci}`)}</div>
       <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}`;
   return { html, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
 }
@@ -822,16 +812,16 @@ const REF_SECTIONS = [
 ];
 function alphabetSection() {
   const ROWS = [
-    ['a–j', 'the foundation', 'abcdefghij', null, 'Only the top four dots. Learn these ten and the rest follow.'],
-    ['k–t', 'add dot 3', 'klmnopqrst', [3], 'Same shapes as a–j, plus the lower-left dot.'],
-    ['u–z', 'add dots 3 and 6', 'uvxyz', [3, 6], 'Same shapes again, plus both bottom dots.'],
-    ['w', 'the latecomer', 'w', [6], 'French had no w in 1824. It’s j plus dot 6.'],
+    ['a–j', 'the foundation', 'abcdefghij', null, 'Only the top four dots. Learn these ten and the rest follow.', 'aj'],
+    ['k–t', 'add the lower-left dot', 'klmnopqrst', [3], 'Same shapes as a–j, with one more dot below on the left.', 'kt'],
+    ['u–z', 'add both bottom dots', 'uvxyz', [3, 6], 'Same shapes again, with both bottom dots.', 'uz'],
+    ['w', 'the latecomer', 'w', [6], 'French had no w in 1824. It’s j plus the lower-right dot.', 'uz'],
   ];
   return `<p class="lead-p">The alphabet is ten shapes, repeated. Each new row adds dots (in blue) to the first. Tap any letter for details.</p>
-    <div id="alphaWrap">${ROWS.map(([range, title, letters, added, blurb]) => `
-      <div class="decade"><div class="decade-head"><h3>${range} · ${title}</h3><span>${blurb}</span></div>
+    <div id="alphaWrap">${ROWS.map(([range, title, letters, added, blurb, set]) => `
+      <div class="decade"><div class="decade-head"><h3>${range} · ${title}</h3><span>${blurb}</span>${letters.length > 1 ? practiseLink(`#/practice/read?cat=letters&set=${set}`) : ''}</div>
       <div class="alpha">${letters.split('').map((l) => `<button class="letter" data-l="${l}">${cellHTML(LETTERS[l], '', { added })}<b>${l}</b></button>`).join('')}</div></div>`).join('')}</div>
-    <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>.</p>`;
+    <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>. Mixing up d, f, h and j? Try <a href="#/practice/read?cat=letters&set=mirror">mirror pairs</a>.</p>`;
 }
 function overviewSection() {
   const ex = (l) => `<div class="ov-ex">${cellHTML(LETTERS[l], 'lg')}<b>${l}</b><small>${dotsLabel(LETTERS[l]).replace(/^dots? /, 'dots ')}</small></div>`;
@@ -850,6 +840,8 @@ function overviewSection() {
     ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Sweep</a>.</p>
       <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. <a href="#/practice/write">Write</a> uses the same six-key idea.</p>`],
     ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), Canadian bank notes, ATMs, transit handrails and many product labels. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
+    ['ov-learn', 'Learning it as a sighted person', `<p>Most sighted learners start by reading braille <b>by sight</b>, which is what this site teaches. It’s a great way to understand signs, help a blind friend or family member, or begin training as a teacher or transcriber. Reading by touch takes much longer, because your fingertips need months of practice to tell the dots apart.</p>
+      <p>A good order is: the letters a–j, then the rest of the <a href="#/reference/alphabet">alphabet</a>, then <a href="#/reference/numbers">numbers and capitals</a>, then the most common <a href="#/reference/grade2">Grade 2</a> contractions. Practise a little each day in <a href="#/practice/read">Read</a> and <a href="#/practice/write">Write</a>, then try real <a href="#/reference/signs">signs</a>.</p>`],
     ['ov-history', 'History', `<p>Louis Braille was born in 1809 in Coupvray, France, and lost his sight after an accident in his father’s workshop at age three. At the Royal Institute for Blind Youth in Paris he met Charles Barbier’s 12-dot “night writing”, a military code for reading in the dark. In 1824, at 15, he simplified it into the six-dot cell that fits under one fingertip. Braille died in 1852; France made his system official two years later.</p>
       <ol class="timeline">${HISTORY.map(([y, t]) => `<li><b>${y}</b>${esc(t)}</li>`).join('')}</ol>`],
   ];
@@ -857,6 +849,29 @@ function overviewSection() {
     jumps: parts.map(([id, t]) => ({ value: id, label: t })),
     html: `<p class="lead-p">A primer for sighted learners: what braille is, how the six-dot cell works, and where it came from.</p>${parts.map(([id, t, h]) => `<div class="sg prose" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join('')}
       <div class="row"><a class="btn primary" href="#/reference/alphabet">Learn the alphabet</a><a class="btn" href="#/practice/read">Start practising</a></div>`,
+  };
+}
+const NUM_EXAMPLES = [
+  ['Canada', 'One capital sign before the letter.'],
+  ['CANADA', 'Two capital signs make the whole word uppercase.'],
+  ['2025', 'One number sign covers every digit that follows.'],
+  ['3.5', 'The decimal point keeps the number going.'],
+  ['1,000', 'So does a comma inside a number.'],
+  ['$20', 'Symbols like $ come before the number sign.'],
+  ['50%', 'Percent is a two-cell symbol after the digits.'],
+  ['Room 2B', 'A grade 1 indicator stops “b” being read as a digit.'],
+];
+function numbersSection() {
+  const ex = ([t, n]) => `<div class="example"><div class="print">${esc(t)}</div>${lineHTML(translate(t, 'en', 2), { cls: 'sm' })}<p class="muted small ex-note">${esc(n)}</p></div>`;
+  const parts = [
+    ['nu-num', groupBlock('Numbers', 'Numbers', 'number sign ⠼ + a–j', '#/practice/read?cat=symbols&set=num')],
+    ['nu-ex', `<div class="group-title"><h3>Putting it together</h3><span>how capitals and numbers combine</span></div><div class="example-grid">${NUM_EXAMPLES.map(ex).join('')}</div>`],
+    ['nu-punct', groupBlock('Punctuation', 'Punctuation & symbols', '', '#/practice/read?cat=symbols&set=punct')],
+    ['nu-ind', groupBlock('Indicators', 'Indicators', '', '#/practice/read?cat=symbols&set=ind')],
+  ];
+  return {
+    jumps: [['nu-num', 'Numbers'], ['nu-ex', 'Putting it together'], ['nu-punct', 'Punctuation & symbols'], ['nu-ind', 'Indicators']].map(([value, label]) => ({ value, label })),
+    html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${parts.map(([id, h]) => `<div class="sg" id="${id}">${h}</div>`).join('')}`,
   };
 }
 // Full character table for a language, shown in a modal from World systems or Languages.
@@ -907,7 +922,7 @@ function scienceSection() {
 function refSection(key, sub) {
   switch (key) {
     case 'alphabet': return { html: alphabetSection() };
-    case 'numbers': return { html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${groupBlock('Numbers', 'Numbers', 'number sign ⠼ + a–j')}${groupBlock('Punctuation', 'Punctuation & symbols')}${groupBlock('Indicators', 'Indicators')}` };
+    case 'numbers': return numbersSection();
     case 'grade2': return grade2Section();
     case 'signs': return signsSection(sub);
     case 'science': return scienceSection();
@@ -1019,7 +1034,6 @@ views.translate = (q) => {
     <div class="card tr-out" id="trOut"></div>
     <div class="tr-tools">
       <button class="btn" id="trCopy">Copy braille</button>
-      <a class="btn" id="trSweep" href="#/practice/sweep?src=custom">Sweep this ${icon('arrow', 18)}</a>
     </div>
     <p class="muted small">Grade 2 follows the main UEB contraction rules but is simplified — a learning aid, not a transcription tool. Other languages are uncontracted.</p>`;
   const inp = $('#trIn');
@@ -1037,7 +1051,6 @@ views.translate = (q) => {
   };
   inp.oninput = render;
   $('#trCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#trOut').dataset.uni); $('#trCopy').textContent = 'Copied ✓'; setTimeout(() => ($('#trCopy').textContent = 'Copy braille'), 1400); } catch {} };
-  $('#trSweep').onclick = () => { store.set('swCustom', inp.value.slice(0, 200)); store.set('swSrc', 'custom'); };
   syncDD(); render();
 };
 
@@ -1055,6 +1068,7 @@ function route() {
   const key = views[name] ? name : '';
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
   closeSheet(); closeDD(); if (!searchBar.hidden) closeSearch();
+  helpBtn.hidden = true;
   document.body.dataset.page = key || 'home';
   const r = views[key](q, sub, sub2);
   cleanup = typeof r === 'function' ? r : null;

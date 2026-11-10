@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Learn Braille</title>
   <meta name="description" content="Learn to read braille: the alphabet, practice, a finger-sweep trainer, a full reference and real-world signage.">
-  <meta name="theme-color" content="#f4f0e8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#171513" media="(prefers-color-scheme: dark)">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -15 100 96'%3E%3Cg fill='%232f68a8'%3E%3Ccircle cx='11' cy='11' r='9.5'/%3E%3Ccircle cx='11' cy='33' r='9.5'/%3E%3Ccircle cx='11' cy='55' r='9.5'/%3E%3C/g%3E%3Cg fill='%23d9d1c4'%3E%3Ccircle cx='33' cy='11' r='9.5'/%3E%3Ccircle cx='33' cy='33' r='9.5'/%3E%3Ccircle cx='33' cy='55' r='9.5'/%3E%3Ccircle cx='81' cy='11' r='9.5'/%3E%3Ccircle cx='59' cy='55' r='9.5'/%3E%3Ccircle cx='81' cy='33' r='9.5'/%3E%3Ccircle cx='81' cy='55' r='9.5'/%3E%3C/g%3E%3Cg fill='%233f8a5c'%3E%3Ccircle cx='59' cy='11' r='9.5'/%3E%3Ccircle cx='59' cy='33' r='9.5'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -15 100 96'%3E%3Cg fill='%232f68a8'%3E%3Ccircle cx='11' cy='11' r='9.5'/%3E%3Ccircle cx='11' cy='33' r='9.5'/%3E%3Ccircle cx='11' cy='55' r='9.5'/%3E%3C/g%3E%3Cg fill='%23d8d4cc'%3E%3Ccircle cx='33' cy='11' r='9.5'/%3E%3Ccircle cx='33' cy='33' r='9.5'/%3E%3Ccircle cx='33' cy='55' r='9.5'/%3E%3Ccircle cx='81' cy='11' r='9.5'/%3E%3Ccircle cx='59' cy='55' r='9.5'/%3E%3Ccircle cx='81' cy='33' r='9.5'/%3E%3Ccircle cx='81' cy='55' r='9.5'/%3E%3C/g%3E%3Cg fill='%233f8a5c'%3E%3Ccircle cx='59' cy='11' r='9.5'/%3E%3Ccircle cx='59' cy='33' r='9.5'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,6 +24,7 @@
     <div class="top-row">
       <a class="brand" href="#/" aria-label="Learn Braille home">
         <svg class="logo-svg" viewBox="0 0 92 66" width="40" height="29" aria-hidden="true"><g class="lb-l"><circle cx="11" cy="11" r="8.5"/><circle cx="11" cy="33" r="8.5"/><circle cx="11" cy="55" r="8.5"/></g><g class="lb-off"><circle cx="33" cy="11" r="8.5"/><circle cx="33" cy="33" r="8.5"/><circle cx="33" cy="55" r="8.5"/><circle cx="81" cy="11" r="8.5"/><circle cx="59" cy="55" r="8.5"/><circle cx="81" cy="33" r="8.5"/><circle cx="81" cy="55" r="8.5"/></g><g class="lb-b"><circle cx="59" cy="11" r="8.5"/><circle cx="59" cy="33" r="8.5"/></g></svg>
+        <span class="brand-wm"><span class="wm-l">L</span>earn <span class="wm-b">B</span>raille</span>
       </a>
       <span class="head-title" id="headTitle"></span>
       <nav class="nav" aria-label="Main">
@@ -32,6 +33,7 @@
         <a href="#/reference" data-route="reference">Reference</a>
         <a href="#/translate" data-route="translate">Translate</a>
       </nav>
+      <button class="icon-btn plain" id="helpBtn" aria-label="How this works" title="How this works" data-icon="help" hidden></button>
       <button class="icon-btn plain" id="searchBtn" aria-label="Search" title="Search" data-icon="search"></button>
       <button class="icon-btn plain" id="settingsBtn" aria-label="Settings" title="Settings" data-icon="settings"></button>
     </div>
@@ -55,6 +57,6 @@
   <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 
-  <script type="module" src="js/app.js?v=7"></script>
+  <script type="module" src="js/app.js?v=8"></script>
 </body>
 </html>
