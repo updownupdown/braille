@@ -1327,3 +1327,87 @@ body.s-color .plate .cell.k-math { --on: #f6bad6; }
 .game.lv-hard :is(.wd-k, .hm-k) b, .game.lv-hard .wd:not(.done) .wd-tile b, .game.lv-hard .hm:not(.done) .hm-slot b { display: none; }
 .sheet .example .braille-line.groups { gap: 6px 0; }
 @media print { .cheatsheet[data-grade="1"] .cs-i .cell { --s: 12px; } .cheatsheet[data-grade="1"] .cs-i b { font-size: .95rem; } .cheatsheet[data-grade="1"] .cs-title { font-size: 1.7rem; } }
+
+/* ===================== v14 ===================== */
+:root { --dot-ring: #d6cdc3; --dot-fill: #e3dbd3; --seg-on: var(--surface); }
+/* dark mode: more contrast everywhere */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #12100e; --surface: #221e1a; --surface-2: #2f2a25; --ink: #f6f1e9; --ink-2: #ddd5c9; --muted: #ab9f92; --line: #4a423a;
+    --dot-off: #6a6056; --dot-ring: #6a6056; --dot-fill: #4a423a; --lb-off: #4f463e; --seg-bg: #2f2a25; --seg-on: #5a5047; --input: #1b1815;
+    --accent: #8db6e8; --accent-soft: #24374d; --good: #86c49d; --bad: #ea958a;
+    --k-digit: #5ccfc0; --k-contraction: #8db6e8; --k-punct: #c39af0; --k-indicator: #c8b096; --k-math: #ef8cbb;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); } }
+:root[data-theme="dark"] { --bg: #12100e; --surface: #221e1a; --surface-2: #2f2a25; --ink: #f6f1e9; --ink-2: #ddd5c9; --muted: #ab9f92; --line: #4a423a;
+    --dot-off: #6a6056; --dot-ring: #6a6056; --dot-fill: #4a423a; --lb-off: #4f463e; --seg-bg: #2f2a25; --seg-on: #5a5047; --input: #1b1815;
+    --accent: #8db6e8; --accent-soft: #24374d; --good: #86c49d; --bad: #ea958a;
+    --k-digit: #5ccfc0; --k-contraction: #8db6e8; --k-punct: #c39af0; --k-indicator: #c8b096; --k-math: #ef8cbb;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); }
+body.s-dotfill { --dot-off: var(--dot-fill); }
+:root[data-theme="dark"] body.s-dotfill, :root[data-theme="dark"] body { --dot-fill: #4a423a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.s-dotfill { --dot-off: #4a423a; } }
+:root[data-theme="dark"] body.s-dotfill { --dot-off: #4a423a; }
+.seg button.on { background: var(--seg-on); }
+:root[data-theme="dark"] .card, :root[data-theme="dark"] .stage { border-color: var(--line); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .seg button.on { color: var(--ink); } }
+
+/* header: the page's tab icon beside a paler, lighter title */
+.head-title { display: flex; align-items: center; gap: 10px; font-weight: 500; color: var(--muted); }
+.head-title .ht-ic { display: grid; place-items: center; color: var(--muted); }
+.head-title .ht-t { overflow: hidden; text-overflow: ellipsis; }
+.brand, body[data-page="home"] .brand { display: none; }
+.home-brand { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+.home-brand .logo-svg { width: 45px; height: auto; }
+.home-brand .brand-wm { font-size: 1.75rem; }
+
+/* inverted pickers carry an icon */
+.dd-lead { display: grid; place-items: center; margin-right: 2px; }
+.dd-strong .dd-btn .dd-lead .ic { color: var(--bg); opacity: .85; }
+
+/* practice: selected mode is inverted, like other main selections */
+.modes a.on { background: var(--ink); color: var(--bg); }
+.modes a.on .ic { color: var(--bg); }
+
+/* cheat sheet print button matches the toggle */
+.cs-head .btn { height: var(--ctl-h); padding: 0 16px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 8px; }
+
+/* games list: tiles, more air on top, quieter intro */
+body[data-page="games"] .g-intro { margin-top: 20px; font-size: .95rem; color: var(--muted); }
+.g-tiles { border-top: 0; display: grid; gap: 10px; }
+.g-tiles .hrow, .g-tiles .hrow:last-child { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); padding: 14px 16px; min-height: 0; }
+.g-tiles .hrow:hover { border-color: color-mix(in srgb, var(--ink) 25%, var(--line)); }
+.g-tiles + .sec-h, .g-intro + .sec-h { margin-top: 40px; }
+
+/* game icon colours */
+.hrow-ic[class*="gc-"], a[href^="#/games/"] .hrow-ic { --gc: var(--accent); color: var(--gc); background: color-mix(in srgb, var(--gc) 13%, var(--surface)); }
+:is(.gc-wordle, a[href="#/games/wordle"] .hrow-ic) { --gc: #2f68a8; }
+:is(.gc-hangman, a[href="#/games/hangman"] .hrow-ic) { --gc: #8a4fbf; }
+:is(.gc-anagrams, a[href="#/games/anagrams"] .hrow-ic) { --gc: #b8407a; }
+:is(.gc-agent, a[href="#/games/agent"] .hrow-ic) { --gc: #3f7d5a; }
+:is(.gc-rain, a[href="#/games/rain"] .hrow-ic) { --gc: #13807a; }
+:is(.gc-time, a[href="#/games/time"] .hrow-ic) { --gc: #4f5bbf; }
+:is(.gc-mirror, a[href="#/games/mirror"] .hrow-ic) { --gc: #c0506a; }
+:is(.gc-memory, a[href="#/games/memory"] .hrow-ic) { --gc: #6b7d2c; }
+:is(.gc-maze, a[href="#/games/maze"] .hrow-ic) { --gc: #4d7590; }
+:is(.gc-trivia, a[href="#/games/trivia"] .hrow-ic) { --gc: #7a3f7a; }
+:is(.gc-riddles, a[href="#/games/riddles"] .hrow-ic) { --gc: #2f8ab8; }
+:root[data-theme="dark"] .hrow-ic[class*="gc-"], :root[data-theme="dark"] a[href^="#/games/"] .hrow-ic { color: color-mix(in srgb, var(--gc) 55%, #fff); background: color-mix(in srgb, var(--gc) 30%, var(--surface)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is(.hrow-ic[class*="gc-"], a[href^="#/games/"] .hrow-ic) { color: color-mix(in srgb, var(--gc) 55%, #fff); background: color-mix(in srgb, var(--gc) 30%, var(--surface)); } }
+
+/* settings */
+.set-row.stack { flex-direction: column; align-items: stretch; gap: 10px; }
+.set-row.stack > span { color: var(--ink); font-weight: 500; }
+.set-row.stack .seg { width: 100%; height: auto; min-height: var(--ctl-h); }
+.set-row.stack .seg button { flex: 1; justify-content: center; gap: 8px; padding: 8px 10px; }
+.set-row.stack .seg button .cell { --s: 5px; padding: 0; }
+.cell.pv-outline i:not(.on) { background: transparent; box-shadow: inset 0 0 0 1.2px var(--dot-ring); }
+.cell.pv-fill i:not(.on) { background: var(--dot-fill); box-shadow: none; }
+.color-key { transition: opacity .25s; }
+.color-key.off { opacity: .3; }
+.set-note { margin: 0; color: var(--ink-2); font-size: .9rem; }
+.reset-row { gap: 10px; }
+.btn.danger { border-color: var(--bad); color: var(--bad); }
+.gh-link { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); margin-top: 6px; }
+
+/* practice help: keyboard tips last, small, only where a keyboard is likely */
+.help .help-keys { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: .82rem; color: var(--muted); }
+.help .help-keys .ic { flex: none; margin-top: 1px; }
+@media (max-width: 600px) { .help .help-keys { display: none; } }

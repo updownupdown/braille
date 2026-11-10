@@ -1,7 +1,7 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=13';
-import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=13';
-import { WORDS } from './data.js?v=13';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=14';
+import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=14';
+import { WORDS } from './data.js?v=14';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -539,9 +539,9 @@ function maze(el, level) {
 }
 
 export const GAME_GROUPS = [
-  ['Word games', ['wordle', 'hangman', 'anagrams', 'agent']],
-  ['Quick fire', ['rain', 'time', 'mirror']],
-  ['Puzzles and quizzes', ['memory', 'maze', 'trivia', 'riddles']],
+  ['Word Games', ['wordle', 'hangman', 'anagrams', 'agent']],
+  ['Quick Fire', ['rain', 'time', 'mirror']],
+  ['Puzzles and Quizzes', ['memory', 'maze', 'trivia', 'riddles']],
 ];
 export const GAMES = {
   wordle: { name: 'Braille Wordle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,

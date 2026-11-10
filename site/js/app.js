@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=13';
+} from './braille.js?v=14';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=13';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=13';
+} from './data.js?v=14';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=14';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -57,6 +57,11 @@ const P = {
   maze: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h6v6M15 3v6h-3M21 15h-6v6M9 21v-3"/>',
   bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
   print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>',
+  keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 13.5h.01M18 13.5h.01M9 14h6"/>',
+  github: '<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
   sweep: '<circle cx="5" cy="8" r="1.6" fill="currentColor"/><circle cx="10" cy="8" r="1.6" fill="currentColor"/><circle cx="15" cy="8" r="1.6" fill="currentColor"/><path d="M3 16h15"/><path d="m15 13 3 3-3 3"/>',
 };
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
@@ -139,11 +144,11 @@ sheet.addEventListener('click', (e) => { if (e.target.closest('a[href^="#"]')) c
 let openDD = null;
 function closeDD() { if (openDD) { openDD.classList.remove('open'); openDD = null; } }
 document.addEventListener('click', (e) => { if (openDD && !openDD.contains(e.target)) closeDD(); });
-function dropdown(el, { label = '', options, value, onChange, plain = false }) {
+function dropdown(el, { label = '', options, value, onChange, plain = false, lead = '' }) {
   const cur = options.find((o) => o.value === value);
   let lastGroup = null;
   el.classList.add('dd');
-  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox">${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
+  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox">${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
     <div class="dd-menu" role="listbox">${options.map((o) => {
       const g = o.group && o.group !== lastGroup ? `<div class="dd-group">${esc(o.group)}</div>` : '';
       lastGroup = o.group || lastGroup;
@@ -166,7 +171,7 @@ function dropdown(el, { label = '', options, value, onChange, plain = false }) {
     const b = e.target.closest('.dd-opt'); if (!b) return;
     e.stopPropagation(); closeDD();
     const v = options.find((o) => String(o.value) === b.dataset.v).value;
-    dropdown(el, { label, options, value: plain ? null : v, onChange, plain });
+    dropdown(el, { label, options, value: plain ? null : v, onChange, plain, lead });
     onChange(v);
   };
 }
@@ -186,30 +191,46 @@ const switchRow = (name, label, checked) => `<label class="set-row switch"><span
 const headTitle = $('#headTitle');
 const helpBtn = $('#helpBtn');
 const subbar = $('#subbar');
-const setTitle = (t) => { headTitle.textContent = t; };
+const PAGE_ICON = { home: 'home', practice: 'practice', reference: 'book', games: 'games', translate: 'translate' };
+const setTitle = (t) => { headTitle.innerHTML = `<span class="ht-ic">${icon(PAGE_ICON[document.body.dataset.page] || 'home', 22)}</span><span class="ht-t">${esc(t)}</span>`; };
 const setSub = (html) => { subbar.innerHTML = html; subbar.hidden = !html; syncHeadH(); };
 function syncHeadH() { requestAnimationFrame(() => document.documentElement.style.setProperty('--head-h', $('.top').offsetHeight + 'px')); }
 
 // ---------- settings modal ----------
 const COLOR_KEY = [['letter', 'Letters (Grade 1)'], ['digit', 'Numbers'], ['contraction', 'Contractions (Grade 2)'], ['punct', 'Punctuation'], ['indicator', 'Indicators'], ['math', 'Maths signs']];
 function openSettings() {
+  const pv = (mode) => `<span class="cell pv-${mode}" aria-hidden="true">${[1, 2, 3, 4, 5, 6].map((d) => `<i class="${[1, 4, 5].includes(d) ? 'on' : ''}"></i>`).join('')}</span>`;
   openSheet(`<div class="settings">
     <div class="set-group"><h3>General</h3>
-      <div class="set-row"><span>Appearance</span>${radios('theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], S.theme)}</div>
-      <div class="set-row"><span>Unraised dots</span>${radios('dotFill', [['outline', 'Outline'], ['fill', 'Filled']], S.dotFill)}</div>
-      ${switchRow('color', 'Colour-code dots', S.color)}
-      <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
+      <div class="set-row stack"><span>Appearance</span>${radios('theme', [['auto', `${icon('auto', 18)}Auto`], ['light', `${icon('sun', 18)}Light`], ['dark', `${icon('moon', 18)}Dark`]], S.theme)}</div>
+      <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
+      <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
+      <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
-    <div class="set-group"><h3>Progress</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
-    <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
+    <div class="set-group"><h3>Your data</h3>
+      <p class="set-note">Resetting clears everything this site has saved on this device: practice progress, the daily review, game scores and levels, and these settings.</p>
+      <div class="row reset-row"><button class="btn" id="resetAll">Reset everything</button><button class="btn ghost" id="resetCancel" hidden>Cancel</button></div>
+    </div>
+    <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p>
+      <a class="gh-link" href="https://github.com/updownupdown/braille" target="_blank" rel="noopener">${icon('github', 16)} Source code on GitHub</a></div>
   </div>`, { title: 'Settings' });
-  bindRadios($('.settings', sheet), (k, v) => setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v));
-  $$('[data-set]', sheet).forEach((i) => { i.onchange = () => setS(i.dataset.set, i.checked); });
-  let armed = false;
-  $('#resetAll').onclick = (e) => {
-    if (!armed) { armed = true; e.target.textContent = 'Tap again to confirm'; return; }
-    store.set('mastery', {}); e.target.textContent = 'Progress reset ✓'; window.dispatchEvent(new CustomEvent('settings', { detail: 'mastery' }));
+  bindRadios($('.settings', sheet), (k, v) => {
+    if (k === 'color') { setS('color', v === '1'); $('.color-key', sheet).classList.toggle('off', v !== '1'); return; }
+    setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
+  });
+  // Three taps to reset, with a way out.
+  let taps = 0;
+  const btn = $('#resetAll'), cancel = $('#resetCancel');
+  const label = ['Reset everything', 'Tap 2 more times to confirm', 'Tap once more to erase everything'];
+  const set = () => { btn.textContent = label[taps]; btn.classList.toggle('danger', taps > 0); cancel.hidden = taps === 0; };
+  btn.onclick = () => {
+    taps++;
+    if (taps < 3) { set(); return; }
+    try { Object.keys(localStorage).filter((k) => k.startsWith('dots.')).forEach((k) => localStorage.removeItem(k)); } catch {}
+    btn.textContent = 'Everything reset ✓'; cancel.hidden = true; btn.disabled = true;
+    setTimeout(() => location.reload(), 700);
   };
+  cancel.onclick = () => { taps = 0; set(); };
 }
 
 // ---------- letter + symbol details ----------
@@ -322,10 +343,11 @@ function progressHTML() {
     </div></details>`;
 }
 views[''] = () => {
-  setTitle(''); setSub('');
+  setTitle('Home'); setSub('');
   const row = (href, title, desc, ic) => `<a class="hrow" href="${href}"><div class="hrow-text"><b>${title}</b><span>${desc}</span></div><span class="hrow-ic">${icon(ic, 26)}</span></a>`;
   view.innerHTML = `
     <div class="home-head">
+      <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
       <p class="slogan">A resource for sighted folks to learn the braille writing system.</p>
     </div>
     ${progressHTML()}
@@ -419,12 +441,18 @@ function mergeByCells(items) {
 const SWEEP_SRC = { words: 'Words', sentences: 'Sentences', signs: 'Signs' };
 const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
 const HELP = {
-  read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'On a keyboard, press 1–4 to choose.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
-  write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.', 'On a keyboard, F D S are the left column from top to bottom, and J K L the right column, like a Perkins brailler.'],
+  read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
+  write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Hint reveals one cell at a time. Skip shows the answer.'],
-  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger near the right edge and the line keeps scrolling. On a laptop, move the mouse or use the arrow keys.', 'Restart goes back to the start of the line. Next loads a new one.'],
+  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger near the right edge and the line keeps scrolling.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
-const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('');
+const HELP_KEYS = {
+  read: 'Press 1, 2, 3 or 4 to pick an answer.',
+  write: 'F, D and S are the left column, top to bottom; J, K and L are the right column, like a Perkins brailler. Backspace clears.',
+  words: 'Just type the word; there is no need to press Enter.',
+  sweep: 'Move the mouse along the line, or use the arrow keys.',
+};
+const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_KEYS[k] ? `<p class="help-keys">${icon('keyboard', 18)}<span>${esc(HELP_KEYS[k])}</span></p>` : '');
 
 views.practice = (q, sub) => {
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
@@ -856,8 +884,8 @@ function grade2Section() {
 
 // ---------- reference ----------
 const REF_SECTIONS = [
-  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
-  ['science', 'Maths & science'], ['languages', 'Languages'], ['systems', 'World systems'], ['cheatsheet', 'Cheat sheet'],
+  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & Symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
+  ['science', 'Maths & Science'], ['languages', 'Languages'], ['systems', 'World Systems'], ['cheatsheet', 'Cheat Sheet'],
 ];
 function alphabetSection() {
   const ROWS = [
@@ -1054,7 +1082,7 @@ views.reference = (q, sub, sub2) => {
   const sec = refSection(key, sub2);
   setTitle('Learn');
   setSub(`<div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
-  dropdown($('#secDD'), { options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
+  dropdown($('#secDD'), { lead: 'book', options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
   if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
   view.innerHTML = `${sec.html}
       <div class="pager">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
@@ -1071,9 +1099,9 @@ views.games = (q, sub) => {
   const g = GAMES[sub];
   if (!g) {
     setTitle('Games'); setSub('');
-    const row = (k) => { const x = GAMES[k]; return `<a class="hrow" href="#/games/${k}"><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div><span class="g-badge">${x.range}</span><span class="hrow-ic">${icon(x.icon, 26)}</span></a>`; };
-    view.innerHTML = `<p class="lead-p">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
-      ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${t}</h2><div class="hrows">${ks.map(row).join('')}</div>`).join('')}`;
+    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div><span class="hrow-ic gc-${k}">${icon(x.icon, 26)}</span></a>`; };
+    view.innerHTML = `<p class="lead-p g-intro">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
+      ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${t}</h2><div class="hrows g-tiles">${ks.map(row).join('')}</div>`).join('')}`;
     return;
   }
   setTitle(g.name);
@@ -1175,7 +1203,7 @@ $('#searchBtn').onclick = () => (searchBar.hidden ? openSearch() : closeSearch()
 
 // ---------- translate ----------
 views.translate = (q) => {
-  const LOPTS = [['en1', 'English · Grade 1', 'English'], ['en2', 'English · Grade 2', 'English'], ['fr', 'Français', 'Other languages'], ['es', 'Español', 'Other languages'], ['de', 'Deutsch', 'Other languages'], ['ru', 'Русский', 'Other languages'], ['el', 'Ελληνικά', 'Other languages']];
+  const LOPTS = [['en1', 'English (Grade 1)', 'English'], ['en2', 'English (Grade 2)', 'English'], ['fr', 'Français', 'Other languages'], ['es', 'Español', 'Other languages'], ['de', 'Deutsch', 'Other languages'], ['ru', 'Русский', 'Other languages'], ['el', 'Ελληνικά', 'Other languages']];
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
@@ -1197,13 +1225,31 @@ views.translate = (q) => {
   };
   const exLang = () => (mode.startsWith('en') ? 'en' : mode);
   const syncDD = () => {
-    dropdown($('#langDD'), { options: LOPTS.map(([v, l, g]) => ({ value: v, label: l, group: g })), value: mode, onChange: (v) => { mode = v; render(); syncDD(); } });
+    dropdown($('#langDD'), { lead: 'globe', options: LOPTS.map(([v, l, g]) => ({ value: v, label: l, group: g })), value: mode, onChange: (v) => { mode = v; render(); syncDD(); } });
     dropdown($('#exDD'), { label: 'Examples', plain: true, options: LANG_INFO[exLang()].phrases.map((p) => ({ value: p, label: p })), value: null, onChange: (v) => { inp.value = v; render(); } });
   };
   inp.oninput = render;
   $('#trCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#trOut').dataset.uni); $('#trCopy').textContent = 'Copied ✓'; setTimeout(() => ($('#trCopy').textContent = 'Copy braille'), 1400); } catch {} };
   syncDD(); render();
 };
+
+// ---------- Title Case for headings ----------
+const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'per', 'the', 'to', 'vs', 'with']);
+function titleCase(str) {
+  let first = true;
+  return str.replace(/\S+/g, (w) => {
+    const m = w.match(/^([(“"‘']?)([a-z])([a-z'’]*)([)”"’'.,:;!?]?)$/);
+    const isFirst = first; first = false;
+    if (!m || (w.length === 1 && w !== 'a') || (!isFirst && SMALL.has(m[2] + m[3]))) return w;
+    return m[1] + m[2].toUpperCase() + m[3] + m[4];
+  });
+}
+const TC_SEL = '.sec-h, .sg-h, .group-title h3, .cs-title, .hrow-text b, .sheet-head h2, .ht-t, .acc-item summary b';
+function applyTitleCase(root = document) {
+  $$(TC_SEL, root).forEach((el) => el.childNodes.forEach((n) => { if (n.nodeType === 3 && n.textContent.trim()) { const t = titleCase(n.textContent); if (t !== n.textContent) n.textContent = t; } }));
+}
+let tcQueued = false;
+new MutationObserver(() => { if (tcQueued) return; tcQueued = true; requestAnimationFrame(() => { tcQueued = false; applyTitleCase(); }); }).observe(document.body, { childList: true, subtree: true });
 
 // ---------- router ----------
 let cleanup = null;
