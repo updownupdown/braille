@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=22';
+} from './braille.js?v=23';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=22';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=22';
+} from './data.js?v=23';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=23';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -67,24 +67,8 @@ const P = {
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', color: true, dotFill: 'outline', swGrade: 1, swSize: 'large', swVibe: true };
+const DEFAULTS = { theme: 'auto', color: true, dotFill: 'outline', swGrade: 1, swSize: 'large' };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
-// Haptics: the Vibration API on Android; on iPhone (no Vibration API) toggling a hidden iOS switch control gives a light tap (iOS 18+).
-const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const canVibrate = matchMedia('(pointer: coarse)').matches && ('vibrate' in navigator || isIOS);
-let iosTick = null;
-const buzz = (n) => {
-  if ('vibrate' in navigator) { const pat = []; for (let i = 0; i < n; i++) pat.push(30, 40); try { navigator.vibrate(pat); } catch {} return; }
-  if (!isIOS) return;
-  if (!iosTick) {
-    iosTick = document.createElement('label');
-    iosTick.setAttribute('aria-hidden', 'true');
-    iosTick.style.cssText = 'position:fixed;left:-200px;top:0;opacity:0;pointer-events:none;';
-    iosTick.innerHTML = '<input type="checkbox" switch tabindex="-1">';
-    document.body.append(iosTick);
-  }
-  iosTick.click();
-};
 function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
@@ -710,14 +694,12 @@ function sweepMode(q) {
     <div class="sweep-settings" id="swSet">
       <div class="sw-opts"><div><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
         <div><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div></div>
-      ${canVibrate ? `<label class="set-row switch"><span>Vibrate on dots</span><input type="checkbox" data-set="swVibe" ${S.swVibe ? 'checked' : ''}></label>` : ''}
     </div>`;
   bindRadios($('#picker'), (k, v) => { src = v; store.set('swSrc', v); text = textFor(); build(); });
   bindRadios($('#swSet'), (k, v) => setS(k, k === 'swGrade' ? Number(v) : v));
-  if (canVibrate) $('#swSet [data-set]').onchange = (e) => setS('swVibe', e.target.checked);
   const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
   let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
-  let lastKey = '', curIdx = -1, raf = 0, edgeRaf = 0, active = false;
+  let curIdx = -1, raf = 0, edgeRaf = 0, active = false;
 
   const textFor = () => {
     if (src === 'words') return shuffle(WORDS).slice(0, 8).join(' ');
@@ -741,7 +723,7 @@ function sweepMode(q) {
   // The line starts just right of the middle, so the reader rests in the middle with the upcoming cells in view.
   const homeX = () => Math.round(W * 0.5);
   const startOffset = () => homeX() + 24;
-  function reset() { offset = startOffset(); headX = homeX(); lastKey = ''; curIdx = -1; update(false); }
+  function reset() { offset = startOffset(); headX = homeX(); curIdx = -1; update(false); }
   const clampV = (o) => Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), o));
   const clamp = () => { offset = clampV(offset); };
   // When the finger lifts, ease the reader back to the middle and slide the line with it,
@@ -783,16 +765,6 @@ function sweepMode(q) {
       $$('.sc.cur', track).forEach((e) => e.classList.remove('cur'));
       if (idx >= 0 && cells[idx].kind !== 'space') track.children[idx].classList.add('cur');
       curIdx = idx;
-    }
-    const c = cells[idx];
-    if (feedback && c && c.kind !== 'space' && S.swVibe && canVibrate) {
-      const col = (pos - lefts[idx]) / widths[idx] < 0.5 ? 0 : 1;
-      const key = idx + ':' + col;
-      if (key !== lastKey) {
-        lastKey = key;
-        const dots = toDots(c.cell).filter((d) => (col === 0 ? d <= 3 : d >= 4 && d <= 6));
-        if (dots.length) buzz(dots.length);
-      }
     }
   }
   function edgeLoop() {
