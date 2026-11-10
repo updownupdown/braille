@@ -1411,3 +1411,15 @@ body[data-page="games"] .g-intro { margin-top: 20px; font-size: .95rem; color: v
 .help .help-keys { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: .82rem; color: var(--muted); }
 .help .help-keys .ic { flex: none; margin-top: 1px; }
 @media (max-width: 600px) { .help .help-keys { display: none; } }
+
+/* ===================== v15 ===================== */
+/* only the chevron turns when a picker opens, not its leading icon */
+.dd.open .dd-btn .dd-lead .ic { transform: none; }
+.dd-btn .ic { transition: transform .2s; }
+/* on-screen keyboard open: fit the content to the visible area */
+body.kb-open { padding-bottom: 0; }
+body.kb-open .tabbar { display: none; }
+body.kb-open .practice-wrap:not(.mode-sweep) { min-height: calc(var(--vvh, 100dvh) - var(--head-h, 120px) - 12px); }
+body.kb-open .mode-words #modeBody { min-height: 0; gap: 12px; padding-bottom: 8px; }
+body.kb-open .mode-words .stage { min-height: 0; padding-top: 18px; padding-bottom: 18px; }
+body.kb-open .mode-words .stage .answer-input { margin-top: 10px; }

@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=14';
+} from './braille.js?v=15';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=14';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=14';
+} from './data.js?v=15';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=15';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -607,10 +607,19 @@ function quizMode(mode, q) {
     stage.classList.remove('glow-good', 'glow-bad');
     const cells = toCells(translate(word, 'en', ws.grade));
     let shown = 0, done = false;
-    stage.innerHTML = `
-      <div class="prompt-cells words ${cells.length > 6 ? 'many' : ''}" id="wcells">${cells.map((c) => `<span class="bw">${cellHTML(c.cell)}<span class="lbl"></span></span>`).join('')}</div>
-      <input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Type the word">
+    const cellsHTML = cells.map((c) => `<span class="bw">${cellHTML(c.cell)}<span class="lbl"></span></span>`).join('');
+    // Keep the same input between words so the phone keyboard stays open.
+    if ($('#ans', stage) && $('#wcells', stage)) {
+      const wc = $('#wcells', stage); wc.className = `prompt-cells words ${cells.length > 6 ? 'many' : ''}`; wc.innerHTML = cellsHTML;
+      $('#ans', stage).value = '';
+    } else {
+      stage.innerHTML = `
+      <div class="prompt-cells words ${cells.length > 6 ? 'many' : ''}" id="wcells">${cellsHTML}</div>
+      <input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type the word">
       <div class="row"><button class="btn ghost" id="hint">Hint</button><button class="btn ghost" id="skip">Skip</button></div>`;
+      // Tapping Hint or Skip shouldn't take focus away from the input (and close the keyboard).
+      $$('#hint, #skip', stage).forEach((b) => b.addEventListener('pointerdown', (e) => { if (document.activeElement === $('#ans', stage)) e.preventDefault(); }));
+    }
     const ans = $('#ans');
     if (matchMedia('(pointer: fine)').matches) ans.focus();
     const lbls = $$('#wcells .lbl');
@@ -1250,6 +1259,16 @@ function applyTitleCase(root = document) {
 }
 let tcQueued = false;
 new MutationObserver(() => { if (tcQueued) return; tcQueued = true; requestAnimationFrame(() => { tcQueued = false; applyTitleCase(); }); }).observe(document.body, { childList: true, subtree: true });
+
+// ---------- on-screen keyboard: size content to the visible area ----------
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const onVV = () => {
+    document.documentElement.style.setProperty('--vvh', vv.height + 'px');
+    document.body.classList.toggle('kb-open', vv.height < window.innerHeight * 0.78);
+  };
+  vv.addEventListener('resize', onVV); onVV();
+}
 
 // ---------- router ----------
 let cleanup = null;
