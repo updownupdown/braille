@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=19';
+} from './braille.js?v=20';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=19';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=19';
+} from './data.js?v=20';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=20';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);

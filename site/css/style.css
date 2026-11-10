@@ -1470,11 +1470,12 @@ body.kb-open .mode-words .stage .answer-input { margin-top: 10px; }
 @media (min-width: 700px) { .hcar { margin: 10px 0 0; padding: 2px 0 6px; scroll-padding-inline: 0; } .hct { width: 128px; } }
 
 /* ---------- v17: tighter sweep box ---------- */
-.sweep-box { height: 300px; }
+/* Finger circle sits 0.8 × its diameter below where it was; the reader line runs down to meet its top. */
+.sweep-box { height: 345px; }
 .sweep-track { top: 82px; }
-.reader { top: 60px; bottom: auto; height: 150px; }
-.finger { top: 196px; }
-body.s-sw-real .sweep-box { height: 230px; }
+.reader { top: 60px; bottom: auto; height: 181px; }
+.finger { top: 241px; }
+body.s-sw-real .sweep-box { height: 275px; }
 body.s-sw-real .sweep-track { top: 92px; }
-body.s-sw-real .reader { top: 66px; height: 90px; }
-body.s-sw-real .finger { top: 140px; }
+body.s-sw-real .reader { top: 66px; height: 119px; }
+body.s-sw-real .finger { top: 185px; }
