@@ -1,7 +1,7 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=11';
-import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=11';
-import { WORDS } from './data.js?v=11';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=12';
+import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=12';
+import { WORDS } from './data.js?v=12';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -99,10 +99,10 @@ function wordle(el, level) {
 
 // ---------- Memory ----------
 function memory(el, level) {
-  const n = { easy: 6, medium: 8, hard: 10 }[level];
+  const n = { easy: 6, medium: 8, hard: 15 }[level];
   const LOOK = 'defhijrw';
   const pickLetters = () => (level === 'easy' ? shuffle([...AJ]).slice(0, n) : level === 'hard'
-    ? [...shuffle([...LOOK]).slice(0, 6), ...shuffle([...AZ].filter((x) => !LOOK.includes(x))).slice(0, n - 6)] : shuffle([...AZ]).slice(0, n));
+    ? [...LOOK, ...shuffle([...AZ].filter((x) => !LOOK.includes(x))).slice(0, n - LOOK.length)] : shuffle([...AZ]).slice(0, n));
   el.innerHTML = `<div class="g-stats"><span>Moves <b id="moves">0</b></span><span>Best <b id="best">–</b></span></div><div class="mem-grid n${n}" id="grid"></div><p class="g-msg" id="msg"></p><div class="g-actions"><button class="btn" id="new">New game</button></div>`;
   const grid = $('#grid', el);
   let open = [], moves = 0, matched = 0, lock = false, timer = 0;
@@ -126,7 +126,7 @@ function memory(el, level) {
       if (matched === n) { const bb = bestLow('mem.' + level, moves); $('#best', el).textContent = bb; $('#msg', el).textContent = `All ${n} pairs in ${moves} moves.`; }
     } else {
       lock = true;
-      timer = setTimeout(() => { a.classList.remove('up'); b.classList.remove('up'); open = []; lock = false; }, 900);
+      timer = setTimeout(() => { a.classList.remove('up'); b.classList.remove('up'); open = []; lock = false; }, 1800);
     }
   };
   $('#new', el).onclick = start;
@@ -563,7 +563,7 @@ export const GAMES = {
   mirror: { name: 'Mirror Match', icon: 'mirror', range: 'Medium–Hard', desc: 'Tell look-alike letters like d, f, h and j apart, fast', levels: LV3, run: mirror,
     help: ['Some letters are mirror images of each other, like d and f, or e and i. Pick the right one before the time runs out.', 'Easy gives you two choices, Medium four, and Hard mixes many look-alikes with less time.', 'Each round lasts 30 seconds.'] },
   memory: { name: 'Memory', icon: 'cards', range: 'Easy–Hard', desc: 'Flip cards to pair each braille cell with its letter', levels: LV3, run: memory,
-    help: ['Flip two cards at a time. Match each braille cell with its print letter.', 'Easy uses 6 pairs from a–j, Medium 8 pairs, Hard 10 pairs with lots of look-alikes.', 'Try to finish in as few moves as you can.'] },
+    help: ['Flip two cards at a time. Match each braille cell with its print letter.', 'Easy uses 6 pairs from a–j, Medium 8 pairs, Hard 15 pairs with lots of look-alikes.', 'Try to finish in as few moves as you can.'] },
   maze: { name: 'Braille Maze', icon: 'maze', range: 'Easy–Hard', desc: 'Step only on the cells that spell the word, in order', levels: LV3, run: maze,
     help: ['Start at the flag. Step up, down, left or right onto the next letter of the word.', 'Cells that don’t spell the word are traps. Three traps and the route is revealed.', 'Bigger grids and longer words on harder levels.'] },
   trivia: { name: 'Trivia', icon: 'help', range: 'Easy–Hard', desc: '500 questions on ten topics, with answers in braille', levels: LV3, run: trivia,
