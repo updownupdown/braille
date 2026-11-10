@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=15';
+} from './braille.js?v=16';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=15';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=15';
+} from './data.js?v=16';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=16';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -352,14 +352,6 @@ views[''] = () => {
     </div>
     ${progressHTML()}
 
-    <h2 class="sec-h">${icon('practice', 28)} Practice</h2>
-    <div class="hrows">
-      ${row('#/practice/read', 'Read', 'Name the letter, symbol or contraction', 'read')}
-      ${row('#/practice/write', 'Write', 'Tap the dots that make it', 'write')}
-      ${row('#/practice/words', 'Words', 'Decode whole words and type them', 'words')}
-      ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', 'sweep')}
-    </div>
-
     <h2 class="sec-h">${icon('book', 28)} Learn</h2>
     <div class="hrows">
       ${row('#/reference/overview', 'Overview', 'What braille is, how a cell works, and its history', 'info')}
@@ -370,6 +362,14 @@ views[''] = () => {
       ${row('#/reference/science', 'Maths & science', 'Equations, units and Nemeth', 'sigma')}
       ${row('#/reference/languages', 'Languages', 'French, Spanish, German, Russian, Greek, Japanese', 'globe')}
       ${row('#/reference/systems', 'World systems', 'The braille family around the world', 'map')}
+    </div>
+
+    <h2 class="sec-h">${icon('practice', 28)} Practice</h2>
+    <div class="hrows">
+      ${row('#/practice/read', 'Read', 'Name the letter, symbol or contraction', 'read')}
+      ${row('#/practice/write', 'Write', 'Tap the dots that make it', 'write')}
+      ${row('#/practice/words', 'Words', 'Decode whole words and type them', 'words')}
+      ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', 'sweep')}
     </div>
 
     <h2 class="sec-h">${icon('games', 28)} Games</h2>
