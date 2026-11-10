@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=18';
+} from './braille.js?v=19';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=18';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=18';
+} from './data.js?v=19';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=19';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -476,7 +476,7 @@ const HELP = {
   read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Hint reveals one cell at a time. Skip shows the answer.'],
-  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger near the right edge and the line keeps scrolling. Lift it and the line glides back so you’re in the middle again.', 'Restart goes back to the start of the line. Next loads a new one.'],
+  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
 const HELP_KEYS = {
   read: 'Press 1, 2, 3 or 4 to pick an answer.',
@@ -724,8 +724,8 @@ function sweepMode(q) {
     totalW = track.scrollWidth; W = box.clientWidth;
   }
   // The line starts just right of the middle, so the reader rests in the middle with the upcoming cells in view.
-  const startOffset = () => Math.round(W * 0.5);
-  const homeX = () => Math.round(W * 0.5) - 24;
+  const homeX = () => Math.round(W * 0.5);
+  const startOffset = () => homeX() + 24;
   function reset() { offset = startOffset(); headX = homeX(); lastKey = ''; curIdx = -1; update(false); }
   const clampV = (o) => Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), o));
   const clamp = () => { offset = clampV(offset); };
@@ -738,9 +738,10 @@ function sweepMode(q) {
     const step = (t) => {
       const dt = Math.min(50, t - prev) / 1000; prev = t;
       if (active) { settleRaf = requestAnimationFrame(step); return; }
-      const want = (homeX() - headX) * Math.min(1, dt * 6);
+      const gap = homeX() - headX;
+      const want = Math.abs(gap) < 0.5 ? gap : gap * Math.min(1, dt * 2.4);
       const d = clampV(offset + want) - offset;
-      if (Math.abs(d) < 0.3) { settleRaf = requestAnimationFrame(step); return; }
+      if (!d) { settleRaf = requestAnimationFrame(step); return; }
       offset += d; headX += d; update(false);
       settleRaf = requestAnimationFrame(step);
     };
@@ -773,17 +774,15 @@ function sweepMode(q) {
       }
     }
   }
-  const EDGE = () => Math.min(90, W * 0.18);
   function edgeLoop() {
     cancelAnimationFrame(edgeRaf);
     let prev = performance.now();
     const step = (t) => {
       const dt = Math.min(50, t - prev) / 1000; prev = t;
       if (!active) return;
-      const e = EDGE();
-      let v = 0;
-      if (headX > W - e) v = -((headX - (W - e)) / e); else if (headX < e) v = (e - headX) / e;
-      if (v) { offset += v * 260 * dt; update(); }
+      // The further the reader is from the middle, the faster the line moves (and backwards left of the middle).
+      const v = -(headX - homeX()) / (W / 2);
+      if (Math.abs(v) > 0.04) { offset += v * 300 * dt; update(); }
       edgeRaf = requestAnimationFrame(step);
     };
     edgeRaf = requestAnimationFrame(step);
