@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=17';
+} from './braille.js?v=18';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=17';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=17';
+} from './data.js?v=18';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=18';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -476,7 +476,7 @@ const HELP = {
   read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Hint reveals one cell at a time. Skip shows the answer.'],
-  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger near the right edge and the line keeps scrolling.', 'Restart goes back to the start of the line. Next loads a new one.'],
+  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger near the right edge and the line keeps scrolling. Lift it and the line glides back so you’re in the middle again.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
 const HELP_KEYS = {
   read: 'Press 1, 2, 3 or 4 to pick an answer.',
@@ -723,9 +723,29 @@ function sweepMode(q) {
     lefts = els.map((e) => e.offsetLeft); widths = els.map((e) => e.offsetWidth);
     totalW = track.scrollWidth; W = box.clientWidth;
   }
-  const startOffset = () => Math.round(W * 0.16);
-  function reset() { offset = startOffset(); headX = Math.round(W * 0.1); lastKey = ''; curIdx = -1; update(false); }
-  const clamp = () => { offset = Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), offset)); };
+  // The line starts just right of the middle, so the reader rests in the middle with the upcoming cells in view.
+  const startOffset = () => Math.round(W * 0.5);
+  const homeX = () => Math.round(W * 0.5) - 24;
+  function reset() { offset = startOffset(); headX = homeX(); lastKey = ''; curIdx = -1; update(false); }
+  const clampV = (o) => Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), o));
+  const clamp = () => { offset = clampV(offset); };
+  // When the finger lifts, ease the reader back to the middle and slide the line with it,
+  // so the same cell stays under the reader (at either end of the line the line can't move, so the reader stays put).
+  let settleRaf = 0;
+  function settle() {
+    cancelAnimationFrame(settleRaf);
+    let prev = performance.now();
+    const step = (t) => {
+      const dt = Math.min(50, t - prev) / 1000; prev = t;
+      if (active) { settleRaf = requestAnimationFrame(step); return; }
+      const want = (homeX() - headX) * Math.min(1, dt * 6);
+      const d = clampV(offset + want) - offset;
+      if (Math.abs(d) < 0.3) { settleRaf = requestAnimationFrame(step); return; }
+      offset += d; headX += d; update(false);
+      settleRaf = requestAnimationFrame(step);
+    };
+    settleRaf = requestAnimationFrame(step);
+  }
 
   function update(feedback = true) {
     clamp();
@@ -792,14 +812,14 @@ function sweepMode(q) {
     const step = (t) => { const k = Math.min(1, (t - t0) / 420); offset = start + (target - start) * (1 - Math.pow(1 - k, 3)); update(); if (k < 1) raf = requestAnimationFrame(step); };
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
   }
-  $('#restart').onclick = () => { headX = Math.round(W * 0.1); animateTo(startOffset()); };
+  $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); };
   $('#shuffleBtn').onclick = () => { text = textFor(); build(); };
   $('.sweep-top', box).addEventListener('pointerdown', (e) => e.stopPropagation());
   const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
   const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); };
   window.addEventListener('resize', onResize); window.addEventListener('settings', onSet);
-  build();
-  return () => { active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); };
+  build(); settle();
+  return () => { active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); cancelAnimationFrame(settleRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); };
 }
 
 // ---------- signs ----------
