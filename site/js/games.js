@@ -1,7 +1,7 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=12';
-import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=12';
-import { WORDS } from './data.js?v=12';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=13';
+import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=13';
+import { WORDS } from './data.js?v=13';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -49,13 +49,11 @@ function keys(fn) {
 const LV3 = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
 
 // ---------- Wordle ----------
-function wordle(el, level) {
-  const show = level === 'easy';
+function wordle(el) {
   let answer, guesses, cur, done;
   const kb = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-  el.innerHTML = `<div class="g-card card wd"><div class="wd-board" id="board"></div><p class="g-msg" id="msg"></p></div>
-    <div class="wd-keys" id="keys"></div>
-    <div class="g-actions"><button class="btn" id="new">New word</button></div>`;
+  el.innerHTML = `<div class="g-card card wd"><button class="btn g-corner" id="new" aria-label="New word" title="New word"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.7-6.2"/><path d="M3 4v5h5"/></svg> New</button><div class="wd-board" id="board"></div><p class="g-msg" id="msg"></p></div>
+    <div class="wd-keys" id="keys"></div>`;
   const board = $('#board', el), msg = $('#msg', el), card = $('.g-card', el);
   const state = {};
   const score = (g) => {
@@ -64,7 +62,7 @@ function wordle(el, level) {
     for (let i = 0; i < 5; i++) if (res[i] !== 'hit' && left[g[i]]) { res[i] = 'near'; left[g[i]]--; }
     return res;
   };
-  const tile = (l, st = '') => `<span class="wd-tile ${st}">${l ? letterCell(l) + (show || done ? `<b>${l}</b>` : '') : ''}</span>`;
+  const tile = (l, st = '') => `<span class="wd-tile ${st}">${l ? letterCell(l) + `<b>${l}</b>` : ''}</span>`;
   function render() {
     let h = '';
     for (let r = 0; r < 6; r++) {
@@ -72,8 +70,8 @@ function wordle(el, level) {
       const w = g || (r === guesses.length ? cur : '');
       h += `<div class="wd-row ${r === guesses.length && !done ? 'cur' : ''}">${[0, 1, 2, 3, 4].map((i) => tile(w[i], res ? res[i] : '')).join('')}</div>`;
     }
-    board.innerHTML = h;
-    $('#keys', el).innerHTML = kb.map((row, ri) => `<div class="wd-krow">${ri === 2 ? '<button class="wd-k wide" data-k="enter">Enter</button>' : ''}${[...row].map((k) => `<button class="wd-k ${state[k] || ''}" data-k="${k}" aria-label="${k}">${letterCell(k)}${show ? `<b>${k}</b>` : ''}</button>`).join('')}${ri === 2 ? '<button class="wd-k wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`).join('');
+    board.innerHTML = h; card.classList.toggle('done', done);
+    $('#keys', el).innerHTML = kb.map((row, ri) => `<div class="wd-krow">${ri === 2 ? '<button class="wd-k wide" data-k="enter">Enter</button>' : ''}${[...row].map((k) => `<button class="wd-k ${state[k] || ''}" data-k="${k}" aria-label="${k}">${letterCell(k)}<b>${k}</b></button>`).join('')}${ri === 2 ? '<button class="wd-k wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`).join('');
   }
   function press(k) {
     if (done) return;
@@ -394,21 +392,19 @@ function anagrams(el, level) {
 }
 
 // ---------- Hangman ----------
-function hangman(el, level) {
-  const show = level === 'easy';
+function hangman(el) {
   const maxMiss = 6;
-  el.innerHTML = `<div class="card g-card hm" id="card"><svg class="hm-art" viewBox="0 0 120 120" id="art" aria-hidden="true">
+  el.innerHTML = `<div class="card g-card hm" id="card"><button class="btn g-corner" id="new"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.7-6.2"/><path d="M3 4v5h5"/></svg> New word</button><svg class="hm-art" viewBox="0 0 120 120" id="art" aria-hidden="true">
       <path class="base" d="M10 112h60M30 112V10h50v14"/>
       <circle class="p p1" cx="80" cy="34" r="10"/><path class="p p2" d="M80 44v30"/><path class="p p3" d="M80 52l-14 12"/><path class="p p4" d="M80 52l14 12"/><path class="p p5" d="M80 74l-12 20"/><path class="p p6" d="M80 74l12 20"/></svg>
     <div class="hm-side"><small id="clue"></small><div class="hm-word" id="word"></div><p class="g-msg" id="msg"></p></div></div>
-    <div class="hm-keys" id="keys"></div>
-    <div class="g-actions"><button class="btn" id="new">New word</button></div>`;
+    <div class="hm-keys" id="keys"></div>`;
   const card = $('#card', el);
   let word, clue, guessed, miss, done;
   function render() {
     $('#clue', el).textContent = clue;
-    $('#word', el).innerHTML = [...word].map((l) => `<span class="hm-slot">${guessed.has(l) || done ? letterCell(l) : '<span class="cell blank">' + '<i></i>'.repeat(6) + '</span>'}${show && (guessed.has(l) || done) ? `<b>${l}</b>` : ''}</span>`).join('');
-    $('#keys', el).innerHTML = [...AZ].map((k) => `<button class="hm-k ${guessed.has(k) ? (word.includes(k) ? 'hit' : 'miss') : ''}" data-k="${k}" ${guessed.has(k) || done ? 'disabled' : ''} aria-label="${k}">${letterCell(k)}${show ? `<b>${k}</b>` : ''}</button>`).join('');
+    $('#word', el).innerHTML = [...word].map((l) => `<span class="hm-slot">${guessed.has(l) || done ? letterCell(l) : '<span class="cell blank">' + '<i></i>'.repeat(6) + '</span>'}${guessed.has(l) || done ? `<b>${l}</b>` : ''}</span>`).join(''); card.classList.toggle('done', done);
+    $('#keys', el).innerHTML = [...AZ].map((k) => `<button class="hm-k ${guessed.has(k) ? (word.includes(k) ? 'hit' : 'miss') : ''}" data-k="${k}" ${guessed.has(k) || done ? 'disabled' : ''} aria-label="${k}">${letterCell(k)}<b>${k}</b></button>`).join('');
     $$('.hm-art .p', el).forEach((p, i) => p.classList.toggle('on', i < miss));
   }
   function guess(k) {
@@ -548,9 +544,9 @@ export const GAME_GROUPS = [
   ['Puzzles and quizzes', ['memory', 'maze', 'trivia', 'riddles']],
 ];
 export const GAMES = {
-  wordle: { name: 'Braille Wordle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], run: wordle,
+  wordle: { name: 'Braille Wordle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
     help: ['Guess the hidden five-letter word in six tries. Type on the braille keyboard or your own keyboard.', 'After each guess, green means the right letter in the right spot, yellow means it’s in the word somewhere else, and grey means it’s not in the word.', '“With letters” shows print under each cell. “Braille only” makes you read every cell.'] },
-  hangman: { name: 'Hangman', icon: 'gallows', range: 'Easy–Hard', desc: 'Guess letters from a braille keyboard before the drawing is done', levels: [['easy', 'With letters'], ['hard', 'Braille only']], run: hangman,
+  hangman: { name: 'Hangman', icon: 'gallows', range: 'Easy–Hard', desc: 'Guess letters from a braille keyboard before the drawing is done', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: hangman,
     help: ['Guess the word one letter at a time. Each correct letter appears as a braille cell.', 'Six wrong guesses and the drawing is complete.', '“Braille only” hides the print letters on the keyboard.'] },
   anagrams: { name: 'Anagrams', icon: 'shuffle', range: 'Easy–Hard', desc: 'Read the scrambled braille, then unscramble the word', levels: LV3, run: anagrams,
     help: ['The letters of a word appear as braille cells, but in the wrong order.', 'Read each cell, then type the real word.', 'Hint numbers the cells in their correct order, one at a time.'] },

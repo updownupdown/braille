@@ -1,5 +1,5 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=12';
+import { cellsOf } from './braille.js?v=13';
 
 export const SIGN_WORDS = [
   'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',
@@ -100,9 +100,9 @@ export const JAPANESE = {
 export const SYSTEMS = [
   { group: 'English', items: [
     ['Unified English Braille (UEB)', 'Canada, US, UK, Ireland, Australia, NZ, South Africa, Nigeria', 'Developed by the International Council on English Braille from 1991 and adopted in 2004. Australia implemented it first (2005); Canada adopted it in 2010 and the US switched in 2016. One code covers literary text, maths and computer notation, in Grade 1 (uncontracted) and Grade 2 (contracted).', 'en'],
-    ['English Braille American Edition (EBAE)', 'US & Canada, before UEB', 'The previous North American literary code, still found on many older signs. UEB dropped nine of its contractions — ble, com, dd, ally, ation, by, into, to and o’clock — and stopped joining “to”, “into” and “by” to the next word.'],
+    ['English Braille American Edition (EBAE)', 'US & Canada, before UEB', 'The previous North American literary code, still found on many older signs. UEB dropped nine of its contractions — ble, com, dd, ally, ation, by, into, to and o’clock — and stopped joining “to”, “into” and “by” to the next word.', 'ebae'],
     ['Standard English Braille', 'UK, before UEB', 'The British code that preceded UEB; very close to EBAE.'],
-    ['Nemeth Code', 'US & Canada (maths)', 'Created by Abraham Nemeth and adopted in the US in 1952. Digits use the lower part of the cell and operations have their own signs. Many schools still teach maths in Nemeth, sometimes inside UEB text.'],
+    ['Nemeth Code', 'US & Canada (maths)', 'Created by Abraham Nemeth and adopted in the US in 1952. Digits use the lower part of the cell and operations have their own signs. Many schools still teach maths in Nemeth, sometimes inside UEB text.', 'nemeth'],
     ['Computer Braille Code', 'US (until UEB)', 'A one-cell-per-character code for programming and web addresses; UEB now handles these itself.'],
   ]},
   { group: 'Other Latin-script languages', items: [
@@ -114,7 +114,7 @@ export const SYSTEMS = [
   { group: 'Other scripts', items: [
     ['Cyrillic (Russian and others)', 'Russia, Eastern Europe, Central Asia', 'Letters are mapped to Latin cells by sound where possible (б = b, д = d); the rest get new cells. Ukrainian, Bulgarian and others vary slightly.', 'ru'],
     ['Greek', 'Greece, Cyprus', 'Letters map to Latin look-alikes or sound-alikes (α = a, π = p). Greek letters in maths use the same cells after a Greek indicator.', 'el'],
-    ['Arabic', 'Middle East, North Africa', 'Print reads right-to-left, but Arabic braille is read left-to-right. Many letters share cells with their Latin sound-alikes.'],
+    ['Arabic', 'Middle East, North Africa', 'Print reads right-to-left, but Arabic braille is read left-to-right. Many letters share cells with their Latin sound-alikes.', 'ar'],
     ['Hebrew', 'Israel', 'Also read left-to-right in braille, with letters loosely matched to Latin sounds.'],
     ['Bharati braille', 'India, Nepal, Sri Lanka, Bangladesh', 'Standardised in 1951. One system shared by Hindi, Bengali, Tamil, Telugu, Punjabi and more: the same sound gets the same cell whatever the print script.'],
     ['Japanese (tenji)', 'Japan', 'Devised by Kuraji Ishikawa in 1890. Kana-based: each cell is a syllable, built from a vowel shape plus consonant dots. An 8-dot Kanji braille exists but is rare.', 'ja'],
@@ -123,7 +123,7 @@ export const SYSTEMS = [
     ['Thai, Vietnamese, Amharic, Tibetan and more', 'Worldwide', 'Most writing systems now have a braille code, often coordinated through UNESCO and the World Blind Union.'],
   ]},
   { group: 'Special-purpose codes', items: [
-    ['Music braille', 'International', 'Notes, durations, octaves and dynamics in 6-dot cells. Louis Braille included music in his 1829 method.'],
+    ['Music braille', 'International', 'Notes, durations, octaves and dynamics in 6-dot cells. Louis Braille included music in his 1829 method.', 'music'],
     ['8-dot / computer braille', 'Refreshable displays', 'Adds a fourth row of two dots below the cell, giving 256 patterns — one per character. Unicode’s braille block (U+2800–U+28FF) contains all of them.'],
     ['Gardner–Salinas braille', 'Science', 'An 8-dot code for maths and science notation, developed in the 1990s.'],
     ['IPA braille', 'Linguistics', 'Phonetic symbols for writing pronunciation.'],

@@ -1,11 +1,11 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=12';
+} from './braille.js?v=13';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=12';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=12';
+} from './data.js?v=13';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=13';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -110,12 +110,12 @@ function crowHTML(cells, label, { kind = '', note = '', i = null, added = null }
 // Tables holding any multi-cell symbol collapse to one column sooner, so every row in a section lines up.
 function markMulti(root = document) { $$('.ctable', root).forEach((t) => t.classList.toggle('multi', !!t.querySelector('.cells .cell + .cell'))); }
 // Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
-function groupsHTML(spec, cls = 'md') {
+function groupsHTML(spec, cls = 'md', fixedKind = '') {
   return `<div class="braille-line groups">${spec.split(' ').map((g) => {
     if (g === '_') return '<span class="bw space"></span>';
     const i = g.indexOf(':');
     const cells = g.slice(0, i), label = g.slice(i + 1);
-    const kind = /^[a-z]$/i.test(label) ? 'letter' : /^[0-9.,#]+$/.test(label) ? 'digit' : /^(cap|caps)$/.test(label) ? 'indicator' : 'math';
+    const kind = fixedKind || (/^[a-z]$/i.test(label) ? 'letter' : /^[0-9.,#]+$/.test(label) ? 'digit' : /^(cap|caps)$/.test(label) ? 'indicator' : 'math');
     return `<span class="bgroup"><span class="mrow">${cellsK(cells, kind, cls)}</span><span class="lbl">${esc(label)}</span></span>`;
   }).join('')}</div>`;
 }
@@ -926,31 +926,75 @@ function numbersSection() {
     html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${parts.map(([id, , h]) => `<div class="sg" id="${id}">${h}</div>`).join('')}`,
   };
 }
+// Printable cheat sheets: Grade 1 on one page (letters laid out by decade), Grade 2 over a few pages.
 function cheatSection() {
-  const t = (title, rows) => `<div class="cs-block"><h3>${title}</h3><div class="ctable narrow">${rows.join('')}</div></div>`;
-  const P = (ch) => crowHTML(UEB_PUNCT[ch][0], ch, { kind: 'punct', note: UEB_PUNCT[ch][1] });
-  const W = (w) => { const e = DICT.find((x) => x.print === w && x.group !== 'Letters'); return crowHTML(e.cells, w, { kind: 'contraction' }); };
-  return { html: `<div class="cs-head"><p class="lead-p">Everything a beginner needs on one page. Print it, or save it as a PDF.</p><button class="btn primary" id="csPrint">${icon('print', 18)} Print</button></div>
-    <div class="cheatsheet">
-      <h2 class="cs-title">Braille cheat sheet <small>Unified English Braille</small></h2>
-      ${t('Letters', [...'abcdefghijklmnopqrstuvwxyz'].map((l) => crowHTML(LETTERS[l], l, { kind: 'letter' })))}
-      ${t('Numbers', ['1234567890'.split('').map((d) => crowHTML(IND.number + LETTERS['jabcdefghi'[Number(d)]], d, { kind: 'digit' }))].flat())}
-      ${t('Signs', [crowHTML(IND.capital, 'capital', { kind: 'indicator' }), crowHTML(IND.number, 'number', { kind: 'digit' }), P('.'), P(','), P('?'), P('!'), P("'"), P('-')])}
-      ${t('Common words (Grade 2)', ['and', 'for', 'of', 'the', 'with', 'but', 'can', 'do', 'it', 'that', 'you', 'ing', 'st', 'sh', 'th', 'ch'].map(W))}
-      <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>
-    </div>`, bind: () => { $('#csPrint').onclick = () => window.print(); } };
+  const item = (cells, label, kind, cls = '') => `<div class="cs-i ${cls}${cells.length > 1 ? ' wide' : ''}"><span class="cs-c">${[...cells].map((c) => cellHTML(c, '', { kind })).join('')}</span><b>${esc(label)}</b></div>`;
+  const blank = '<div class="cs-i cs-blank" aria-hidden="true"></div>';
+  const block = (title, body, cls = '', note = '') => `<section class="cs-block ${cls}"><h3>${title}${note ? `<span>${note}</span>` : ''}</h3><div class="cs-grid">${body}</div></section>`;
+  const L = (str) => [...str].map((l) => item(LETTERS[l], l, 'letter')).join('');
+  const P = (ch, label) => item(UEB_PUNCT[ch][0], label || ch, 'punct');
+  const grade1 = () => `<h2 class="cs-title">Braille cheat sheet · Grade 1 <small>Unified English Braille</small></h2>
+    ${block('Letters', `${L('abcdefghij')}${L('klmnopqrst')}${L('uvxyz')}${blank.repeat(4)}${L('w')}`, 'cs-decades', 'each row adds dots to the one above')}
+    ${block('Numbers', '1234567890'.split('').map((d) => item(LETTERS['jabcdefghi'[Number(d)]], d, 'digit')).join(''), 'cs-decades', `put ${cellHTML(IND.number, 'cs-inline', { kind: 'digit' })} before a number: 1–0 are a–j`)}
+    ${block('Signs', [item(IND.capital, 'capital', 'indicator'), item(IND.capital + IND.capital, 'all caps', 'indicator'), item(IND.number, 'number', 'digit'), P('.'), P(','), P('?'), P('!'), P('’', '’'), P('-'), P(':'), P(';'), P('“'), P('”'), P('('), P(')'), P('/')].join(''), 'cs-decades')}
+    <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>`;
+  const grade2 = () => `<h2 class="cs-title">Braille cheat sheet · Grade 2 <small>Unified English Braille contractions</small></h2>
+    ${Object.entries(CONTRACTIONS).map(([cat, { blurb }]) => block(esc(cat), DICT.filter((e) => e.group === cat).map((e) => item(e.cells, e.print, 'contraction', e.cells.length > 1 ? 'wide' : '')).join(''), 'cs-g2', esc(blurb))).join('')}
+    <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>`;
+  let g = store.get('csGrade', '1');
+  return { html: `<div class="cs-head"><p class="lead-p">Print it, or save it as a PDF. Grade 1 fits on one page; Grade 2 takes a few.</p><div class="row">${radios('csg', [['1', 'Grade 1'], ['2', 'Grade 2']], g)}<button class="btn primary" id="csPrint">${icon('print', 18)} Print</button></div></div>
+    <div class="cheatsheet" id="cheatsheet"></div>`, bind: () => {
+    const render = () => { $('#cheatsheet').innerHTML = g === '2' ? grade2() : grade1(); $('#cheatsheet').dataset.grade = g; };
+    render();
+    bindRadios($('.cs-head'), (k, v) => { g = v; store.set('csGrade', v); render(); });
+    $('#csPrint').onclick = () => window.print();
+  } };
 }
-// Full character table for a language, shown in a modal from World systems or Languages.
-function charsTable(k) {
-  if (k === 'ja') return `<p class="muted">${esc(JAPANESE.blurb)}</p>${kanaTable()}`;
+// Extra charts for World systems that aren't full translators. Cells are dot strings; a space joins multi-cell signs.
+const D = (s) => s.split(' ').map(fromDots).join('');
+const grp = (pairs, kind = '') => pairs.map(([dots, label]) => dots === '_' ? '_' : `${D(dots)}:${label}`).join(' ');
+const MUSIC_NOTES = [['C', '145'], ['D', '15'], ['E', '124'], ['F', '1245'], ['G', '125'], ['A', '24'], ['B', '245']];
+const withDots = (d, add) => [...new Set([...d, ...add])].sort().join('');
+const EXTRA_CHARTS = {
+  ebae: { name: 'EBAE', kind: 'contraction',
+    blurb: 'Letters, numbers and most contractions are the same as UEB. These signs were dropped when Canada and the US moved to UEB in 2010–2016, but you will still find them on older signs and books.',
+    examples: [['by the way', grp([['356', 'by'], ['2346', 'the'], ['_'], ['2456', 'w'], ['1', 'a'], ['13456', 'y']])], ['table', grp([['2345', 't'], ['1', 'a'], ['3456', 'ble']])], ['nation', grp([['1345', 'n'], ['6 1345', 'ation']])]],
+    groups: [['Signs dropped in UEB', [['3456', 'ble'], ['36', 'com'], ['256', 'dd'], ['356', 'by'], ['235', 'to'], ['35 235', 'into'], ['6 1345', 'ation'], ['6 13456', 'ally'], ['135 3 14', 'o’clock']]]] },
+  nemeth: { name: 'Nemeth Code', kind: 'math',
+    blurb: 'Nemeth writes digits in the lower part of the cell, so a number never looks like a letter. The numeric indicator comes before a number that starts a line or follows a space.',
+    examples: NEMETH.map((s) => [s.print, s.g]),
+    groups: [['Digits', [['2', '1'], ['23', '2'], ['25', '3'], ['256', '4'], ['26', '5'], ['235', '6'], ['2356', '7'], ['236', '8'], ['35', '9'], ['356', '0']]],
+      ['Signs', [['3456', 'numeric indicator'], ['346', 'plus'], ['36', 'minus'], ['16', 'times'], ['46 34', 'divided by'], ['46 13', 'equals'], ['46', 'decimal point']]]] },
+  ar: { name: 'Arabic braille', kind: 'letter',
+    blurb: 'Read left to right, even though print Arabic runs right to left. A letter has one cell whatever its position in the word, and many share cells with Latin sound-alikes (ب = b, د = d, ف = f).',
+    examples: [['سلام · peace', grp([['234', 'س'], ['123', 'ل'], ['1', 'ا'], ['134', 'م']])], ['كتاب · book', grp([['13', 'ك'], ['2345', 'ت'], ['1', 'ا'], ['12', 'ب']])]],
+    groups: [['Letters', [['1', 'ا'], ['12', 'ب'], ['2345', 'ت'], ['1456', 'ث'], ['245', 'ج'], ['156', 'ح'], ['1346', 'خ'], ['145', 'د'], ['2346', 'ذ'], ['1235', 'ر'], ['1356', 'ز'], ['234', 'س'], ['146', 'ش'], ['12346', 'ص'], ['1246', 'ض'], ['23456', 'ط'], ['123456', 'ظ'], ['12356', 'ع'], ['126', 'غ'], ['124', 'ف'], ['12345', 'ق'], ['13', 'ك'], ['123', 'ل'], ['134', 'م'], ['1345', 'ن'], ['125', 'ه'], ['2456', 'و'], ['24', 'ي']]]] },
+  music: { name: 'Music braille', kind: 'contraction',
+    blurb: 'Each note is one cell. The top four dots give the pitch (using the shapes of d to j), and dots 3 and 6 give the length. Octave, rests and dynamics have signs of their own.',
+    examples: [['Twinkle, twinkle', grp([['1456', 'C'], ['1456', 'C'], ['1256', 'G'], ['1256', 'G'], ['246', 'A'], ['246', 'A'], ['1235', 'G']])], ['A scale in eighth notes', grp(MUSIC_NOTES.map(([n, d]) => [d, n]))]],
+    groups: [['Eighth notes', MUSIC_NOTES.map(([n, d]) => [d, n])], ['Quarter notes (add the lower-right dot)', MUSIC_NOTES.map(([n, d]) => [withDots(d, '6'), n])],
+      ['Half notes (add the lower-left dot)', MUSIC_NOTES.map(([n, d]) => [withDots(d, '3'), n])], ['Whole notes (add both bottom dots)', MUSIC_NOTES.map(([n, d]) => [withDots(d, '36'), n])]] },
+};
+const exTiles = (items) => `<div class="group-title"><h3>Examples</h3></div><div class="example-grid">${items.join('')}</div>`;
+// Full character table for a language, shown in a modal from World systems or Languages (with examples first in the modal).
+function charsTable(k, { examples = false } = {}) {
+  const X = EXTRA_CHARTS[k];
+  if (X) return `<p class="muted">${esc(X.blurb)}</p>${exTiles(X.examples.map(([p, g]) => `<div class="example"><div class="print">${esc(p)}</div>${groupsHTML(g, 'sm', X.kind)}</div>`))}
+    ${X.groups.map(([t, items]) => `<div class="group-title"><h3>${esc(t)}</h3></div><div class="ctable narrow">${items.map(([d, l]) => crowHTML(D(d), l, { kind: X.kind })).join('')}</div>`).join('')}`;
+  if (k === 'ja') {
+    const kana = Object.fromEntries(JAPANESE.rows.flatMap(([, r]) => r));
+    const words = [['さくら · sakura', ['sa', 'ku', 'ra']], ['ねこ · neko', ['ne', 'ko']], ['すし · sushi', ['su', 'shi']], ['やま · yama', ['ya', 'ma']], ['ひかり · hikari', ['hi', 'ka', 'ri']]];
+    return `<p class="muted">${esc(JAPANESE.blurb)}</p>${examples ? exTiles(words.map(([p, sy]) => `<div class="example"><div class="print">${esc(p)}</div>${groupsHTML(sy.map((x) => `${kana[x]}:${x}`).join(' '), 'sm', 'letter')}</div>`)) : ''}${kanaTable()}`;
+  }
   const info = LANG_INFO[k];
-  return `<p class="muted">${esc(info.blurb)}</p>
+  return `<p class="muted">${esc(info.blurb)}</p>${examples ? exTiles(info.phrases.map((p) => `<div class="example"><div class="print">${esc(p)}</div>${lineHTML(translate(p, k, k === 'en' ? 2 : 1), { cls: 'sm' })}</div>`)) : ''}
     <div class="group-title"><h3>Letters</h3></div>
     <div class="ctable narrow">${[...info.letters].map((l) => crowHTML(translate(l, k, 1)[0].cells, l, { kind: 'letter' })).join('')}</div>
     <div class="group-title"><h3>Digits</h3></div>
     <div class="ctable narrow">${'1234567890'.split('').map((d) => crowHTML(unicodeOf(translate(d, k, 1)), d, { kind: 'digit' })).join('')}</div>`;
 }
 const LANG_NAMES = () => ({ ...Object.fromEntries(Object.keys(LANG_INFO).map((k) => [k, k === 'en' ? 'English (UEB)' : LANGS[k].name])), ja: '日本語 Japanese' });
+const CHART_NAMES = () => ({ ...LANG_NAMES(), ...Object.fromEntries(Object.entries(EXTRA_CHARTS).map(([k, x]) => [k, x.name])) });
 function languagesSection() {
   return { html: '<div class="picker"><div id="langDD"></div></div><div id="langBody"></div>', bind: () => {
     const render = (k) => {
@@ -969,11 +1013,11 @@ function languagesSection() {
   } };
 }
 function systemsSection() {
-  return { html: `<p class="lead-p">The braille family: the codes you’re likely to meet, plus special-purpose and tactile cousins. Tap a row to expand it.</p>
+  return { html: `<p class="lead-p">The braille family: the codes you’re likely to meet, plus special-purpose and tactile cousins. Tap a row to expand it; many include a full chart.</p>
     ${SYSTEMS.map((g) => `<div class="group-title"><h3>${esc(g.group)}</h3></div><div class="acc-list">${g.items.map(([n, w, d, chars]) => `
       <details class="acc-item"><summary><span><b>${esc(n)}</b><small>${esc(w)}</small></span>${icon('chevron', 20)}</summary>
       <div class="acc-body"><p>${esc(d)}</p>${chars ? `<button class="btn small-btn" data-chars="${chars}">See all characters ${icon('right', 16)}</button>` : ''}</div></details>`).join('')}</div>`).join('')}`,
-    bind: () => { $$('[data-chars]').forEach((b) => { b.onclick = () => openSheet(charsTable(b.dataset.chars), { title: LANG_NAMES()[b.dataset.chars] }); }); },
+    bind: () => { $$('[data-chars]').forEach((b) => { b.onclick = () => openSheet(charsTable(b.dataset.chars, { examples: true }), { title: CHART_NAMES()[b.dataset.chars] }); }); },
   };
 }
 function scienceSection() {
@@ -1050,8 +1094,11 @@ views.games = (q, sub) => {
     gameEl.append(foot);
   };
   const mo = new MutationObserver(arrange); mo.observe(gameEl, { childList: true });
+  const lvlClass = () => { gameEl.className = `game lv-${lvl}`; };
+  lvlClass();
   let stop = g.run(gameEl, lvl, { dropdown }); arrange();
-  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); if (stop) stop(); stop = g.run(gameEl, lvl, { dropdown }); });
+  // Display-only toggles (With letters / Braille only) keep the current puzzle.
+  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); lvlClass(); if (g.display) return; if (stop) stop(); stop = g.run(gameEl, lvl, { dropdown }); });
   return () => { mo.disconnect(); if (stop) stop(); };
 };
 
@@ -1072,7 +1119,7 @@ function buildIndex() {
   for (const k of ['fr', 'es', 'de', 'ru', 'el']) {
     for (const l of LANG_INFO[k].letters) {
       if (/[a-z]/.test(l)) continue;
-      out.push({ title: l, sub: LANGS[k].name + ' letter', cells: translate(l, k, 1)[0].cells, kind: 'letter', sec: 'languages', act: () => openSheet(charsTable(k), { title: LANG_NAMES()[k] }) });
+      out.push({ title: l, sub: LANGS[k].name + ' letter', cells: translate(l, k, 1)[0].cells, kind: 'letter', sec: 'languages', act: () => openSheet(charsTable(k, { examples: true }), { title: LANG_NAMES()[k] }) });
     }
   }
   for (const [rk, r] of Object.entries(SIGN_REGIONS)) for (const w of r.signs) out.push({ title: w, sub: 'Sign · ' + r.name, cells: unicodeOf(translate(w, r.signLang || 'en', r.signLang ? 1 : 2)), sec: 'signs', act: nav('#/reference/signs/' + rk) });
