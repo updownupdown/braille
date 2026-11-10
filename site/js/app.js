@@ -1,10 +1,10 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=8';
+} from './braille.js?v=9';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=8';
+} from './data.js?v=9';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -91,9 +91,9 @@ function kindOf(c) {
 }
 const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, cls, { kind })).join('');
 // Compact row: cells · label · dot numbers · note (a button when it opens a detail sheet).
-function crowHTML(cells, label, { kind = '', note = '', i = null } = {}) {
+function crowHTML(cells, label, { kind = '', note = '', i = null, added = null } = {}) {
   const tag = i == null ? 'div' : 'button';
-  return `<${tag} class="crow"${i == null ? '' : ` data-i="${i}"`}><span class="cells">${cellsK(cells, kind)}</span><b>${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span><span class="cnote">${esc(note)}</span></${tag}>`;
+  return `<${tag} class="crow"${i == null ? '' : ` data-i="${i}"`}><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span><span class="cnote">${esc(note)}</span></${tag}>`;
 }
 // Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
 function groupsHTML(spec, cls = 'md') {
@@ -185,7 +185,7 @@ function openSettings() {
       ${switchRow('color', 'Colour-code dots', S.color)}
       <div class="color-key">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
-    <div class="set-group"><h3>Reference</h3>${switchRow('dotNums', 'Show dot numbers in Reference', S.dotNums)}</div>
+    <div class="set-group"><h3>Learn</h3>${switchRow('dotNums', 'Show dot numbers in Learn', S.dotNums)}</div>
     <div class="set-group"><h3>Progress</h3><button class="btn" id="resetAll">Reset practice progress</button></div>
     <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p></div>
   </div>`, { title: 'Settings' });
@@ -264,7 +264,9 @@ for (const e of DICT) e.kind = KIND_OF_GROUP[e.group] || 'contraction';
 const SEC_OF_GROUP = { Letters: 'alphabet', Numbers: 'numbers', Punctuation: 'numbers', Indicators: 'numbers' };
 const symHTML = (e, i) => `<button class="sym" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c, '', { kind: e.kind })).join('')}</span><b>${esc(e.print)}</b>${e.note && e.note.length < 26 ? `<small>${esc(e.note)}</small>` : ''}</button>`;
 const practiseLink = (href) => `<a class="gt-link" href="${href}">Practise ${icon('right', 16)}</a>`;
-const groupBlock = (g, title, blurb, href) => `<div class="group-title"><h3>${title}</h3>${blurb ? `<span>${esc(blurb)}</span>` : ''}${href ? practiseLink(href) : ''}</div><div class="sym-grid">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === g).map(([e, i]) => symHTML(e, i)).join('')}</div>`;
+const groupBlock = (g, title, blurb, href) => `<div class="group-title"><h3>${title}</h3>${blurb ? `<span>${esc(blurb)}</span>` : ''}${href ? practiseLink(href) : ''}</div><div class="ctable narrow">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === g).map(([e, i]) => crowHTML(e.cells, e.print, { kind: e.kind, i, note: e.group === 'Numbers' ? '' : e.note })).join('')}</div>`;
+// "Examples" block that closes a section: [print, note] pairs.
+const exBlock = (list, grade = 1) => `<div class="ex-block"><h4 class="ex-h">Examples</h4><div class="example-grid">${list.map(([t, n]) => `<div class="example"><div class="print">${esc(t)}</div>${lineHTML(translate(t, 'en', grade), { cls: 'sm' })}${n ? `<p class="muted small ex-note">${esc(n)}</p>` : ''}</div>`).join('')}</div></div>`;
 
 const view = $('#view');
 const views = {};
@@ -322,7 +324,7 @@ views[''] = () => {
       ${row('#/practice/sweep', 'Sweep', 'Glide a finger along a line, like real reading', 'sweep')}
     </div>
 
-    <h2 class="sec-h">${icon('book', 28)} Reference</h2>
+    <h2 class="sec-h">${icon('book', 28)} Learn</h2>
     <div class="hrows">
       ${row('#/reference/overview', 'Overview', 'What braille is, how a cell works, and its history', 'info')}
       ${row('#/reference/alphabet', 'Alphabet', 'a–z in three simple rows', 'alpha')}
@@ -378,9 +380,9 @@ const SWEEP_SRC = { words: 'Words', sentences: 'Sentences', signs: 'Signs' };
 const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
 const HELP = {
   read: 'A braille cell appears — pick what it says. The card glows green when you’re right and red (with a shake) when you’re not. On a keyboard, press 1–4. Your progress for each item goes from pale blue to dark blue, then green once you know it; ones you miss come up more often.',
-  write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Dot 1 is top left and dot 4 top right; see Reference → Overview.',
+  write: 'Tap the dots that make the letter or symbol. It checks itself: the card glows green as soon as the dots are right, and red if you add a dot that doesn’t belong. Symbols longer than one cell are built one cell at a time. On a keyboard, F D S are dots 1 2 3 and J K L are dots 4 5 6, like a Perkins brailler. Dot 1 is top left and dot 4 top right; see Learn → Overview.',
   words: 'Decode the word and type it — it checks as you type. Hint reveals one cell at a time; Skip shows the answer.',
-  sweep: 'Put your finger on the line and slide right. The cell under your finger is shaded, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “Again” goes back to the start of the line and “Next” loads a new one. Grade, cell size and vibration are below the reading area.',
+  sweep: 'Put your finger on the line and slide right. The cell under your finger is shaded, and its letter appears once you’ve passed it. Hold your finger in the shaded right edge and the line keeps scrolling. On a laptop, move the mouse across or use the arrow keys. “Again” goes back to the start of the line and “Next” loads a new one. Grade and cell size are below the reading area.',
 };
 
 views.practice = (q, sub) => {
@@ -572,18 +574,18 @@ function sweepMode(q) {
       <div class="sweep-track" id="track"></div>
       <div class="reader" id="reader"></div>
       <div class="finger" id="finger"></div>
-      <div class="sweep-top"><span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span>
-        <button class="link-btn pillish" id="restart">${icon('restart', 16)} Again</button><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
+      <div class="sweep-top"><button class="link-btn pillish" id="restart">${icon('restart', 16)} Again</button>
+        <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>
     <div class="sweep-settings" id="swSet">
       <div class="set-row"><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
       <div class="set-row"><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
-      <label class="set-row switch ${canVibrate ? '' : 'disabled'}"><span>Vibrate on dots${canVibrate ? '' : '<small>Not available here: only Android phones let websites vibrate. iPhones, iPads and computers don’t.</small>'}</span><input type="checkbox" data-set="swVibe" ${canVibrate && S.swVibe ? 'checked' : ''} ${canVibrate ? '' : 'disabled'}></label>
+      ${canVibrate ? `<label class="set-row switch"><span>Vibrate on dots</span><input type="checkbox" data-set="swVibe" ${S.swVibe ? 'checked' : ''}></label>` : ''}
     </div>`;
   bindRadios($('#picker'), (k, v) => { src = v; store.set('swSrc', v); text = textFor(); build(); });
   bindRadios($('#swSet'), (k, v) => setS(k, k === 'swGrade' ? Number(v) : v));
-  $('#swSet [data-set]').onchange = (e) => setS('swVibe', e.target.checked);
+  if (canVibrate) $('#swSet [data-set]').onchange = (e) => setS('swVibe', e.target.checked);
   const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
   let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
   let lastKey = '', curIdx = -1, raf = 0, edgeRaf = 0, active = false;
@@ -730,7 +732,7 @@ function signsSection(regionKey) {
   const grade = R.signLang ? 1 : 2;
   const parts = [];
   if (region === 'jp') parts.push(['sg-kana', 'Kana braille', `<p class="lead-p">${esc(JAPANESE.blurb)}</p>${kanaTable()}`]);
-  else parts.push(['sg-read', 'Read these signs', `<div class="sign-gallery">${R.signs.map((s) => plateHTML(s, lang, grade)).join('')}${(R.bilingual || []).map(([en, fr]) => plateHTML(en, 'en', 2, [fr, 'fr'])).join('')}</div><p class="muted small">Tap a sign to see what each cell means. ${esc(R.note || 'Shown in UEB Grade 2, the way new signs are made.')}</p>`]);
+  else parts.push(['sg-read', 'Read these signs', `<div class="sign-gallery">${R.signs.map((s) => plateHTML(s, lang, grade)).join('')}${(R.bilingual || []).map(([en, fr]) => plateHTML(en, 'en', 2, [fr, 'fr'])).join('')}</div>`]);
   parts.push(['sg-how', 'How it works here', textList(R.facts)]);
   if (R.room) parts.push(['sg-anatomy', 'Anatomy of a room sign', `<div class="anatomy">${plateHTML(R.room, lang, grade)}<ol>
       <li>Raised capitals or a pictogram you can feel.</li>
@@ -753,6 +755,7 @@ function signsSection(regionKey) {
   return {
     jumps: parts.map(([id, t]) => ({ value: id, label: t })),
     html: `<div class="picker"><div id="regionDD"></div></div>
+      ${region === 'jp' ? '' : `<p class="lead-p">Tap a sign to see what each cell means. ${esc(R.note || 'Shown in UEB Grade 2, the way new signs are made.')}</p>`}
       ${parts.map(([id, t, h]) => `<div class="sg" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join('')}`,
     bind: () => {
       dropdown($('#regionDD'), { label: 'Region', options: Object.entries(SIGN_REGIONS).map(([k, r]) => ({ value: k, label: r.name })), value: region, onChange: (v) => { location.hash = '#/reference/signs/' + v; } });
@@ -801,7 +804,8 @@ function grade2Section() {
     <p class="muted small">The most frequent signs. Learn a few at a time, then practise them in Practice → Contractions.</p>
     <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: DICT[i].cat }); }).join('')}</div>
     ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}</h3><span>${CONTRACTIONS[cat].items.length} · ${esc(blurb)}</span>${practiseLink(`#/practice/read?cat=contractions&set=k${ci}`)}</div>
-      <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}`;
+      <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}
+    ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
   return { html, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
 }
 
@@ -820,18 +824,18 @@ function alphabetSection() {
   return `<p class="lead-p">The alphabet is ten shapes, repeated. Each new row adds dots (in blue) to the first. Tap any letter for details.</p>
     <div id="alphaWrap">${ROWS.map(([range, title, letters, added, blurb, set]) => `
       <div class="decade"><div class="decade-head"><h3>${range} · ${title}</h3><span>${blurb}</span>${letters.length > 1 ? practiseLink(`#/practice/read?cat=letters&set=${set}`) : ''}</div>
-      <div class="alpha">${letters.split('').map((l) => `<button class="letter" data-l="${l}">${cellHTML(LETTERS[l], '', { added })}<b>${l}</b></button>`).join('')}</div></div>`).join('')}</div>
+      <div class="ctable narrow">${letters.split('').map((l) => crowHTML(LETTERS[l], l, { kind: 'letter', i: 'abcdefghijklmnopqrstuvwxyz'.indexOf(l), added })).join('')}</div></div>`).join('')}</div>
+    ${exBlock([['hello', 'Letters are simply written one after another.'], ['braille', ''], ['jazz quiz', 'A space is an empty cell.']])}
     <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>. Mixing up d, f, h and j? Try <a href="#/practice/read?cat=letters&set=mirror">mirror pairs</a>.</p>`;
 }
 function overviewSection() {
-  const ex = (l) => `<div class="ov-ex">${cellHTML(LETTERS[l], 'lg')}<b>${l}</b><small>${dotsLabel(LETTERS[l]).replace(/^dots? /, 'dots ')}</small></div>`;
   const parts = [
     ['ov-what', 'What braille is', `<p>Braille is a way of <b>writing</b> with raised dots that you read by touch. It isn’t a language: English, French, Japanese and many others each have their own braille. Blind and low-vision people use it to read books, labels, signs, music and maths, and to write with a braille device or a slate and stylus.</p>
       <p>Every symbol is made inside a small <b>cell</b> of six possible dots. Which dots are raised tells you what the cell means.</p>`],
     ['ov-cell', 'How a cell works', `<div class="cell-anatomy">${cellHTML(fromDots('123456'), 'numbered xl')}<div>
       <p>The six spots are numbered <b>1-2-3</b> down the left column and <b>4-5-6</b> down the right. Every braille symbol is described by its raised dots, so “dots 1-2” means the top two on the left.</p>
       <p>That gives 63 possible patterns plus the blank cell. A real cell is about 6 mm tall, small enough to feel all at once under one fingertip.</p></div></div>
-      <div class="ov-examples">${ex('a')}${ex('b')}${ex('c')}${ex('l')}</div>
+      <div class="ctable narrow ov-rows">${['a', 'b', 'c', 'l'].map((l) => crowHTML(LETTERS[l], l, { kind: 'letter', note: dotsLabel(LETTERS[l]) })).join('')}</div>
       <p class="muted small">a is dot 1 alone. b adds dot 2 below it, c adds dot 4 beside it, and l is the whole left column. The <a href="#/reference/alphabet">alphabet</a> builds on these ten-letter patterns.</p>`],
     ['ov-context', 'One cell, several meanings', `<p>There are far more symbols than patterns, so context matters. ${cellHTML(LETTERS.b, 'sm')} is <b>b</b> on its own in a word, the word <b>“but”</b> when it stands alone in Grade 2, and the digit <b>2</b> after the number sign ${cellHTML(IND.number, 'sm')}. A capital sign ${cellHTML(IND.capital, 'sm')} makes the next letter uppercase.</p>
       <p>See <a href="#/reference/numbers">Numbers &amp; symbols</a> for these signs.</p>`],
@@ -851,27 +855,30 @@ function overviewSection() {
       <div class="row"><a class="btn primary" href="#/reference/alphabet">Learn the alphabet</a><a class="btn" href="#/practice/read">Start practising</a></div>`,
   };
 }
-const NUM_EXAMPLES = [
-  ['Canada', 'One capital sign before the letter.'],
-  ['CANADA', 'Two capital signs make the whole word uppercase.'],
-  ['2025', 'One number sign covers every digit that follows.'],
-  ['3.5', 'The decimal point keeps the number going.'],
-  ['1,000', 'So does a comma inside a number.'],
-  ['$20', 'Symbols like $ come before the number sign.'],
-  ['50%', 'Percent is a two-cell symbol after the digits.'],
-  ['Room 2B', 'A grade 1 indicator stops “b” being read as a digit.'],
-];
 function numbersSection() {
-  const ex = ([t, n]) => `<div class="example"><div class="print">${esc(t)}</div>${lineHTML(translate(t, 'en', 2), { cls: 'sm' })}<p class="muted small ex-note">${esc(n)}</p></div>`;
   const parts = [
-    ['nu-num', groupBlock('Numbers', 'Numbers', 'number sign ⠼ + a–j', '#/practice/read?cat=symbols&set=num')],
-    ['nu-ex', `<div class="group-title"><h3>Putting it together</h3><span>how capitals and numbers combine</span></div><div class="example-grid">${NUM_EXAMPLES.map(ex).join('')}</div>`],
-    ['nu-punct', groupBlock('Punctuation', 'Punctuation & symbols', '', '#/practice/read?cat=symbols&set=punct')],
-    ['nu-ind', groupBlock('Indicators', 'Indicators', '', '#/practice/read?cat=symbols&set=ind')],
+    ['nu-num', 'Numbers', groupBlock('Numbers', 'Numbers', 'number sign ⠼ + a–j', '#/practice/read?cat=symbols&set=num') + exBlock([
+      ['2025', 'One number sign covers every digit that follows.'],
+      ['1 2 3', 'After a space, each number needs its own number sign.'],
+    ])],
+    ['nu-punct', 'Punctuation & symbols', groupBlock('Punctuation', 'Punctuation & symbols', '', '#/practice/read?cat=symbols&set=punct') + exBlock([
+      ['yes!', 'Punctuation follows the word, just like print.'],
+      ['e-mail', 'A hyphen joins the two parts.'],
+      ['3.5', 'The decimal point keeps the number going.'],
+      ['1,000', 'So does a comma inside a number.'],
+      ['$20', 'Symbols like $ come before the number sign.'],
+      ['50%', 'Percent is a two-cell symbol after the digits.'],
+    ])],
+    ['nu-ind', 'Indicators', groupBlock('Indicators', 'Indicators', '', '#/practice/read?cat=symbols&set=ind') + exBlock([
+      ['Canada', 'One capital sign before the letter.'],
+      ['CANADA', 'Two capital signs make the whole word uppercase.'],
+      ['Hi!', 'Capitals and punctuation together.'],
+      ['Room 2B', 'A grade 1 indicator stops “b” being read as a digit.'],
+    ])],
   ];
   return {
-    jumps: [['nu-num', 'Numbers'], ['nu-ex', 'Putting it together'], ['nu-punct', 'Punctuation & symbols'], ['nu-ind', 'Indicators']].map(([value, label]) => ({ value, label })),
-    html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${parts.map(([id, h]) => `<div class="sg" id="${id}">${h}</div>`).join('')}`,
+    jumps: parts.map(([value, label]) => ({ value, label })),
+    html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${parts.map(([id, , h]) => `<div class="sg" id="${id}">${h}</div>`).join('')}`,
   };
 }
 // Full character table for a language, shown in a modal from World systems or Languages.
@@ -911,13 +918,15 @@ function systemsSection() {
 }
 function scienceSection() {
   const ex = (s) => `<div class="example"><div class="print">${esc(s.print)}</div>${groupsHTML(s.g)}</div>`;
-  return { html: `<p class="lead-p">UEB uses extra indicators for technical material. Each group of cells is labelled below. In Grade 2 text a grade 1 indicator ⠰ often goes before superscript ⠔ and subscript ⠢ so they aren’t read as “in” and “en”; these examples are in Grade 1 mode.</p>
-    <div class="example-grid">${SCIENCE.map(ex).join('')}</div>
-    <div class="group-title"><h3>Nemeth Code</h3><span>still used for maths in many Canadian and US schools</span></div>
-    <div class="example-grid">${NEMETH.map(ex).join('')}</div>
-    <hr class="pale">
-    <div class="group-title"><h3>Symbols used above</h3><span>UEB</span></div>
-    <div class="sym-grid">${SCIENCE_SYMBOLS.map(([c, n]) => `<div class="sym"><span class="cells">${cellsK(c, 'math')}</span><b>${esc(n)}</b></div>`).join('')}</div>` };
+  const parts = [
+    ['sc-sym', 'Symbols', `<p class="lead-p">UEB uses extra signs and indicators for technical material. These are the ones used in the examples below.</p><div class="ctable narrow">${SCIENCE_SYMBOLS.map(([c, n]) => crowHTML(c, n, { kind: 'math' })).join('')}</div>`],
+    ['sc-ueb', 'UEB examples', `<p class="muted small">Each group of cells is labelled. In Grade 2 text a grade 1 indicator ⠰ often goes before superscript ⠔ and subscript ⠢ so they aren’t read as “in” and “en”; these examples are in Grade 1 mode.</p><div class="example-grid">${SCIENCE.map(ex).join('')}</div>`],
+    ['sc-nem', 'Nemeth Code', `<p class="muted small">Still used for maths in many Canadian and US schools.</p><div class="example-grid">${NEMETH.map(ex).join('')}</div>`],
+  ];
+  return {
+    jumps: parts.map(([value, label]) => ({ value, label })),
+    html: parts.map(([id, t, h]) => `<div class="sg" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join(''),
+  };
 }
 function refSection(key, sub) {
   switch (key) {
@@ -938,7 +947,7 @@ views.reference = (q, sub, sub2) => {
   store.set('refSec', key);
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
-  setTitle('Reference');
+  setTitle('Learn');
   setSub(`<div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
   dropdown($('#secDD'), { options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
   if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
@@ -946,7 +955,8 @@ views.reference = (q, sub, sub2) => {
       <div class="pager">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
   if (sec.bind) sec.bind();
   view.onclick = (ev) => {
-    const s = ev.target.closest('.sym[data-i], .crow[data-i]'); if (s) { openSheet(symbolDetail(DICT[Number(s.dataset.i)]), { title: 'Symbol' }); return; }
+    const s = ev.target.closest('.sym[data-i], .crow[data-i]');
+    if (s) { const e = DICT[Number(s.dataset.i)]; if (e.group === 'Letters') openSheet(letterDetail(e.print), { title: 'Letter ' + e.print }); else openSheet(symbolDetail(e), { title: 'Symbol' }); return; }
     const l = ev.target.closest('.letter[data-l]'); if (l) openSheet(letterDetail(l.dataset.l), { title: 'Letter ' + l.dataset.l });
   };
   return () => { view.onclick = null; };
@@ -962,7 +972,7 @@ function buildIndex() {
     sec: SEC_OF_GROUP[e.group] || 'grade2', dict: e,
     act: () => openSheet(e.group === 'Letters' ? letterDetail(e.print) : symbolDetail(e), { title: e.group === 'Letters' ? 'Letter ' + e.print : 'Symbol' }),
   }));
-  REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Reference section', sec: k, page: true, act: nav('#/reference/' + k) }));
+  REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Learn section', sec: k, page: true, act: nav('#/reference/' + k) }));
   Object.entries(MODES).forEach(([k, t]) => out.push({ title: t, sub: 'Practice mode', sec: 'practice', page: true, act: nav('#/practice/' + k) }));
   SCIENCE_SYMBOLS.forEach(([c, n]) => out.push({ title: n, sub: 'Maths & science symbol', cells: c, kind: 'math', sec: 'science', act: nav('#/reference/science') }));
   for (const k of ['fr', 'es', 'de', 'ru', 'el']) {
@@ -1056,7 +1066,7 @@ views.translate = (q) => {
 
 // ---------- router ----------
 let cleanup = null;
-const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Reference · Learn Braille', translate: 'Translate · Learn Braille' };
+const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Learn · Learn Braille', translate: 'Translate · Learn Braille' };
 function route() {
   const raw = location.hash.replace(/^#\/?/, '');
   let [path, qs] = raw.split('?');
