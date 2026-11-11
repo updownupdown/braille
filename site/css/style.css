@@ -1562,7 +1562,10 @@ body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; b
 .mode-words .stage .prompt-cells.words .lbl:empty { min-height: 0; }
 /* Translate */
 .subbar .tr-dir { flex: none; display: flex; }
-.subbar .tr-dir button { padding: 6px 12px; display: grid; place-items: center; }
+.subbar .tr-dir { margin: 0; height: var(--ctl-h); box-sizing: border-box; align-items: stretch; }
+.subbar .tr-dir button { padding: 0 12px; display: grid; place-items: center; height: auto; }
+.subbar:has(.tr-dir) { align-items: center; }
+.subbar:has(.tr-dir) .dd-strong .dd-btn { height: var(--ctl-h); box-sizing: border-box; padding-top: 0; padding-bottom: 0; }
 #langDD[hidden] { display: none; }
 .tr-ex { margin: 0 0 10px; }
 .tb-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }

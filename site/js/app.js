@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=26';
+} from './braille.js?v=27';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=26';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=26';
-import { COMMON_WORDS } from './wordlist.js?v=26';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=26';
+} from './data.js?v=27';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=27';
+import { COMMON_WORDS } from './wordlist.js?v=27';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=27';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -1319,13 +1319,21 @@ function readBraille(cells) {
   return out.sort((a, b) => a.length - b.length).filter((r) => { const k = r.map((t) => t.text + '|' + t.kind).join('/'); if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
+// Direction pictograms: a print "A", an arrow, and a braille cell (or the reverse).
+function dirIcon(dir) {
+  const A = (x) => `<path d="M${x} 17 ${x + 5} 5l5 12M${x + 2} 13h6"/>`;
+  const cellG = (x) => [[0, 0, 1], [0, 1, 1], [0, 2, 0], [1, 0, 1], [1, 1, 0], [1, 2, 0]].map(([c, r, on]) => `<circle cx="${x + c * 6}" cy="${5 + r * 6}" r="2.1" ${on ? 'fill="currentColor" stroke="none"' : 'fill="none" stroke-width="1.3"'}/>`).join('');
+  const arrow = '<path d="M18 11h9m-3.5-3.5L27 11l-3.5 3.5"/>';
+  const body = dir === 'text' ? A(2) + arrow + cellG(34) : cellG(4) + arrow + A(31);
+  return `<svg class="ic dir-ic" width="46" height="22" viewBox="0 0 44 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}
 views.translate = (q) => {
   const LOPTS = [['en1', 'English (Grade 1)', 'English'], ['en2', 'English (Grade 2)', 'English'], ['fr', 'Français', 'Other languages'], ['es', 'Español', 'Other languages'], ['de', 'Deutsch', 'Other languages'], ['ru', 'Русский', 'Other languages'], ['el', 'Ελληνικά', 'Other languages']];
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
   let dir = store.get('trDir', 'text');
-  setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${icon(ic, 22)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div>`);
+  setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${dirIcon(v)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div>`);
   view.innerHTML = `
     <div id="trText">
       <div class="tr-ex" id="exDD"></div>
