@@ -1,10 +1,10 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=29';
-import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=29';
-import { WORDS } from './data.js?v=29';
-import { SNOWMAN_WORDS } from './snowman.js?v=29';
-import { AGENT_CASES } from './agentcases.js?v=29';
-import { COMMON_WORDS } from './wordlist.js?v=29';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=30';
+import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=30';
+import { WORDS } from './data.js?v=30';
+import { SNOWMAN_WORDS } from './snowman.js?v=30';
+import { AGENT_CASES } from './agentcases.js?v=30';
+import { COMMON_WORDS } from './wordlist.js?v=30';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -77,9 +77,25 @@ function letterPad({ display = null, mount, digits = false, onInput, onEnter }) 
   show();
   return { get value() { return value; }, set value(v) { value = v; show(); }, set disabled(d) { disabled = d; kb.classList.toggle('off', d); }, off };
 }
+// Braille keyboard in the usual QWERTY layout, shared by Braidle and Snowman.
+// state maps a letter to a class (hit, near, miss); actions adds Enter and Delete to the last row.
+function brailleKeys({ state = {}, disabled = () => false, actions = false } = {}) {
+  return KB_ROWS.map((row, ri) => {
+    const last = actions && ri === KB_ROWS.length - 1;
+    return `<div class="wd-krow">${last ? '<button class="wd-k wide" data-k="enter">Enter</button>' : ''}${[...row].map((k) => `<button class="wd-k ${state[k] || ''}" data-k="${k}" aria-label="${k}" ${disabled(k) ? 'disabled' : ''}>${letterCell(k)}<b>${k}</b></button>`).join('')}${last ? '<button class="wd-k wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`;
+  }).join('');
+}
+// Countdown bar with the seconds written inside it. The blue part is clipped, so the text stays put.
+const timerBar = (secs) => `<div class="ta-bar"><span class="ta-t">${secs}s</span><div class="ta-fill" id="bar"><span class="ta-t">${secs}s</span></div></div>`;
+function setTimer(el, frac, secs) {
+  const b = $('#bar', el); if (!b) return;
+  b.style.clipPath = `inset(0 ${((1 - frac) * 100).toFixed(2)}% 0 0 round 999px)`;
+  const t = secs + 's';
+  if (b.dataset.t !== t) { b.dataset.t = t; $$('.ta-t', b.parentNode).forEach((x) => { x.textContent = t; }); }
+}
 // One stats row for every game: left, centre and right slots.
 const statBar = (l = '', c = '', r = '') => `<div class="g-bar"><span class="l">${l}</span><span class="c">${c}</span><span class="r">${r}</span></div>`;
-const scoreBest = (k, extra = '') => `Score <b id="sc">0</b> <span class="g-best">(Best <b id="best">${store.get('best.' + k, '–') ?? '–'}</b>)</span>${extra}`;
+const scoreBest = (k, extra = '') => `<span class="g-score">Score: <b id="sc">0</b></span><span class="g-sep">/</span><span class="g-best">Best: <b id="best">${store.get('best.' + k, '–') ?? '–'}</b></span>${extra}`;
 const livesHTML = (n, of = 3) => Array.from({ length: of }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
 // Start screen for timed games: what to do, which symbols are in play at this level, then Start.
 const startScreen = (how, incl) => `<p class="g-how">${how}</p><p class="g-incl"><b>Includes</b> ${incl}</p><button class="btn primary" id="go">Start</button>`;
@@ -87,8 +103,7 @@ const startScreen = (how, incl) => `<p class="g-how">${how}</p><p class="g-incl"
 // ---------- Wordle ----------
 function wordle(el) {
   let answer, guesses, cur, done;
-  const kb = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-  el.innerHTML = `<div class="g-card card wd"><button class="btn g-corner" id="new" aria-label="New word" title="New word"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.7-6.2"/><path d="M3 4v5h5"/></svg> New</button><div class="wd-board" id="board"></div><p class="g-msg" id="msg"></p></div>
+  el.innerHTML = `<div class="g-card card wd"><div class="g-confirm" id="cf" hidden><div class="g-confirm-box"><p>Start a new word? This one will be lost.</p><div class="row"><button class="btn" id="cfNo">Keep playing</button><button class="btn primary" id="cfYes">New word</button></div></div></div><button class="btn g-corner" id="new" aria-label="New word" title="New word"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.7-6.2"/><path d="M3 4v5h5"/></svg> New</button><div class="wd-board" id="board"></div><p class="g-msg" id="msg"></p></div>
     <div class="wd-keys" id="keys"></div>`;
   const board = $('#board', el), msg = $('#msg', el), card = $('.g-card', el);
   const state = {};
@@ -107,10 +122,11 @@ function wordle(el) {
       h += `<div class="wd-row ${r === guesses.length && !done ? 'cur' : ''}">${[0, 1, 2, 3, 4].map((i) => tile(w[i], res ? res[i] : '')).join('')}</div>`;
     }
     board.innerHTML = h; card.classList.toggle('done', done);
-    $('#keys', el).innerHTML = kb.map((row, ri) => `<div class="wd-krow">${ri === 2 ? '<button class="wd-k wide" data-k="enter">Enter</button>' : ''}${[...row].map((k) => `<button class="wd-k ${state[k] || ''}" data-k="${k}" aria-label="${k}">${letterCell(k)}<b>${k}</b></button>`).join('')}${ri === 2 ? '<button class="wd-k wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`).join('');
+    $('#keys', el).innerHTML = brailleKeys({ state, actions: true });
   }
+  const cf = $('#cf', el);
   function press(k) {
-    if (done) return;
+    if (done || !cf.hidden) return;
     if (k === 'enter') {
       if (cur.length < 5) { glow(card, false); return; }
       const res = score(cur);
@@ -124,9 +140,12 @@ function wordle(el) {
     if (/^[a-z]$/.test(k) && cur.length < 5) { cur += k; render(); }
   }
   $('#keys', el).onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) press(b.dataset.k); };
-  const off = keys((e) => { const k = e.key.toLowerCase(); if (k === 'enter') press('enter'); else if (k === 'backspace') press('back'); else if (/^[a-z]$/.test(k)) press(k); });
+  const off = keys((e) => { const k = e.key.toLowerCase(); if (!cf.hidden) { if (k === 'escape') cf.hidden = true; else if (k === 'enter') { cf.hidden = true; start(); } return; } if (k === 'enter') press('enter'); else if (k === 'backspace') press('back'); else if (/^[a-z]$/.test(k)) press(k); });
   const start = () => { answer = pick(WORDLE); guesses = []; cur = ''; done = false; Object.keys(state).forEach((k) => delete state[k]); msg.textContent = ''; render(); };
-  $('#new', el).onclick = start;
+  // Ask first when a word is under way, so a stray tap doesn't throw it away.
+  $('#new', el).onclick = () => { if (done || (!guesses.length && !cur)) start(); else cf.hidden = false; };
+  $('#cfNo', el).onclick = () => { cf.hidden = true; };
+  $('#cfYes', el).onclick = () => { cf.hidden = true; start(); };
   start();
   return off;
 }
@@ -171,13 +190,11 @@ function memory(el, level) {
 }
 
 // ---------- multiple-choice engine (Trivia, Riddles) ----------
-function quiz(el, level, { next, statSlot, labels = level === 'easy', print = true, choices = 4 }) {
+function quiz(el, level, { next, labels = level === 'easy', print = true, choices = 4 }) {
   const grade = level === 'hard' ? 2 : 1;
-  const stats = `<div class="g-qstats"><span>Question <b id="qn">1</b>/10</span><span>Score <b id="sc">0</b></span></div>`;
-  if (statSlot) statSlot.innerHTML = stats;
-  el.innerHTML = `${statSlot ? '' : stats}
-    <div class="card g-card quiz" id="card"></div><div class="g-actions"><button class="btn primary" id="nextBtn" hidden>Next</button></div>`;
-  const q$ = (sel) => (statSlot && $(sel, statSlot)) || $(sel, el);
+  el.innerHTML = `<div class="g-qstats"><span>Question <b id="qn">1</b> / 10</span><span>Score: <b id="sc">0</b></span><div class="g-qslot" id="qslot"></div></div>
+    <div class="card g-card quiz" id="card"></div><div class="q-next"><button class="btn primary" id="nextBtn" hidden>Next</button></div>`;
+  const q$ = (sel) => $(sel, el);
   const card = $('#card', el);
   let n = 0, sc = 0, item, answered;
   function show() {
@@ -226,8 +243,8 @@ function trivia(el, level, ctx) {
   };
   const run = () => {
     el.dataset.k = 'trivia';
-    const stop = quiz(el, level, { next, statSlot: ctx.statSlot });
-    ctx.dropdown(ctx.slot, { label: 'Topic', options: ['All', ...topics].map((t) => ({ value: t, label: t === 'All' ? 'All topics' : t, hint: t === 'All' ? '500 questions' : TRIVIA[t].length + ' questions' })), value: topic, onChange: (v) => { topic = v; store.set('topic', v); seen.clear(); run(); } });
+    const stop = quiz(el, level, { next });
+    ctx.dropdown($('#qslot', el), { label: 'Topic', options: ['All', ...topics].map((t) => ({ value: t, label: t === 'All' ? 'All topics' : t, hint: t === 'All' ? '500 questions' : TRIVIA[t].length + ' questions' })), value: topic, onChange: (v) => { topic = v; store.set('topic', v); seen.clear(); run(); } });
     return stop;
   };
   return run();
@@ -237,7 +254,7 @@ function riddles(el, level, ctx) {
   const seen = new Set();
   el.dataset.k = 'riddles';
   // Riddles never show print under the cells; Easy has three choices instead of four.
-  return quiz(el, level, { statSlot: ctx.statSlot, labels: false, print: false, choices: level === 'easy' ? 3 : 4,
+  return quiz(el, level, { labels: false, print: false, choices: level === 'easy' ? 3 : 4,
     next: () => {
       let list = items.filter((x) => !seen.has(x[0]));
       if (!list.length) { seen.clear(); list = items; }
@@ -319,7 +336,7 @@ function timeAttack(el, level) {
   const pool = level === 'easy' ? [...AJ] : level === 'medium' ? [...AZ] : [...AZ, ...'0123456789'];
   const cellsOf = (x) => (/\d/.test(x) ? IND.number + LETTERS['jabcdefghi'[Number(x)]] : LETTERS[x]);
   const incl = { easy: 'the letters a to j.', medium: 'all 26 letters.', hard: 'all 26 letters and the digits 0 to 9, each with the number sign.' }[level];
-  el.innerHTML = `${statBar('<b id="tl">60</b> s', '<div class="ta-bar"><i id="bar"></i></div>', scoreBest('time.' + level))}
+  el.innerHTML = `${statBar('', timerBar(60), scoreBest('time.' + level))}
     <div class="card g-card ta" id="card"><button class="btn g-corner" id="skip">Skip</button><div class="g-overlay" id="ov">${startScreen('Type what each braille cell says, as fast as you can. You have 60 seconds.', incl)}</div><div class="prompt-cells" id="cells"></div></div>
     <div id="kb"></div>`;
   const card = $('#card', el);
@@ -328,7 +345,7 @@ function timeAttack(el, level) {
   const nextItem = () => { let x; do { x = pick(pool); } while (x === cur && pool.length > 1); cur = x; $('#cells', el).innerHTML = [...cellsOf(x)].map((c) => cell(c)).join(''); };
   function tick() {
     const left = Math.max(0, end - performance.now());
-    $('#bar', el).style.width = (left / 600) + '%'; $('#tl', el).textContent = Math.ceil(left / 1000);
+    setTimer(el, left / 60000, Math.ceil(left / 1000));
     if (!left) return over();
     raf = requestAnimationFrame(tick);
   }
@@ -349,6 +366,20 @@ function timeAttack(el, level) {
   $('#skip', el).onclick = () => { if (running) nextItem(); };
   $('#go', el).onclick = go;
   return () => { running = false; cancelAnimationFrame(raf); inp.off(); };
+}
+
+// Eased horizontal scroll over a set time (the browser's smooth scroll is too quick to follow).
+function glide(box, to, ms) {
+  to = Math.max(0, Math.min(to, box.scrollWidth - box.clientWidth));
+  cancelAnimationFrame(box._glide);
+  if (!ms) { box.scrollLeft = to; return; }
+  const from = box.scrollLeft, d = to - from, t0 = performance.now();
+  const f = (t) => {
+    const p = Math.min(1, (t - t0) / ms), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    box.scrollLeft = from + d * e;
+    if (p < 1) box._glide = requestAnimationFrame(f);
+  };
+  box._glide = requestAnimationFrame(f);
 }
 
 // ---------- Secret Agent ----------
@@ -379,8 +410,7 @@ function agent(el, level, ctx) {
     }
     const m = cs.missions[mi];
     const words = m.msg.split(' ');
-    let wi = 0;
-    const hints = words.map(() => 0);
+    let wi = 0, hinting = false;
     el.innerHTML = `<div class="ag-prog"><span>Mission ${mi + 1} of ${N}${m.grade === 2 ? ' · Grade 2' : ''}</span><span class="bar"><i style="width:${(mi / N) * 100}%"></i></span></div>
       <div class="card g-card ag">
         <div class="ag-top"><b class="ag-title">${esc(m.title)}</b><button class="btn ghost small-btn" id="hint">Hint</button></div>
@@ -392,17 +422,25 @@ function agent(el, level, ctx) {
       <div class="g-actions"><button class="btn primary" id="nextM" hidden>${mi + 1 < N ? 'Next mission' : 'Close the case'}</button></div>`;
     const card = $('.ag', el);
     if (pad) pad.off();
-    // What you type appears under the highlighted word (after any hint letters).
-    const showTyped = () => { if (wi >= words.length) return; const t = words[wi].replace(/[^A-Za-z0-9]/g, ''); const h = t.slice(0, hints[wi]); $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = inp.value ? inp.value : h ? h + '…' : ''; };
+    const tgt = () => norm(words[wi]);
+    // What you type appears under the highlighted word; letters that can't be right turn red.
+    const showTyped = () => {
+      if (wi >= words.length) return;
+      const t = tgt();
+      $(`.ag-w[data-i="${wi}"] .ag-l`, el).innerHTML = [...inp.value].map((ch, i) => `<span class="${ch === t[i] ? '' : 'bad'}">${esc(ch)}</span>`).join('');
+    };
+    const check = () => { if (wi < words.length && norm(inp.value) === tgt()) solveWord(); else showTyped(); };
     const inp = pad = letterPad({ mount: $('#kb', el), digits: /\d/.test(m.msg),
-      onInput: () => { if (wi < words.length && norm(inp.value) === norm(words[wi])) solveWord(); else showTyped(); },
+      onInput: () => { if (!hinting) check(); },
       onEnter: () => { if (inp.value.trim() && wi < words.length) glow(card, false); } });
     const mark = () => {
       $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
       // The message is one scrolling line, so keep the current word centred in it.
       const msg = $('#msg', el), cur = $('.ag-w.cur', el);
-      if (msg && cur) msg.scrollTo({ left: cur.offsetLeft - (msg.clientWidth - cur.offsetWidth) / 2, behavior: 'smooth' });
+      if (msg && cur) glide(msg, cur.offsetLeft - (msg.clientWidth - cur.offsetWidth) / 2, first ? 0 : 1000);
+      first = false;
     };
+    let first = true;
     const solveWord = () => {
       $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = words[wi];
       wi++; inp.value = ''; mark();
@@ -414,11 +452,20 @@ function agent(el, level, ctx) {
         $('#nextM', el).hidden = false;
       }
     };
+    // Hint types for you: wrong letters are deleted one at a time, then the next right letter goes in.
     $('#hint', el).onclick = () => {
-      if (wi >= words.length) return;
-      const target = words[wi].replace(/[^A-Za-z0-9]/g, '');
-      hints[wi] = Math.min(target.length, hints[wi] + 1);
-      showTyped();
+      if (wi >= words.length || hinting) return;
+      hinting = true;
+      const w0 = wi, t = tgt();
+      const step = () => {
+        if (wi !== w0 || !el.isConnected) { hinting = false; return; }
+        const v = inp.value;
+        let k = 0; while (k < v.length && v[k] === t[k]) k++;
+        if (k < v.length) { inp.value = v.slice(0, -1); showTyped(); setTimeout(step, 140); return; }
+        inp.value = v + t[v.length];
+        hinting = false; check();
+      };
+      step();
     };
     $('#nextM', el).onclick = render;
     mark();
@@ -514,14 +561,15 @@ function snowman(el) {
   el.innerHTML = `<div class="card g-card hm" id="card"><button class="btn g-corner" id="new"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.7-6.2"/><path d="M3 4v5h5"/></svg> New word</button><svg class="hm-art sm-art" viewBox="0 0 120 120" id="art" aria-hidden="true">
       <path class="base" d="M14 112h92"/><g class="ghost">${SNOW_PARTS}</g><g class="parts">${SNOW_PARTS}</g></svg>
     <div class="hm-side"><small id="clue"></small><div class="hm-word" id="word"></div><p class="g-msg" id="msg"></p></div></div>
-    <div class="hm-keys" id="keys"></div>`;
+    <div class="wd-keys hm-kb" id="keys"></div>`;
   $$('#art .parts > *', el).forEach((p) => p.classList.add('p'));
   const card = $('#card', el);
   let word, clue, guessed, miss, done;
   function render() {
     $('#clue', el).textContent = clue;
     $('#word', el).innerHTML = [...word].map((l) => `<span class="hm-slot">${guessed.has(l) || done ? letterCell(l) : '<span class="cell blank">' + '<i></i>'.repeat(6) + '</span>'}${guessed.has(l) || done ? `<b>${l}</b>` : ''}</span>`).join(''); card.classList.toggle('done', done);
-    $('#keys', el).innerHTML = [...AZ].map((k) => `<button class="hm-k ${guessed.has(k) ? (word.includes(k) ? 'hit' : 'miss') : ''}" data-k="${k}" ${guessed.has(k) || done ? 'disabled' : ''} aria-label="${k}">${letterCell(k)}<b>${k}</b></button>`).join('');
+    const state = {}; guessed.forEach((k) => { state[k] = word.includes(k) ? 'hit' : 'miss'; });
+    $('#keys', el).innerHTML = brailleKeys({ state, disabled: (k) => guessed.has(k) || done });
     $$('#art .parts .p', el).forEach((p, i) => p.classList.toggle('on', i < miss));
   }
   function guess(k) {
@@ -558,7 +606,7 @@ function mirror(el, level) {
   const HARD = [...'defhijrwstnzkoumxy', ...Object.keys(SIGN)];
   const cellFor = (x) => (SIGN[x] ? fromDotsLocal(SIGN[x]) : LETTERS[x]);
   const near = (a, b) => { const A = new Set(toDots(cellFor(a))), B = toDots(cellFor(b)); const same = B.filter((d) => A.has(d)).length; return same - Math.abs(A.size - B.length); };
-  el.innerHTML = `${statBar('Streak <b id="st">0</b>', '<div class="ta-bar"><i id="bar"></i></div>', scoreBest('mirror.' + level))}
+  el.innerHTML = `${statBar('Streak <b id="st">0</b>', timerBar(30), scoreBest('mirror.' + level))}
     <div class="card g-card mm" id="card"><div class="g-overlay" id="ov">${startScreen('Pick the letter each cell shows. Take your time on each one; you have 30 seconds in all.', cfg.incl)}</div><div class="prompt-cells" id="cells"></div><div class="choices" id="opts"></div></div>`;
   const card = $('#card', el);
   let target, sc = 0, st = 0, end = 0, raf = 0, running = false;
@@ -577,7 +625,7 @@ function mirror(el, level) {
   function tick(t) {
     if (!running) return;
     const left = Math.max(0, end - t);
-    $('#bar', el).style.width = (left / 300) + '%';
+    setTimer(el, left / 30000, Math.ceil(left / 1000));
     if (!left) return over();
     raf = requestAnimationFrame(tick);
   }
@@ -607,11 +655,10 @@ function maze(el, level) {
   const N = { easy: 4, medium: 5, hard: 6 }[level];
   const hardList = level === 'hard' ? MAZE_HARD() : null;
   el.innerHTML = `${statBar('Solved <b id="sc">' + store.get('maze.' + level, 0) + '</b>', '<span class="lives" id="lives"></span>', '<button class="btn small-btn" id="new">New maze</button>')}
-    <div class="mz-target">Spell <b id="target"></b></div>
-    <div class="card g-card mz-card" id="card"><div class="mz-grid" id="grid" style="--n:${N}"></div></div>
+    <div class="card g-card mz-card" id="card"><div class="mz-target">Spell: <b id="target"></b></div><div class="mz-grid" id="grid" style="--n:${N}"></div></div>
     <p class="muted small g-tip">Start at the flag. Step up, down, left or right onto the cells that spell the word, in order. Wrong cells are traps.</p>`;
   const grid = $('#grid', el), card = $('#card', el);
-  let word, target, cells, pos, step, lives, done;
+  let word, target, chunks, cells, pos, step, lives, done, won;
   function makePath(len) {
     for (let tries = 0; tries < 300; tries++) {
       const path = [[0, 0]], seen = new Set(['0,0']);
@@ -629,20 +676,25 @@ function maze(el, level) {
     let path;
     do {
       word = level === 'hard' ? pick(hardList) : pick(MAZE_WORDS[level].filter((w) => new Set(w).size === w.length));
-      target = toCells(translate(word, 'en', level === 'hard' ? 2 : 1)).map((c) => c.cell);
+      const tc = toCells(translate(word, 'en', level === 'hard' ? 2 : 1));
+      target = tc.map((c) => c.cell);
+      // Print pieces of the word and the last cell each one needs (contractions can take two cells).
+      chunks = [];
+      tc.forEach((c, i) => { if (c.idx === 0 || !chunks.length) chunks.push({ t: c.print || '', end: i }); else chunks[chunks.length - 1].end = i; });
       path = target.length <= N * N - 1 ? makePath(target.length) : null;
     } while (!path);
     const filler = (level === 'hard' ? FILLER_CELLS() : Object.values(LETTERS)).filter((c) => !target.includes(c));
     cells = Array.from({ length: N }, () => Array.from({ length: N }, () => pick(filler)));
     path.slice(1).forEach(([r, c], i) => { cells[r][c] = target[i]; });
     cells[0][0] = null;
-    pos = [0, 0]; step = 0; lives = 3; done = false;
+    pos = [0, 0]; step = 0; lives = 3; done = false; won = false;
     Object.keys(grid.dataset).forEach((k) => delete grid.dataset[k]);
-    $('#target', el).textContent = word;
     render();
   }
   function render() {
     $('#lives', el).innerHTML = livesHTML(lives);
+    const t = $('#target', el); t.classList.toggle('won', won);
+    t.innerHTML = chunks.map((c) => `<span class="${step > c.end ? 'got' : ''}">${esc(c.t)}</span>`).join('');
     grid.innerHTML = cells.map((row, r) => row.map((c, k) => {
       const here = pos[0] === r && pos[1] === k;
       const st = grid.dataset['s' + r + '_' + k] || '';
@@ -655,7 +707,7 @@ function maze(el, level) {
     if (Math.abs(r - pos[0]) + Math.abs(c - pos[1]) !== 1) return;
     if (cells[r][c] === target[step] && grid.dataset['s' + r + '_' + c] !== 'walked') {
       grid.dataset['s' + r + '_' + c] = 'walked'; pos = [r, c]; step++;
-      if (step === target.length) { done = true; glow(card, true); const n = store.get('maze.' + level, 0) + 1; store.set('maze.' + level, n); $('#sc', el).textContent = n; }
+      if (step === target.length) { done = true; won = true; glow(card, true); const n = store.get('maze.' + level, 0) + 1; store.set('maze.' + level, n); $('#sc', el).textContent = n; }
     } else if (grid.dataset['s' + r + '_' + c] !== 'walked') {
       grid.dataset['s' + r + '_' + c] = 'trap'; lives--; glow(card, false);
       if (lives <= 0) { done = true; reveal(); }
@@ -683,7 +735,7 @@ export const GAME_GROUPS = [
   ['Puzzles and Quizzes', ['memory', 'maze', 'trivia', 'riddles']],
 ];
 export const GAMES = {
-  wordle: { name: 'Braille Wordle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
+  wordle: { name: 'Braidle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
     help: ['Guess the hidden five-letter word in six tries. Type on the braille keyboard or your own keyboard.', 'After each guess, green means the right letter in the right spot, yellow means it’s in the word somewhere else, and grey means it’s not in the word.', '“With letters” shows print under each cell. “Braille only” makes you read every cell.'] },
   snowman: { name: 'Snowman', icon: 'snowman', range: 'Easy–Hard', desc: 'Guess the word from a braille keyboard before the snowman is built', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: snowman,
     help: ['Guess the word one letter at a time. Each correct letter appears as a braille cell. The clue tells you the category.', 'Each wrong guess adds a piece to the snowman. The pale outline shows what’s left; six wrong guesses and it’s finished.', 'Over 1,000 words in 16 categories.', '“Braille only” hides the print letters on the keyboard.'] },
@@ -701,9 +753,9 @@ export const GAMES = {
     help: ['Flip two cards at a time. Match each braille cell with its print letter.', 'Easy uses 6 pairs from a–j, Medium 8 pairs, Hard 15 pairs with lots of look-alikes.', 'Try to finish in as few moves as you can.'] },
   maze: { name: 'Braille Maze', icon: 'maze', range: 'Easy–Hard', desc: 'Step only on the cells that spell the word, in order', levels: LV3, run: maze,
     help: ['Start at the flag. Step up, down, left or right onto the next letter of the word.', 'Cells that don’t spell the word are traps. Three traps and the route is revealed.', 'Bigger grids and longer words on harder levels. Hard uses Grade 2, so some steps are contractions.'] },
-  trivia: { name: 'Trivia', icon: 'help', range: 'Easy–Hard', desc: '500 questions on ten topics, with answers in braille', levels: LV3, run: trivia, inline: true,
+  trivia: { name: 'Trivia', icon: 'help', range: 'Easy–Hard', desc: '500 questions on ten topics, with answers in braille', levels: LV3, run: trivia,
     help: ['Read the question, then pick the answer. The answers are written in braille.', 'Easy shows print under the cells, Medium is braille only, Hard uses Grade 2 contractions.', 'Rounds are ten questions. Choose a topic or play them all.'] },
-  riddles: { name: 'Riddles', icon: 'bulb', range: 'Easy–Hard', desc: 'Over 100 riddles; pick the answer written in braille', levels: LV3, run: riddles, inline: true,
+  riddles: { name: 'Riddles', icon: 'bulb', range: 'Easy–Hard', desc: 'Over 100 riddles; pick the answer written in braille', levels: LV3, run: riddles,
     help: ['Read the riddle, then pick the answer. The answers are written in braille only.', 'Easy has three choices, Medium four, and Hard uses Grade 2 contractions.'] },
 };
 export const gameStore = store;

@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=29';
+} from './braille.js?v=30';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=29';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=29';
-import { COMMON_WORDS } from './wordlist.js?v=29';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=29';
+} from './data.js?v=30';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=30';
+import { COMMON_WORDS } from './wordlist.js?v=30';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=30';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -405,7 +405,7 @@ views[''] = () => {
   // Games
   const nextGame = GAME_ORDER.find((k) => !played.includes(k) && k !== lastGame) || GAME_ORDER.find((k) => k !== lastGame);
   let gA, gB;
-  if (!played.length) { gA = card('#/games/memory', 'Easy first', 'Memory', 'Pair cells and letters', true); gB = card('#/games/wordle', 'Or', 'Braille Wordle', 'With letters shown'); }
+  if (!played.length) { gA = card('#/games/memory', 'Easy first', 'Memory', 'Pair cells and letters', true); gB = card('#/games/wordle', 'Or', 'Braidle', 'With letters shown'); }
   else { gA = card(`#/games/${lastGame}`, 'Resume', GAMES[lastGame].name, GAMES[lastGame].desc); gB = card(`#/games/${nextGame}`, 'Try next', GAMES[nextGame].name, GAMES[nextGame].desc, true); }
   const gUsed = !played.length ? ['memory', 'wordle'] : [lastGame, nextGame];
   const games = `${head('games', 'Games', '#/games', played.length ? [played.length / GAME_ORDER.length, `${played.length} of ${GAME_ORDER.length} played`] : null)}
