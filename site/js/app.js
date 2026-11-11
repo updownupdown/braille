@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=30';
+} from './braille.js?v=31';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=30';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=30';
-import { COMMON_WORDS } from './wordlist.js?v=30';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=30';
+} from './data.js?v=31';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=31';
+import { COMMON_WORDS } from './wordlist.js?v=31';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=31';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -439,6 +439,7 @@ const CATS = {
   } },
   review: { name: 'Review', sets: { today: ['Today’s mix', () => reviewItems()] } },
   contractions: { name: 'Grade 2', sets: {
+    start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean), 'the 18 most common'],
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
     all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
   } },
@@ -886,9 +887,9 @@ function signsSection(regionKey) {
     </div><div class="elev-text">
       <p>Braille sits beside each button, usually on the left. Floors use the number sign: ${cellHTML(IND.number, 'sm')}${cellHTML(LETTERS.b, 'sm')} = 2.</p>
       <p>★ is the main floor, spelled <b>main</b>: ${cellsHTML(unicodeOf(translate('main', 'en', 2)), 'sm')} (m-a-<span class="acc">in</span>).</p>
-      <p>“Open” is ${cellsHTML(unicodeOf(translate('open', 'en', 2)), 'sm')} (o-p-<span class="acc">en</span>); “alarm” uses <span class="acc">ar</span>: ${cellsHTML(unicodeOf(translate('alarm', 'en', 2)), 'sm')}.</p>
+      <p>“Open” is ${cellsHTML(unicodeOf(translate('open', 'en', 2)), 'sm')} (o-p-<span class="acc">en</span>); “alarm” uses <span class="acc">ar</span>: <span class="nw">${cellsHTML(unicodeOf(translate('alarm', 'en', 2)), 'sm')}.</span></p>
       <p class="muted small">Outside, the same numbers are on both sides of the door frame.</p></div></div>`]);
-  if (R.money) parts.push(['sg-money', 'Feel your money', `<p>Canadian notes carry raised cell-shaped clusters in the top corner. Count them:</p><div class="money">${[5, 10, 20, 50, 100].map((v, i) => `<div class="note"><span>${cellHTML(fromDots('123456'), 'sm').repeat(i + 1)}</span><b>$${v}</b></div>`).join('')}</div>`]);
+  if (R.money) parts.push(['sg-money', 'Feel your money', `<p>Canadian notes carry raised cell-shaped clusters in the top corner. Count them:</p><div class="money">${[5, 10, 20, 50, 100].map((v, i) => { const c = cellHTML(fromDots('123456'), 'sm'); return `<div class="note"><span>${v === 100 ? `${c}<i class="note-gap"></i>${c}` : c.repeat(i + 1)}</span><b>$${v}</b></div>`; }).join('')}</div><p class="muted small">The $100 note has two clusters with a wide smooth gap between them.</p>`]);
   if (R.tips) parts.push(['sg-tips', 'Field tips', textList(R.tips)]);
   return {
     jumps: parts.map(([id, t]) => ({ value: id, label: t })),
@@ -922,6 +923,7 @@ const G2_EXAMPLE = {
   ound: 'pound', ance: 'dance', sion: 'mansion', less: 'useless', ount: 'mount', ence: 'fence', ong: 'song', ful: 'joyful',
   tion: 'nation', ness: 'madness', ment: 'moment', ity: 'city',
 };
+const G2_USE = { 'Alphabetic wordsigns': 'whole word', 'Strong contractions': 'word or part of one', 'Strong groupsigns': 'part of a word' };
 const G2_START = ['and', 'for', 'of', 'the', 'with', 'but', 'can', 'do', 'it', 'that', 'you', 'ing', 'st', 'sh', 'th', 'ch', 'er', 'ed'];
 function grade2Section() {
   const cats = Object.entries(CONTRACTIONS);
@@ -938,9 +940,8 @@ function grade2Section() {
       <div><small>Grade 1 · ${g1} cells</small>${lineHTML(translate(sample, 'en', 1), { cls: 'sm' })}</div>
       <div><small>Grade 2 · ${g2} cells</small>${lineHTML(translate(sample, 'en', 2), { cls: 'sm' })}</div>
     </div>
-    <h3 class="sg-h">Start with these</h3>
-    <p class="muted small">The most frequent signs. Learn a few at a time, then practise them in Practice → Contractions.</p>
-    <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: DICT[i].cat }); }).join('')}</div>
+    <div class="group-title"><h3>Start with these</h3><span>The most frequent signs. Learn a few at a time.</span>${practiseLink('#/practice/read?cat=contractions&set=start')}</div>
+    <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: G2_USE[DICT[i].cat] || DICT[i].cat }); }).join('')}</div>
     ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><span>${esc(blurb)}</span>${practiseLink(`#/practice/read?cat=contractions&set=k${ci}`)}</div>
       <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}
     ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
@@ -964,7 +965,8 @@ function alphabetSection() {
       <div class="decade"><div class="decade-head"><h3 class="range">${range}</h3>${letters.length > 1 ? practiseLink(`#/practice/read?cat=letters&set=${set}`) : ''}</div><p class="decade-p">${title}. ${blurb}</p>
       <div class="ctable narrow">${letters.split('').map((l) => crowHTML(LETTERS[l], l, { kind: 'letter', i: 'abcdefghijklmnopqrstuvwxyz'.indexOf(l), added })).join('')}</div></div>`).join('')}</div>
     ${exBlock([['hello', 'Letters are simply written one after another.'], ['braille', ''], ['jazz quiz', 'A space is an empty cell.']])}
-    <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>. Mixing up d, f, h and j? Try <a href="#/practice/read?cat=letters&set=mirror">mirror pairs</a>.</p>`;
+    <p class="muted small">New to braille? Start with the <a href="#/reference/overview">Overview</a>. Mixing up d, f, h and j? Try <a href="#/practice/read?cat=letters&set=mirror">mirror pairs</a>.</p>
+    <div class="row"><a class="btn primary" href="#/practice/read?cat=letters&set=az">Practise all letters</a><a class="btn" href="#/reference/cheatsheet">Cheat sheet</a></div>`;
 }
 function overviewSection() {
   const parts = [
@@ -980,10 +982,10 @@ function overviewSection() {
     ['ov-grades', 'Grade 1 and Grade 2', `<p><b>Grade 1</b> spells every letter. <b>Grade 2</b> adds about 180 contractions, like ${cellHTML('⠮', 'sm')} for “the”, so text takes far less space. Most books and public signs in Canada use Grade 2. Learners usually start with Grade 1, then add contractions a few at a time.</p>
       <p>See <a href="#/reference/grade2">Grade 2</a> for every contraction.</p>`],
     ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Practice › Read</a>.</p>
-      <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. <a href="#/practice/write">Write</a> uses the same six-key idea.</p>`],
+      <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. You can build cells dot by dot in <a href="#/practice/write">Practice › Draw</a>.</p>`],
     ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), Canadian bank notes, ATMs, transit handrails and many product labels. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
     ['ov-learn', 'Learning it as a sighted person', `<p>Most sighted learners start by reading braille <b>by sight</b>, which is what this site teaches. It’s a great way to understand signs, help a blind friend or family member, or begin training as a teacher or transcriber. Reading by touch takes much longer, because your fingertips need months of practice to tell the dots apart.</p>
-      <p>A good order is: the letters a–j, then the rest of the <a href="#/reference/alphabet">alphabet</a>, then <a href="#/reference/numbers">numbers and capitals</a>, then the most common <a href="#/reference/grade2">Grade 2</a> contractions. Practise a little each day in <a href="#/practice/read">Read</a> and <a href="#/practice/write">Write</a>, then try real <a href="#/reference/signs">signs</a>.</p>`],
+      <p>A good order is: the letters a–j, then the rest of the <a href="#/reference/alphabet">alphabet</a>, then <a href="#/reference/numbers">numbers and capitals</a>, then the most common <a href="#/reference/grade2">Grade 2</a> contractions. Practise a little each day in <a href="#/practice/read">Guess</a> and <a href="#/practice/write">Draw</a>, then try real <a href="#/reference/signs">signs</a>.</p>`],
     ['ov-history', 'History', `<p>Louis Braille was born in 1809 in Coupvray, France, and lost his sight after an accident in his father’s workshop at age three. At the Royal Institute for Blind Youth in Paris he met Charles Barbier’s 12-dot “night writing”, a military code for reading in the dark. In 1824, at 15, he simplified it into the six-dot cell that fits under one fingertip. Braille died in 1852; France made his system official two years later.</p>
       <ol class="timeline">${HISTORY.map(([y, t]) => `<li><b>${y}</b>${esc(t)}</li>`).join('')}</ol>`],
   ];
@@ -1011,7 +1013,8 @@ function numbersSection() {
       ['Canada', 'One capital sign before the letter.'],
       ['CANADA', 'Two capital signs make the whole word uppercase.'],
       ['Hi!', 'Capitals and punctuation together.'],
-      ['Room 2B', 'A grade 1 indicator stops “b” being read as a digit.'],
+      ['Room 2b', 'A grade 1 indicator stops “b” being read as a second 2.'],
+      ['Room 2B', 'A capital B needs no grade 1 indicator: the capital sign already ends the number.'],
     ])],
   ];
   return {
@@ -1225,7 +1228,7 @@ function buildIndex() {
   for (const [y, t] of HISTORY) out.push({ title: String(y), sub: t, sec: 'overview', act: nav('#/reference/overview') });
   return out;
 }
-const curSec = () => (document.body.dataset.page === 'reference' ? store.get('refSec', 'alphabet') : document.body.dataset.page);
+const curSec = () => (document.body.dataset.page === 'reference' ? store.get('refSec', 'overview') : document.body.dataset.page);
 function searchResults(raw) {
   INDEX = INDEX || buildIndex();
   const s = raw.trim().toLowerCase();

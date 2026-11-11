@@ -244,7 +244,8 @@ export function translateEnglish(text, grade = 1) {
         let j = i;
         while (j < w.length && isLetter(w[j])) j++;
         const run = w.slice(i, j);
-        if (numMode && /^[a-j]/i.test(run)) parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (letter after number)'));
+        // Only lowercase a–j can be mistaken for digits; a capital sign already ends number mode.
+        if (numMode && /^[a-j]/.test(run)) parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (letter after number)'));
         numMode = false;
         const lower = run.toLowerCase();
         const whole = run === lettersOnly;

@@ -1,5 +1,5 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=30';
+import { cellsOf } from './braille.js?v=31';
 
 export const SIGN_WORDS = [
   'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',
@@ -160,7 +160,7 @@ export const SIGN_REGIONS = {
       ['Where to reach', 'Room signs sit on the wall beside the door, on the latch (handle) side, at about shoulder height (roughly 1.2–1.5 m), so you never stand in the door’s swing.'],
       ['Elevators', 'Raised floor numbers with braille are on both sides of the door frame outside, and next to each button inside (CSA B44). A ★ star marks the main / street floor.'],
       ['Bilingual signs', 'Federal buildings, New Brunswick and some cities show French braille under the English. See Canada (French) for how that reads.'],
-      ['Money', 'Canadian $5–$100 notes have raised 6-dot clusters in the top corner: 1 cluster = $5, 2 = $10, 3 = $20, 4 = $50, 5 = $100. They’re not letters, but they’re braille-cell sized.'],
+      ['Money', 'Canadian $5–$100 notes have raised 6-dot clusters in the top corner: 1 cluster = $5, 2 = $10, 3 = $20, 4 = $50, and $100 has 2 clusters with a wide gap between them. They’re not letters, but they’re braille-cell sized.'],
     ],
     signs: ['Washroom', 'Men', 'Women', 'Exit', 'Stairs', 'Room 101', 'Elevator', 'Main floor', 'Information', 'Fire alarm'],
     bilingual: [['Exit', 'Sortie'], ['Washroom', 'Toilettes'], ['Elevator', 'Ascenseur']],

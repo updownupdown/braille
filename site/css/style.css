@@ -306,7 +306,7 @@ input[type=range] { accent-color: var(--accent); }
 .fact { padding: 16px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
 .fact b { display: block; font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 500; margin-bottom: 4px; }
 .fact p { margin: 0; font-size: .95rem; }
-.sign-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.sign-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 14px; }
 .plate {
   position: relative; background: #2e2a26; color: #f4f0e8; border-radius: 14px; padding: 20px 18px 18px;
   box-shadow: none; cursor: pointer; display: flex; flex-direction: column; gap: 14px; min-height: 150px; border: 0; text-align: left; font: inherit;
@@ -449,7 +449,7 @@ footer.foot { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; color:
 @media (min-width: 761px) { .sheet { width: min(480px, calc(100vw - 32px)); } }
 
 /* reference */
-.lead-p { color: var(--ink-2); max-width: 64ch; }
+.lead-p { color: var(--ink-2); max-width: 68ch; }
 .search-wrap { margin-bottom: 14px; }
 .search-wrap[hidden] { display: none; }
 .pager { display: flex; justify-content: space-between; gap: 12px; margin: 36px 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: .95rem; }
@@ -468,7 +468,9 @@ a.example:hover { text-decoration: none; border-color: var(--accent); }
 .acc { color: var(--accent); }
 .money { display: flex; gap: 12px; flex-wrap: wrap; }
 .money .note { padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
-.money .note span { display: flex; gap: 4px; }
+.money .note span { display: flex; gap: 4px; flex-wrap: wrap; }
+.money .note-gap { width: 34px; }
+.nw { white-space: nowrap; }
 .tr-out { margin-top: 12px; }
 .tr-tools { margin: 12px 0; }
 footer.foot { display: none; }
@@ -1089,6 +1091,7 @@ div.crow { cursor: default; }
 .cheatsheet { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
 .cs-title { font-size: 1.4rem; margin: 0 0 4px; }
 .cs-title small { font-size: .8rem; color: var(--muted); font-weight: 400; margin-left: 8px; }
+@media screen and (max-width: 560px) { .cs-title small { display: block; margin: 2px 0 0; } }
 .cs-block h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 18px 0 6px; font-weight: 500; }
 .cheatsheet .ctable.narrow, .cheatsheet .ctable.narrow.multi { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
 .cheatsheet .crow .cnote { display: none; }
