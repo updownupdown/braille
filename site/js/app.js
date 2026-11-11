@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=27';
+} from './braille.js?v=28';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=27';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=27';
-import { COMMON_WORDS } from './wordlist.js?v=27';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=27';
+} from './data.js?v=28';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=28';
+import { COMMON_WORDS } from './wordlist.js?v=28';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=28';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);

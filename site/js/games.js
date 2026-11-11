@@ -1,10 +1,10 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=27';
-import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=27';
-import { WORDS } from './data.js?v=27';
-import { SNOWMAN_WORDS } from './snowman.js?v=27';
-import { AGENT_CASES } from './agentcases.js?v=27';
-import { COMMON_WORDS } from './wordlist.js?v=27';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=28';
+import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=28';
+import { WORDS } from './data.js?v=28';
+import { SNOWMAN_WORDS } from './snowman.js?v=28';
+import { AGENT_CASES } from './agentcases.js?v=28';
+import { COMMON_WORDS } from './wordlist.js?v=28';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -51,6 +51,32 @@ function keys(fn) {
   return () => document.removeEventListener('keydown', h);
 }
 const LV3 = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
+// On-screen print keyboard for games, in place of a text box (no phone keyboard popping up and taking half the screen).
+// The physical keyboard works too. Returns an input-like object: value, disabled, off().
+const KB_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+function letterPad({ display = null, mount, digits = false, onInput, onEnter }) {
+  let value = '', disabled = false;
+  const show = () => { if (display) { display.textContent = value; display.classList.toggle('empty', !value); } };
+  const rows = (digits ? ['1234567890'] : []).concat(KB_ROWS);
+  mount.innerHTML = `<div class="g-kb">${rows.map((r, i) => `<div class="g-kr">${[...r].map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('')}${i === rows.length - 1 ? '<button type="button" class="wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`).join('')}</div>`;
+  const press = (k) => {
+    if (disabled) return;
+    if (k === 'enter') { if (onEnter) onEnter(); return; }
+    value = k === 'back' ? value.slice(0, -1) : value + k;
+    show(); if (onInput) onInput();
+  };
+  const kb = mount.firstElementChild;
+  // Act on touch-down for speed; keep the click for keyboard activation (Enter or Space on a focused key).
+  kb.addEventListener('pointerdown', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; e.preventDefault(); press(b.dataset.k); });
+  kb.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b && e.detail === 0) press(b.dataset.k); });
+  const off = keys((e) => {
+    const k = e.key.toLowerCase();
+    if (k === 'backspace') press('back'); else if (k === 'enter') press('enter');
+    else if (/^[a-z]$/.test(k) || (digits && /^[0-9]$/.test(k))) press(k);
+  });
+  show();
+  return { get value() { return value; }, set value(v) { value = v; show(); }, set disabled(d) { disabled = d; kb.classList.toggle('off', d); }, off };
+}
 // One stats row for every game: left, centre and right slots.
 const statBar = (l = '', c = '', r = '') => `<div class="g-bar"><span class="l">${l}</span><span class="c">${c}</span><span class="r">${r}</span></div>`;
 const scoreBest = (k, extra = '') => `Score <b id="sc">0</b> <span class="g-best">(Best <b id="best">${store.get('best.' + k, '–') ?? '–'}</b>)</span>${extra}`;
@@ -228,8 +254,9 @@ function rain(el, level) {
   const shortWords = WORDS.filter((w) => w.length <= 5);
   el.innerHTML = `${statBar('Level <b id="lv">1</b>', '<span class="lives" id="lives"></span>', scoreBest('rain.' + level))}
     <div class="rain-field card" id="field"><div class="g-overlay" id="ov"><button class="btn primary" id="go">Start</button><small>Type each letter before it lands.</small></div></div>
-    <input class="answer-input rain-in" id="in" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Type here" enterkeyhint="done">`;
-  const field = $('#field', el), inp = $('#in', el);
+    <div class="g-typed" id="typed" data-ph="Tap the letters"></div><div id="kb"></div>`;
+  const field = $('#field', el);
+  const inp = letterPad({ display: $('#typed', el), mount: $('#kb', el), onInput: () => check() });
   let items = [], raf = 0, last = 0, spawnT = 0, sc = 0, lives = 3, lv = 1, running = false;
   const H = () => field.clientHeight;
   const setLives = () => { $('#lives', el).innerHTML = [0, 1, 2].map((i) => `<i class="${i < lives ? 'on' : ''}"></i>`).join(''); };
@@ -270,9 +297,9 @@ function rain(el, level) {
   function go() {
     sc = 0; lives = 3; lv = 1; last = 0; spawnT = 300; setLives();
     $('#sc', el).textContent = 0; $('#lv', el).textContent = 1; $('#ov', el).hidden = true;
-    running = true; inp.value = ''; inp.focus(); raf = requestAnimationFrame(tick);
+    running = true; inp.value = ''; raf = requestAnimationFrame(tick);
   }
-  inp.oninput = () => {
+  const check = () => {
     const v = inp.value.trim().toLowerCase(); if (!v || !running) return;
     const hits = items.filter((i) => i.text === v).sort((a, b) => b.y - a.y);
     if (hits.length) {
@@ -283,7 +310,7 @@ function rain(el, level) {
     } else if (!items.some((i) => i.text.startsWith(v))) { inp.value = ''; glow(field, false); }
   };
   $('#go', el).onclick = go; setLives();
-  return () => { running = false; cancelAnimationFrame(raf); };
+  return () => { running = false; cancelAnimationFrame(raf); inp.off(); };
 }
 
 // ---------- Time Attack ----------
@@ -294,9 +321,10 @@ function timeAttack(el, level) {
   el.innerHTML = `${statBar('<b id="tl">60</b> s', '', scoreBest('time.' + level))}
     <div class="ta-bar"><i id="bar"></i></div>
     <div class="card g-card ta" id="card"><div class="g-overlay" id="ov">${startScreen('Type what each braille cell says, as fast as you can. You have 60 seconds.', incl)}</div><div class="prompt-cells" id="cells"></div></div>
-    <input class="answer-input" id="in" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Type the letter" enterkeyhint="next">
+    <div id="kb"></div>
     <div class="g-actions"><button class="btn ghost" id="skip">Skip</button></div>`;
-  const card = $('#card', el), inp = $('#in', el);
+  const card = $('#card', el);
+  const inp = letterPad({ mount: $('#kb', el), digits: level === 'hard', onInput: () => check() });
   let cur, sc = 0, end = 0, raf = 0, running = false;
   const nextItem = () => { let x; do { x = pick(pool); } while (x === cur && pool.length > 1); cur = x; $('#cells', el).innerHTML = [...cellsOf(x)].map((c) => cell(c)).join(''); };
   function tick() {
@@ -312,16 +340,16 @@ function timeAttack(el, level) {
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
-  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; running = true; end = performance.now() + 60000; inp.value = ''; inp.focus(); nextItem(); raf = requestAnimationFrame(tick); }
-  inp.oninput = () => {
+  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; running = true; end = performance.now() + 60000; inp.value = ''; nextItem(); raf = requestAnimationFrame(tick); }
+  const check = () => {
     if (!running) return;
     const v = inp.value.trim().toLowerCase(); if (!v) return;
     inp.value = '';
     if (v === cur) { sc++; $('#sc', el).textContent = sc; glow(card, true); nextItem(); } else glow(card, false);
   };
-  $('#skip', el).onclick = () => { if (running) { nextItem(); inp.focus(); } };
+  $('#skip', el).onclick = () => { if (running) nextItem(); };
   $('#go', el).onclick = go;
-  return () => { running = false; cancelAnimationFrame(raf); };
+  return () => { running = false; cancelAnimationFrame(raf); inp.off(); };
 }
 
 // ---------- Secret Agent ----------
@@ -331,7 +359,7 @@ function agent(el, level, ctx) {
   // Carry over progress from the old single case.
   const old = store.get('agent', null);
   if (old != null && store.get('agent.p.' + (CASES.length - 1), null) == null) store.set('agent.p.' + (CASES.length - 1), Math.max(0, old - 1));
-  let ci = Math.min(store.get('agent.case', 0), CASES.length - 1);
+  let ci = Math.min(store.get('agent.case', 0), CASES.length - 1), pad = null;
   const prog = (i) => store.get('agent.p.' + i, 0);
   const pickCase = () => ctx.dropdown(ctx.slot, {
     label: 'Case',
@@ -342,6 +370,7 @@ function agent(el, level, ctx) {
     pickCase();
     const cs = CASES[ci], N = cs.missions.length, mi = prog(ci);
     if (mi >= N) {
+      if (pad) { pad.off(); pad = null; }
       el.innerHTML = `<div class="card g-card ag ag-done"><div class="ag-prog"><span>Case solved</span><span class="bar"><i style="width:100%"></i></span></div>
         <b class="ag-title">${esc(cs.name)}</b><p class="ag-brief">${esc(cs.missions[N - 1].after)}</p>
         <div class="row"><button class="btn" id="again">Play this case again</button>${ci + 1 < CASES.length ? '<button class="btn primary" id="nextCase">Next case</button>' : ''}</div></div>`;
@@ -358,11 +387,16 @@ function agent(el, level, ctx) {
         <b class="ag-title">${esc(m.title)}</b>
         <p class="ag-brief">${esc(m.brief)}</p>
         <div class="ag-msg" id="msg">${words.map((w, i) => `<span class="ag-w" data-i="${i}">${line(w, { grade: m.grade })}<span class="ag-l"></span></span>`).join('')}</div>
-        <div class="ag-input"><input class="answer-input" id="in" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Type the highlighted word" enterkeyhint="next"><button class="btn ghost" id="hint">Hint</button></div>
+        <div class="ag-input"><div class="g-typed" id="typed" data-ph="Type the highlighted word"></div><button class="btn ghost" id="hint">Hint</button></div>
         <p class="ag-after" id="after" hidden></p>
       </div>
+      <div id="kb"></div>
       <div class="g-actions"><button class="btn primary" id="nextM" hidden>${mi + 1 < N ? 'Next mission' : 'Close the case'}</button></div>`;
-    const inp = $('#in', el), card = $('.ag', el);
+    const card = $('.ag', el);
+    if (pad) pad.off();
+    const inp = pad = letterPad({ display: $('#typed', el), mount: $('#kb', el), digits: /\d/.test(m.msg),
+      onInput: () => { if (wi < words.length && norm(inp.value) === norm(words[wi])) solveWord(); },
+      onEnter: () => { if (inp.value.trim() && wi < words.length) glow(card, false); } });
     const mark = () => {
       $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
       // The message is one scrolling line, so keep the current word centred in it.
@@ -373,27 +407,24 @@ function agent(el, level, ctx) {
       $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = words[wi];
       wi++; inp.value = ''; mark();
       if (wi === words.length) {
-        glow(card, true); inp.disabled = true; $('#hint', el).disabled = true;
+        glow(card, true); inp.disabled = true; $('#hint', el).disabled = true; $('#kb', el).hidden = true;
         $('#after', el).hidden = false; $('#after', el).textContent = m.after;
         store.set('agent.p.' + ci, mi + 1); pickCase();
         $('.ag-prog .bar i', el).style.width = ((mi + 1) / N) * 100 + '%';
         $('#nextM', el).hidden = false;
       }
     };
-    inp.oninput = () => { if (wi < words.length && norm(inp.value) === norm(words[wi])) solveWord(); };
-    inp.onkeydown = (e) => { if (e.key === 'Enter' && inp.value.trim() && wi < words.length) { glow(card, false); } };
     $('#hint', el).onclick = () => {
       if (wi >= words.length) return;
       const target = words[wi].replace(/[^A-Za-z0-9]/g, '');
       hints[wi] = Math.min(target.length, hints[wi] + 1);
       $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = target.slice(0, hints[wi]) + '…';
-      inp.focus();
     };
     $('#nextM', el).onclick = render;
     mark();
   }
   render();
-  return () => {};
+  return () => { if (pad) pad.off(); };
 }
 
 // ---------- Anagrams ----------
