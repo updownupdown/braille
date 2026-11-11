@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=25';
+} from './braille.js?v=26';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=25';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=25';
-import { COMMON_WORDS } from './wordlist.js?v=25';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=25';
+} from './data.js?v=26';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=26';
+import { COMMON_WORDS } from './wordlist.js?v=26';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=26';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -50,7 +50,10 @@ const P = {
   words: '<path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/>',
   games: '<rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7 10.5v4M5 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="18" cy="13.8" r=".9" fill="currentColor"/>',
   grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
-  gallows: '<path d="M4 21h10M7 21V3h9v3"/><circle cx="16" cy="8.5" r="2.5"/><path d="M16 11v5M16 13l-2.5 2M16 13l2.5 2"/>',
+  snowman: '<circle cx="12" cy="16.5" r="4.5"/><circle cx="12" cy="8.5" r="3"/><path d="M8.5 4.5h7M10 4.5V2h4v2.5"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
+  t2b: '<path d="M3 6h7M6.5 6v12"/><path d="m12 12h4m-2-2 2 2-2 2"/><circle cx="19" cy="7" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/><circle cx="22" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="17" r="1.3" fill="currentColor"/>',
+  b2t: '<circle cx="3" cy="7" r="1.3" fill="currentColor"/><circle cx="3" cy="12" r="1.3" fill="currentColor"/><circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="3" cy="17" r="1.3" fill="currentColor"/><path d="m9 12h4m-2-2 2 2-2 2"/><path d="M15 6h7M18.5 6v12"/>',
   key: '<circle cx="8" cy="15" r="4.5"/><path d="m11.5 11.5 8-8M16.5 6.5l2.5 2.5M14 9l2 2"/>',
   rain: '<circle cx="6" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="10" r="1.5" fill="currentColor"/><circle cx="18" cy="4" r="1.5" fill="currentColor"/><circle cx="8" cy="15" r="1.5" fill="currentColor"/><path d="M3 21h18"/>',
   timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M19 6l-1.5 1.5"/>',
@@ -346,13 +349,15 @@ function progressHTML() {
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
 const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
 const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'The 180 contractions', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
-const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'hangman', 'anagrams', 'time', 'maze', 'agent', 'trivia', 'riddles'];
+const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
   const m = mastery(), misses = store.get('misses', {});
   const seen = store.get('learnSeen', []);
   const pVisited = store.get('pvisited', false);
-  const played = gameStore.get('played', []), lastGame = gameStore.get('last', null);
+  const ren = (k) => (k === 'hangman' ? 'snowman' : k);
+  const played = gameStore.get('played', []).map(ren).filter((k) => GAMES[k]);
+  const lastGame = GAMES[ren(gameStore.get('last', null))] ? ren(gameStore.get('last', null)) : played[played.length - 1] || null;
   const isNew = !seen.length && !pVisited && !played.length;
   const card = (href, k, t, d, go = false) => `<a class="hcard ${go ? 'go' : ''}" href="${href}"><span class="k">${k}</span><b>${t}</b><span class="d">${d}</span></a>`;
   const tile = (href, t, ic, cls = '') => `<a class="hl" href="${href}"><span class="hl-ic ${cls}">${icon(ic, 22)}</span><span class="hl-t">${t}</span>${icon('right', 18)}</a>`;
@@ -527,7 +532,7 @@ function quizMode(mode, q) {
   function renderPicker() {
     if (mode === 'words') {
       if (!WORD_LEN[state.wlen]) state.wlen = 'medium';
-      picker.innerHTML = '<div class="sw-row">' + radios('wgrade', [[1, 'Grade 1'], [2, 'Grade 2']], state.wgrade) + '</div><div class="sw-row">' + radios('wlen', Object.entries(WORD_LEN).map(([k, [n]]) => [k, n]), state.wlen) + '</div>';
+      picker.innerHTML = '<div class="sw-row fit">' + radios('wgrade', [[1, 'Grade 1'], [2, 'Grade 2']], state.wgrade) + radios('wlen', Object.entries(WORD_LEN).map(([k, [n]]) => [k, n]), state.wlen) + '</div>';
       wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[state.wlen][1]));
     } else {
       picker.innerHTML = radios('cat', Object.entries(CATS).map(([k, c]) => [k, c.name]), state.cat) + '<div id="setDD"></div>';
@@ -642,16 +647,16 @@ function quizMode(mode, q) {
     stage.classList.remove('glow-good', 'glow-bad');
     const cells = toCells(translate(word, 'en', state.wgrade));
     let shown = 0, done = false;
-    const cellsHTML = cells.map((c) => `<span class="bw">${cellHTML(c.cell)}<span class="lbl"></span></span>`).join('');
+    // Contractions are colour coded like everywhere else; cells stay one size so nothing jumps around.
+    const cellsHTML = cells.map((c) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}<span class="lbl"></span></span>`).join('');
     // Keep the same input between words so the phone keyboard stays open.
     if ($('#ans', stage) && $('#wcells', stage)) {
-      const wc = $('#wcells', stage); wc.className = `prompt-cells words ${cells.length > 6 ? 'many' : ''}`; wc.innerHTML = cellsHTML;
+      $('#wcells', stage).innerHTML = cellsHTML;
       $('#ans', stage).value = '';
     } else {
       stage.innerHTML = `
-      <div class="prompt-cells words ${cells.length > 6 ? 'many' : ''}" id="wcells">${cellsHTML}</div>
-      <input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type the word">
-      <div class="row"><button class="btn ghost" id="hint">Hint</button><button class="btn ghost" id="skip">Skip</button></div>`;
+      <div class="prompt-cells words many" id="wcells">${cellsHTML}</div>
+      <div class="w-row"><button class="btn ghost" id="hint">Hint</button><input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type the word"><button class="btn ghost" id="skip">Skip</button></div>`;
       // Tapping Hint or Skip shouldn't take focus away from the input (and close the keyboard).
       $$('#hint, #skip', stage).forEach((b) => b.addEventListener('pointerdown', (e) => { if (document.activeElement === $('#ans', stage)) e.preventDefault(); }));
     }
@@ -1172,9 +1177,11 @@ views.games = (q, sub) => {
   helpBtn.onclick = () => openSheet(`<div class="help">${g.help.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`, { title: g.name });
   let lvl = gameStore.get('lvl.' + sub, g.levels ? g.levels[0][0] : null);
   if (g.levels && !g.levels.some(([k]) => k === lvl)) lvl = g.levels[0][0];
-  const top = g.levels && sub !== 'trivia';
-  setSub(`<div class="g-sub"><a class="back-link" href="#/games">${icon('right', 18)} Games</a>${top ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}</div>`);
-  view.innerHTML = `<div class="game-wrap game-${sub}">${g.levels && !top ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}<div class="game" id="game"></div></div>`;
+  // Trivia and Riddles keep their level in the page, next to the question count and score.
+  const top = g.levels && !g.inline;
+  setSub(`<div class="g-sub"><a class="back-link" href="#/games">${icon('right', 18)} Games</a><div class="g-slot" id="gSlot"></div>${top ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}</div>`);
+  view.innerHTML = `<div class="game-wrap game-${sub}">${g.levels && !top ? `<div class="picker g-lvrow">${radios('lvl', g.levels, lvl)}<div class="g-stat-slot" id="gStat"></div></div>` : ''}<div class="game" id="game"></div></div>`;
+  const ctx = { dropdown, slot: $('#gSlot'), statSlot: $('#gStat') };
   const gameEl = $('#game');
   // Stats and buttons share one row at the bottom, to save height.
   const arrange = () => {
@@ -1187,9 +1194,9 @@ views.games = (q, sub) => {
   const mo = new MutationObserver(arrange); mo.observe(gameEl, { childList: true });
   const lvlClass = () => { gameEl.className = `game lv-${lvl}`; };
   lvlClass();
-  let stop = g.run(gameEl, lvl, { dropdown }); arrange();
+  let stop = g.run(gameEl, lvl, ctx); arrange();
   // Display-only toggles (With letters / Braille only) keep the current puzzle.
-  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); lvlClass(); if (g.display) return; if (stop) stop(); stop = g.run(gameEl, lvl, { dropdown }); });
+  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); lvlClass(); if (g.display) return; if (stop) stop(); stop = g.run(gameEl, lvl, ctx); });
   return () => { mo.disconnect(); if (stop) stop(); };
 };
 
@@ -1317,11 +1324,11 @@ views.translate = (q) => {
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
-  setSub('<div id="langDD" class="dd-strong"></div><div id="exDD" class="dd-right"></div>');
   let dir = store.get('trDir', 'text');
+  setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${icon(ic, 22)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div>`);
   view.innerHTML = `
-    <div class="tr-dir">${radios('trDir', [['text', 'Text to braille'], ['dots', 'Braille to text']], dir)}</div>
     <div id="trText">
+      <div class="tr-ex" id="exDD"></div>
       <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
       <div class="card tr-out" id="trOut"></div>
       <div class="tr-tools">
@@ -1332,7 +1339,7 @@ views.translate = (q) => {
     <div id="trDots"></div>`;
   const showDir = () => {
     $('#trText').hidden = dir !== 'text'; $('#trDots').hidden = dir !== 'dots';
-    $('#langDD').style.visibility = $('#exDD').style.visibility = dir === 'text' ? '' : 'hidden';
+    $('#langDD').hidden = dir !== 'text';
     if (dir === 'dots') dotsEditor($('#trDots'));
   };
   bindRadios($('.tr-dir'), (k, v) => { dir = v; store.set('trDir', v); showDir(); });
@@ -1362,26 +1369,27 @@ let dotsKey = null;
 function dotsEditor(root) {
   let cells = store.get('trDots', [[5], [1, 2, 4]]);
   if (!Array.isArray(cells) || !cells.length) cells = [[]];
-  let cur = cells.length - 1;
+  let cur = cells.length - 1; // keyboard input goes to the last cell
   const uni = (d) => (d.length ? fromDots(d.slice().sort().join('')) : '⠀');
   const save = () => store.set('trDots', cells);
   const POS = [1, 4, 2, 5, 3, 6];
   function draw() {
     root.innerHTML = `
-      <div class="tb-row" id="tbRow">${cells.map((d, i) => `<div class="tb-cell ${i === cur ? 'cur' : ''}" data-c="${i}">${POS.map((n) => `<button type="button" class="tb-dot ${d.includes(n) ? 'on' : ''}" data-n="${n}" aria-label="Cell ${i + 1}, dot ${n}" aria-pressed="${d.includes(n)}"></button>`).join('')}</div>`).join('')}
-        <button type="button" class="tb-add" id="tbAdd" aria-label="Add a cell">+</button></div>
-      <div class="tb-tools"><button class="link-btn pillish" id="tbDel">Remove cell</button><button class="link-btn pillish" id="tbClear">Clear</button></div>
+      <div class="tb-row" id="tbRow">${cells.map((d, i) => `<div class="tb-col"><div class="tb-cell" data-c="${i}">${POS.map((n) => `<button type="button" class="tb-dot ${d.includes(n) ? 'on' : ''}" data-n="${n}" aria-label="Cell ${i + 1}, dot ${n}" aria-pressed="${d.includes(n)}"></button>`).join('')}</div><button type="button" class="tb-del" data-del="${i}" aria-label="Remove cell ${i + 1}">${icon('trash', 18)}</button></div>`).join('')}
+        <button type="button" class="tb-add" id="tbAdd"><span>+</span>Add cell</button></div>
+      <div class="tb-tools"><button class="link-btn pillish" id="tbClear">Clear all</button></div>
       <div id="tbOut" class="tb-out"></div>`;
     $('#tbRow', root).onclick = (e) => {
       const add = e.target.closest('#tbAdd');
       if (add) { cells.push([]); cur = cells.length - 1; save(); draw(); return; }
+      const del = e.target.closest('[data-del]');
+      if (del) { const i = Number(del.dataset.del); if (cells.length > 1) cells.splice(i, 1); else cells = [[]]; cur = cells.length - 1; save(); draw(); return; }
       const cell = e.target.closest('.tb-cell'); if (!cell) return;
       cur = Number(cell.dataset.c);
       const b = e.target.closest('.tb-dot');
       if (b) { const n = Number(b.dataset.n), d = cells[cur]; cells[cur] = d.includes(n) ? d.filter((x) => x !== n) : [...d, n]; save(); }
       draw();
     };
-    $('#tbDel', root).onclick = () => { if (cells.length > 1) { cells.splice(cur, 1); cur = Math.min(cur, cells.length - 1); } else cells = [[]]; save(); draw(); };
     $('#tbClear', root).onclick = () => { cells = [[]]; cur = 0; save(); draw(); };
     results();
   }
@@ -1450,6 +1458,7 @@ function route() {
   let [path, qs] = raw.split('?');
   path = path || '';
   if (path === 'sweep') path = 'practice/sweep';
+  if (path === 'games/hangman') { location.replace('#/games/snowman'); return; }
   if (path.startsWith('signs')) path = 'reference/' + path;
   const [name, sub, sub2] = path.split('/');
   const q = new URLSearchParams(qs || '');
