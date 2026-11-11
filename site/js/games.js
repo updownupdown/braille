@@ -1,7 +1,7 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=23';
-import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=23';
-import { WORDS } from './data.js?v=23';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=25';
+import { TRIVIA, RIDDLES, WORDLE, HANGMAN, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=25';
+import { WORDS } from './data.js?v=25';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -326,7 +326,12 @@ function agent(el) {
       </div>
       <div class="g-actions"><button class="btn primary" id="nextM" hidden>Next mission</button></div>`;
     const inp = $('#in', el), card = $('.ag', el);
-    const mark = () => $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
+    const mark = () => {
+      $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
+      // The message is one scrolling line, so keep the current word centred in it.
+      const msg = $('#msg', el), cur = $('.ag-w.cur', el);
+      if (msg && cur) msg.scrollTo({ left: cur.offsetLeft - (msg.clientWidth - cur.offsetWidth) / 2, behavior: 'smooth' });
+    };
     const solveWord = () => {
       $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = words[wi];
       wi++; inp.value = ''; mark();

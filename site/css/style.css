@@ -1455,3 +1455,54 @@ body.s-sw-real .finger { top: 185px; }
 .sw-opts > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: .92rem; color: var(--ink-2); }
 .sw-opts .radios { display: flex; }
 .sw-opts .radios button { flex: 1; min-width: 0; padding-inline: 6px; }
+
+/* ---------- v18: practice toggles at the top, two rows, no labels ---------- */
+.practice-wrap.mode-sweep .picker, .practice-wrap.mode-words .picker { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 8px; }
+.practice-wrap .sw-row { display: flex; gap: 8px; min-width: 0; }
+.practice-wrap .sw-row > .seg { flex: 1 1 0; display: flex; min-width: 0; }
+.practice-wrap .sw-row > .seg button { flex: 1; min-width: 0; padding-inline: 4px; justify-content: center; text-align: center; }
+.sweep-box { margin-top: 6px; }
+
+/* ---------- v18: calmer home ---------- */
+body[data-page="home"] .head-title { visibility: hidden; }
+body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; box-shadow: none; }
+.hcard.go, :root[data-theme="dark"] .hcard.go { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.hcard.go .k, :root[data-theme="dark"] .hcard.go .k { color: var(--accent); }
+.hcard.go .d, :root[data-theme="dark"] .hcard.go .d { color: var(--ink-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hcard.go { color: var(--ink); } :root:not([data-theme="light"]) .hcard.go .k { color: var(--accent); } :root:not([data-theme="light"]) .hcard.go .d { color: var(--ink-2); } }
+.hlist { display: grid; margin-top: 8px; }
+@media (min-width: 700px) { .hlist { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+.hl { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none !important; }
+.hl:hover .hl-t { color: var(--accent); }
+.hl > .ic:last-child { color: var(--muted); flex: none; }
+.hl-t { flex: 1; min-width: 0; font-weight: 500; }
+.hl-ic { flex: none; display: grid; place-items: center; color: var(--gc, var(--accent)); }
+:root[data-theme="dark"] .hl-ic[class*="gc-"] { color: color-mix(in srgb, var(--gc) 55%, #fff); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hl-ic[class*="gc-"] { color: color-mix(in srgb, var(--gc) 55%, #fff); } }
+.hsec { margin-top: 34px; }
+.home-head { margin-bottom: 4px; }
+
+/* ---------- v18: Secret Agent message scrolls sideways ---------- */
+.ag-msg { position: relative; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.ag-msg::-webkit-scrollbar { display: none; }
+.ag-w { flex: none; }
+
+/* ---------- v18: Translate, braille to text ---------- */
+.tr-dir { margin: 2px 0 14px; }
+.tr-dir .seg { display: flex; }
+.tr-dir .seg button { flex: 1; justify-content: center; text-align: center; }
+.tb-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; align-items: center; scrollbar-width: thin; }
+.tb-cell { flex: none; display: grid; grid-template-columns: repeat(2, 38px); grid-auto-rows: 38px; gap: 8px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.tb-cell.cur { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tb-dot { width: 38px; height: 38px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: transparent; box-shadow: inset 0 0 0 2px var(--off, #cfc6b8); touch-action: manipulation; }
+.tb-dot.on { background: var(--ink); box-shadow: none; }
+.tb-add { flex: none; width: 52px; height: 52px; border-radius: 50%; border: 1px dashed var(--line); background: none; color: var(--ink-2); font-size: 1.6rem; cursor: pointer; }
+.tb-tools { display: flex; gap: 8px; margin: 4px 0 18px; }
+.tb-h { font-size: 1rem; font-weight: 600; margin: 0 0 8px; }
+.tb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.tb-list li { padding: 12px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.tb-list li > b { font-size: 1.25rem; font-weight: 600; }
+.tb-list li > span { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .85rem; color: var(--muted); }
+.tb-tok { display: inline-flex; align-items: center; gap: 6px; }
+.tb-tok i { font-style: normal; color: var(--ink); font-weight: 500; }
+.tb-c { display: inline-flex; }

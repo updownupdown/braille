@@ -1,11 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=23';
+} from './braille.js?v=25';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=23';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=23';
+} from './data.js?v=25';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=25';
+import { COMMON_WORDS } from './wordlist.js?v=25';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=25';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -353,9 +355,9 @@ views[''] = () => {
   const played = gameStore.get('played', []), lastGame = gameStore.get('last', null);
   const isNew = !seen.length && !pVisited && !played.length;
   const card = (href, k, t, d, go = false) => `<a class="hcard ${go ? 'go' : ''}" href="${href}"><span class="k">${k}</span><b>${t}</b><span class="d">${d}</span></a>`;
-  const tile = (href, t, ic, cls = '') => `<a class="hct" href="${href}"><span class="hrow-ic ${cls}">${icon(ic, 20)}</span><b>${t}</b></a>`;
+  const tile = (href, t, ic, cls = '') => `<a class="hl" href="${href}"><span class="hl-ic ${cls}">${icon(ic, 22)}</span><span class="hl-t">${t}</span>${icon('right', 18)}</a>`;
   const head = (ic, t, href, prog) => `<div class="hsec-h"><h2 class="sec-h">${icon(ic, 26)} ${t}</h2><a href="${href}">See all</a></div>${prog ? `<div class="hprog"><span class="bar"><i style="width:${Math.round(prog[0] * 100)}%"></i></span><span>${prog[1]}</span></div>` : ''}`;
-  const carousel = (items) => `<div class="hcar" role="list">${items.join('')}</div>`;
+  const carousel = (items) => `<div class="hlist">${items.join('')}</div>`;
 
   // Learn
   const secs = REF_SECTIONS.filter(([k]) => k !== 'cheatsheet');
@@ -381,19 +383,19 @@ views[''] = () => {
   const missTop = Object.entries(misses).filter(([k]) => /^[rw]:[a-z]$/.test(k)).sort((x, y) => y[1] - x[1]).map(([k]) => k[2]).filter((l, i, a) => a.indexOf(l) === i && (m['r:' + l] || 0) < 4).slice(0, 5);
   const nextSet = [['aj', 'abcdefghij'], ['kt', 'klmnopqrst'], ['uz', 'uvwxyz']].find(([, ls]) => [...ls].some((l) => (m['r:' + l] || 0) < 4));
   let pA, pB;
-  if (!pVisited) { pA = card('#/practice/read?cat=letters&set=aj', 'Get started', 'Read a–j', 'Ten letters, top dots only', true); pB = card('#/practice/write?cat=letters&set=aj', 'Or', 'Write a–j', 'Tap the dots'); }
+  if (!pVisited) { pA = card('#/practice/read?cat=letters&set=aj', 'Get started', 'Guess a–j', 'Ten letters, top dots only', true); pB = card('#/practice/write?cat=letters&set=aj', 'Or', 'Draw a–j', 'Tap the dots'); }
   else {
-    const label = pmode === 'sweep' ? 'Sweep' : `${MODES[pmode]} · ${pset ? pset[0] : 'a–j'}`;
+    const label = pmode === 'sweep' ? 'Read' : `${MODES[pmode]} · ${pset ? pset[0] : 'a–j'}`;
     const items = pmode !== 'sweep' && pset ? pset[1]() : [];
     const pre = pmode === 'write' ? 'w:' : 'r:';
     pA = card(pmode === 'sweep' ? '#/practice/sweep' : `#/practice/${pmode}?cat=${psel.cat}&set=${psel.set}`, 'Continue', label, items.length ? `${items.filter((x) => (m[pre + x.key] || 0) >= 4).length} of ${items.length} known` : 'Pick up where you left off');
     pB = missTop.length ? card('#/practice/read?cat=review&set=today', 'Needs work', missTop.join(', '), '15-item daily review', true)
-      : nextSet ? card(`#/practice/read?cat=letters&set=${nextSet[0]}`, 'Up next', `Read ${CATS.letters.sets[nextSet[0]][0]}`, 'Learn the next letters', true)
+      : nextSet ? card(`#/practice/read?cat=letters&set=${nextSet[0]}`, 'Up next', `Guess ${CATS.letters.sets[nextSet[0]][0]}`, 'Learn the next letters', true)
       : card('#/practice/read?cat=contractions&set=k0', 'Up next', 'Grade 2', 'Start the contractions', true);
   }
   const practice = `${head('practice', 'Practice', '#/practice', pVisited ? [knownL / 26, `${knownL} of 26 letters`] : null)}
     <div class="hsplit">${pA}${pB}</div>
-    ${carousel([...Object.entries(MODES).map(([k, t]) => tile(`#/practice/${k}`, t, k)), tile('#/practice/read?cat=review&set=today', 'Daily Review', 'restart')])}`;
+    ${carousel([...Object.entries(MODES).map(([k, t]) => tile(`#/practice/${k}`, t, k === 'sweep' ? 'sweep' : k)), tile('#/practice/read?cat=review&set=today', 'Daily Review', 'restart')])}`;
 
   // Games
   const nextGame = GAME_ORDER.find((k) => !played.includes(k) && k !== lastGame) || GAME_ORDER.find((k) => k !== lastGame);
@@ -408,13 +410,11 @@ views[''] = () => {
   view.innerHTML = `
     <div class="home-head">
       <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
-      <p class="slogan">${isNew ? 'A resource for sighted folks to learn the braille writing system.' : 'Welcome back.'}</p>
     </div>
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>
-    <section class="hsec">${games}</section>
-    <a class="htr" href="#/translate"><span class="hrow-ic">${icon('translate', 22)}</span><div><b>Translate</b><span>Type anything and see it in braille</span></div><span class="btn">Open</span></a>`;
+    <section class="hsec">${games}</section>`;
 };
 
 // ---------- practice data ----------
@@ -455,11 +455,6 @@ function reviewItems() {
   }
   return r.keys.map((k) => all.get(k));
 }
-const WORD_SETS = {
-  simple: { name: 'Simple', grade: 1, list: WORDS },
-  signs: { name: 'Signs', grade: 2, list: SIGN_WORDS.map((w) => w.toLowerCase()) },
-  g2: { name: 'Contracted', grade: 2, list: ['the', 'and', 'with', 'for', 'children', 'knowledge', 'people', 'there', 'father', 'mother', 'station', 'thing', 'shower', 'river', 'beach', 'information', 'kindness', 'house', 'light', 'stone'] },
-};
 // Merge items that share the same cells (e.g. "bb" and "be") so a reading quiz is never ambiguous.
 function mergeByCells(items) {
   const map = new Map();
@@ -469,13 +464,20 @@ function mergeByCells(items) {
   }
   return [...map.values()];
 }
-const SWEEP_SRC = { words: 'Words', sentences: 'Sentences', signs: 'Signs' };
-const MODES = { read: 'Read', write: 'Write', words: 'Words', sweep: 'Sweep' };
+const SWEEP_SRC = { words: 'Words', phrases: 'Phrases', numbers: 'Numbers', signs: 'Signs' };
+// Mode keys stay as they were (URLs, saved progress); only the names changed.
+const MODES = { read: 'Guess', write: 'Draw', words: 'Type', sweep: 'Read' };
+// A shuffled deck: every item comes up once before any repeats.
+function deck(list) {
+  let d = [];
+  return () => { if (!d.length) d = shuffle(list); return d.pop(); };
+}
+const WORD_LEN = { short: ['Short', (w) => w.length >= 2 && w.length <= 4], medium: ['Medium', (w) => w.length >= 5 && w.length <= 7], long: ['Long', (w) => w.length >= 8] };
 const HELP = {
   read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
-  words: ['Decode the word and type it. It checks as you type.', 'Hint reveals one cell at a time. Skip shows the answer.'],
-  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'The cell under your finger is shaded, and its letter appears once you’ve passed it.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
+  words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
+  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
 const HELP_KEYS = {
   read: 'Press 1, 2, 3 or 4 to pick an answer.',
@@ -498,7 +500,7 @@ views.practice = (q, sub) => {
 
 function quizMode(mode, q) {
   const saved = store.get('psel', { cat: 'letters', set: 'aj' });
-  const state = { cat: q.get('cat') || saved.cat, set: q.get('set') || saved.set, wset: store.get('pwset', 'simple'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
+  const state = { cat: q.get('cat') || saved.cat, set: q.get('set') || saved.set, wgrade: store.get('pwgrade', 1), wlen: store.get('pwlen', 'medium'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
   if (!CATS[state.cat]) state.cat = 'letters';
   if (!CATS[state.cat].sets[state.set]) state.set = Object.keys(CATS[state.cat].sets)[0];
   const m = mastery();
@@ -521,9 +523,12 @@ function quizMode(mode, q) {
     if (d < 0) { const ms = store.get('misses', {}); ms[pre + k] = (ms[pre + k] || 0) + 1; store.set('misses', ms); }
   };
 
+  let wordDeck = null;
   function renderPicker() {
     if (mode === 'words') {
-      picker.innerHTML = radios('wset', Object.entries(WORD_SETS).map(([k, s]) => [k, s.name]), state.wset);
+      if (!WORD_LEN[state.wlen]) state.wlen = 'medium';
+      picker.innerHTML = '<div class="sw-row">' + radios('wgrade', [[1, 'Grade 1'], [2, 'Grade 2']], state.wgrade) + '</div><div class="sw-row">' + radios('wlen', Object.entries(WORD_LEN).map(([k, [n]]) => [k, n]), state.wlen) + '</div>';
+      wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[state.wlen][1]));
     } else {
       picker.innerHTML = radios('cat', Object.entries(CATS).map(([k, c]) => [k, c.name]), state.cat) + '<div id="setDD"></div>';
       if (state.cat === 'review') return;
@@ -532,7 +537,8 @@ function quizMode(mode, q) {
   }
   const saveSel = () => store.set('psel', { cat: state.cat, set: state.set });
   bindRadios(picker, (k, v) => {
-    if (k === 'wset') { state.wset = v; store.set('pwset', v); next(); return; }
+    if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); next(); return; }
+    if (k === 'wlen') { state.wlen = v; store.set('pwlen', v); wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[v][1])); next(); return; }
     state.cat = v; state.set = Object.keys(CATS[v].sets)[0]; saveSel(); renderPicker(); restart();
   });
   function restart() { state.last = null; renderMastery(); next(); }
@@ -631,12 +637,10 @@ function quizMode(mode, q) {
   }
 
   function renderWords() {
-    const ws = WORD_SETS[state.wset];
-    let word = pick(ws.list);
-    if (state.last === word) word = pick(ws.list);
+    const word = wordDeck();
     state.last = word; state.firstTry = true;
     stage.classList.remove('glow-good', 'glow-bad');
-    const cells = toCells(translate(word, 'en', ws.grade));
+    const cells = toCells(translate(word, 'en', state.wgrade));
     let shown = 0, done = false;
     const cellsHTML = cells.map((c) => `<span class="bw">${cellHTML(c.cell)}<span class="lbl"></span></span>`).join('');
     // Keep the same input between words so the phone keyboard stays open.
@@ -679,8 +683,10 @@ function quizMode(mode, q) {
 // ---------- sweep ----------
 function sweepMode(q) {
   let src = q.get('src') || store.get('swSrc', 'words');
+  if (src === 'sentences') src = 'phrases';
   if (!SWEEP_SRC[src]) src = 'words';
-  $('#picker').innerHTML = radios('src', Object.entries(SWEEP_SRC), src);
+  $('#picker').innerHTML = `<div class="sw-row">${radios('src', Object.entries(SWEEP_SRC), src)}</div>
+    <div class="sw-row">${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>`;
   $('#modeBody').innerHTML = `
     <div class="sweep-box" id="box" tabindex="0" aria-label="Braille line. Arrow keys move cell by cell.">
       <div class="edge left"></div><div class="edge right"></div>
@@ -691,24 +697,25 @@ function sweepMode(q) {
         <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>
-    <div class="sweep-settings" id="swSet">
-      <div class="sw-opts"><div><span>Braille</span>${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}</div>
-        <div><span>Cell size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div></div>
-    </div>`;
-  bindRadios($('#picker'), (k, v) => { src = v; store.set('swSrc', v); text = textFor(); build(); });
-  bindRadios($('#swSet'), (k, v) => setS(k, k === 'swGrade' ? Number(v) : v));
+`;
+  bindRadios($('#picker'), (k, v) => {
+    if (k === 'src') { src = v; store.set('swSrc', v); text = textFor(); build(); return; }
+    setS(k, k === 'swGrade' ? Number(v) : v);
+  });
   const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
   let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
   let curIdx = -1, raf = 0, edgeRaf = 0, active = false;
 
+  const nextWord = deck(COMMON_WORDS.slice(0, 3000)), nextPhrase = deck(PHRASES);
   const textFor = () => {
-    if (src === 'words') return shuffle(WORDS).slice(0, 8).join(' ');
-    if (src === 'sentences') return pick(SENTENCES);
-    return shuffle(SIGN_WORDS).slice(0, 6).join(' ');
+    if (src === 'words') return Array.from({ length: 7 }, nextWord).join(' ');
+    if (src === 'phrases') return nextPhrase();
+    if (src === 'numbers') return numberLine();
+    return [signLine(), signLine(), signLine()].join(', ');
   };
   let text = textFor();
   function build() {
-    const grade = src === 'signs' ? 2 : S.swGrade;
+    const grade = S.swGrade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
       ? `<div class="sc space" data-i="${i}"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`
@@ -755,11 +762,11 @@ function sweepMode(q) {
     let idx = -1;
     for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
     $$('.sc', track).forEach((el, i) => el.classList.toggle('passed', lefts[i] + widths[i] < pos));
-    // From the middle of the current cell, its letter fades in blurred and sharpens by the cell's right edge.
+    // The current cell's letter fades in with a strong ease-in: barely visible at first, mostly appearing near the cell's right edge.
     if (idx !== curIdx && curIdx >= 0 && track.children[curIdx]) { const l = $('.lbl', track.children[curIdx]); if (l) l.style.cssText = ''; }
     if (idx >= 0 && cells[idx].kind !== 'space') {
       const l = $('.lbl', track.children[idx]), f = (pos - lefts[idx]) / widths[idx];
-      if (l) l.style.cssText = f < 0.5 ? '' : `opacity:1;filter:blur(${((1 - f) / 0.5 * 6).toFixed(2)}px)`;
+      if (l) l.style.opacity = Math.pow(Math.max(0, Math.min(1, f)), 4).toFixed(3);
     }
     if (idx !== curIdx) {
       $$('.sc.cur', track).forEach((e) => e.classList.remove('cur'));
@@ -967,7 +974,7 @@ function overviewSection() {
       <p>See <a href="#/reference/numbers">Numbers &amp; symbols</a> for these signs.</p>`],
     ['ov-grades', 'Grade 1 and Grade 2', `<p><b>Grade 1</b> spells every letter. <b>Grade 2</b> adds about 180 contractions, like ${cellHTML('⠮', 'sm')} for “the”, so text takes far less space. Most books and public signs in Canada use Grade 2. Learners usually start with Grade 1, then add contractions a few at a time.</p>
       <p>See <a href="#/reference/grade2">Grade 2</a> for every contraction.</p>`],
-    ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Sweep</a>.</p>
+    ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Practice › Read</a>.</p>
       <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. <a href="#/practice/write">Write</a> uses the same six-key idea.</p>`],
     ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), Canadian bank notes, ATMs, transit handrails and many product labels. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
     ['ov-learn', 'Learning it as a sighted person', `<p>Most sighted learners start by reading braille <b>by sight</b>, which is what this site teaches. It’s a great way to understand signs, help a blind friend or family member, or begin training as a teacher or transcriber. Reading by touch takes much longer, because your fingertips need months of practice to tell the dots apart.</p>
@@ -1258,19 +1265,77 @@ searchPanel.addEventListener('click', (e) => {
 $('#searchBtn').onclick = () => (searchBar.hidden ? openSearch() : closeSearch());
 
 // ---------- translate ----------
+// ---------- braille to text: every sign that a run of cells could be ----------
+let BR_INDEX = null;
+function brailleIndex() {
+  if (BR_INDEX) return BR_INDEX;
+  const m = new Map();
+  const add = (cells, text, kind) => {
+    if (!cells) return;
+    const a = m.get(cells) || [];
+    if (!a.some((x) => x.text === text || (x.kind === kind && kind !== 'letter'))) a.push({ text, kind });
+    m.set(cells, a);
+  };
+  Object.entries(LETTERS).forEach(([l, c]) => add(c, l, 'letter'));
+  Object.entries(CONTRACTIONS).forEach(([cat, g]) => g.items.forEach(([t, d]) => add(cellsOf(d), t, cat.toLowerCase().replace(/s$/, ''))));
+  Object.entries(UEB_PUNCT).forEach(([ch, v]) => v && add(v[0], ch, v[1]));
+  INDICATORS.forEach(([name, d]) => add(cellsOf(d), '', name));
+  return (BR_INDEX = m);
+}
+const DIGIT_OF_CELL = Object.fromEntries('abcdefghij'.split('').map((l, i) => [LETTERS[l], String((i + 1) % 10)]));
+// All ways to read a row of cells (blank cell = space), most compact first.
+function readBraille(cells) {
+  const idx = brailleIndex(), out = [];
+  const go = (i, toks, cap) => {
+    if (out.length >= 60) return;
+    if (i >= cells.length) { out.push(toks); return; }
+    if (cells[i] === '⠀') { go(i + 1, [...toks, { text: ' ', kind: 'space', cells: '⠀' }], 0); return; }
+    if (cells[i] === IND.number) {
+      let j = i + 1, d = '';
+      while (j < cells.length && DIGIT_OF_CELL[cells[j]]) d += DIGIT_OF_CELL[cells[j++]];
+      if (d) { go(j, [...toks, { text: d, kind: 'number', cells: cells.slice(i, j) }], 0); }
+    }
+    for (let L = Math.min(4, cells.length - i); L >= 1; L--) {
+      const c = cells.slice(i, i + L);
+      if (c.includes('⠀')) continue;
+      for (const e of idx.get(c) || []) {
+        if (e.kind === 'capital letter') { go(i + L, [...toks, { text: '', kind: e.kind, cells: c }], 1); continue; }
+        if (e.kind === 'capital word') { go(i + L, [...toks, { text: '', kind: e.kind, cells: c }], 2); continue; }
+        if (!e.text) { if (L === cells.length) go(i + L, [...toks, { text: '', kind: e.kind, cells: c }], cap); continue; }
+        const t = cap === 2 ? e.text.toUpperCase() : cap === 1 ? e.text[0].toUpperCase() + e.text.slice(1) : e.text;
+        go(i + L, [...toks, { text: t, kind: e.kind, cells: c }], cap === 2 ? 2 : 0);
+      }
+    }
+  };
+  go(0, [], 0);
+  const seen = new Set();
+  return out.sort((a, b) => a.length - b.length).filter((r) => { const k = r.map((t) => t.text + '|' + t.kind).join('/'); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
 views.translate = (q) => {
   const LOPTS = [['en1', 'English (Grade 1)', 'English'], ['en2', 'English (Grade 2)', 'English'], ['fr', 'Français', 'Other languages'], ['es', 'Español', 'Other languages'], ['de', 'Deutsch', 'Other languages'], ['ru', 'Русский', 'Other languages'], ['el', 'Ελληνικά', 'Other languages']];
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
   setSub('<div id="langDD" class="dd-strong"></div><div id="exDD" class="dd-right"></div>');
+  let dir = store.get('trDir', 'text');
   view.innerHTML = `
-    <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
-    <div class="card tr-out" id="trOut"></div>
-    <div class="tr-tools">
-      <button class="btn" id="trCopy">Copy braille</button>
+    <div class="tr-dir">${radios('trDir', [['text', 'Text to braille'], ['dots', 'Braille to text']], dir)}</div>
+    <div id="trText">
+      <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
+      <div class="card tr-out" id="trOut"></div>
+      <div class="tr-tools">
+        <button class="btn" id="trCopy">Copy braille</button>
+      </div>
+      <p class="muted small">Grade 2 follows the main UEB contraction rules but is simplified — a learning aid, not a transcription tool. Other languages are uncontracted.</p>
     </div>
-    <p class="muted small">Grade 2 follows the main UEB contraction rules but is simplified — a learning aid, not a transcription tool. Other languages are uncontracted.</p>`;
+    <div id="trDots"></div>`;
+  const showDir = () => {
+    $('#trText').hidden = dir !== 'text'; $('#trDots').hidden = dir !== 'dots';
+    $('#langDD').style.visibility = $('#exDD').style.visibility = dir === 'text' ? '' : 'hidden';
+    if (dir === 'dots') dotsEditor($('#trDots'));
+  };
+  bindRadios($('.tr-dir'), (k, v) => { dir = v; store.set('trDir', v); showDir(); });
   const inp = $('#trIn');
   const render = () => {
     const [lang, grade] = mode.startsWith('en') ? ['en', Number(mode[2])] : [mode, 1];
@@ -1286,8 +1351,62 @@ views.translate = (q) => {
   };
   inp.oninput = render;
   $('#trCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#trOut').dataset.uni); $('#trCopy').textContent = 'Copied ✓'; setTimeout(() => ($('#trCopy').textContent = 'Copy braille'), 1400); } catch {} };
-  syncDD(); render();
+  syncDD(); render(); showDir();
+  const onKey = (e) => { if (dir === 'dots' && dotsKey) dotsKey(e); };
+  document.addEventListener('keydown', onKey);
+  return () => document.removeEventListener('keydown', onKey);
 };
+
+// Braille to text: tap dots across one or more cells; every possible reading is listed.
+let dotsKey = null;
+function dotsEditor(root) {
+  let cells = store.get('trDots', [[5], [1, 2, 4]]);
+  if (!Array.isArray(cells) || !cells.length) cells = [[]];
+  let cur = cells.length - 1;
+  const uni = (d) => (d.length ? fromDots(d.slice().sort().join('')) : '⠀');
+  const save = () => store.set('trDots', cells);
+  const POS = [1, 4, 2, 5, 3, 6];
+  function draw() {
+    root.innerHTML = `
+      <div class="tb-row" id="tbRow">${cells.map((d, i) => `<div class="tb-cell ${i === cur ? 'cur' : ''}" data-c="${i}">${POS.map((n) => `<button type="button" class="tb-dot ${d.includes(n) ? 'on' : ''}" data-n="${n}" aria-label="Cell ${i + 1}, dot ${n}" aria-pressed="${d.includes(n)}"></button>`).join('')}</div>`).join('')}
+        <button type="button" class="tb-add" id="tbAdd" aria-label="Add a cell">+</button></div>
+      <div class="tb-tools"><button class="link-btn pillish" id="tbDel">Remove cell</button><button class="link-btn pillish" id="tbClear">Clear</button></div>
+      <div id="tbOut" class="tb-out"></div>`;
+    $('#tbRow', root).onclick = (e) => {
+      const add = e.target.closest('#tbAdd');
+      if (add) { cells.push([]); cur = cells.length - 1; save(); draw(); return; }
+      const cell = e.target.closest('.tb-cell'); if (!cell) return;
+      cur = Number(cell.dataset.c);
+      const b = e.target.closest('.tb-dot');
+      if (b) { const n = Number(b.dataset.n), d = cells[cur]; cells[cur] = d.includes(n) ? d.filter((x) => x !== n) : [...d, n]; save(); }
+      draw();
+    };
+    $('#tbDel', root).onclick = () => { if (cells.length > 1) { cells.splice(cur, 1); cur = Math.min(cur, cells.length - 1); } else cells = [[]]; save(); draw(); };
+    $('#tbClear', root).onclick = () => { cells = [[]]; cur = 0; save(); draw(); };
+    results();
+  }
+  function results() {
+    const str = cells.map(uni).join('').replace(/⠀+$/, '');
+    const out = $('#tbOut', root);
+    if (!str.replace(/⠀/g, '')) { out.innerHTML = '<p class="muted">Tap dots to build one or more cells. Leave a cell empty for a space.</p>'; return; }
+    const reads = readBraille(str);
+    if (!reads.length) { out.innerHTML = `<p class="muted">No known reading for this. Check the dots, or try it as separate cells.</p>`; return; }
+    const shown = reads.slice(0, 8);
+    out.innerHTML = `<h3 class="tb-h">${reads.length > 1 ? 'Possible readings' : 'Reading'}</h3>
+      <ol class="tb-list">${shown.map((r) => `<li><b>${esc(r.map((t) => t.text).join('') || r.map((t) => t.kind).join(' + '))}</b>
+        <span>${r.filter((t) => t.kind !== 'space').map((t) => `<span class="tb-tok"><span class="tb-c">${[...t.cells].map((c) => cellHTML(c, 'xs')).join('')}</span>${t.text ? `<i>${esc(t.text)}</i>` : ''} ${esc(t.kind)}</span>`).join('')}</span></li>`).join('')}</ol>
+      ${reads.length > shown.length ? `<p class="muted small">and ${reads.length - shown.length} less likely readings.</p>` : ''}`;
+  }
+  const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
+  dotsKey = (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;
+    const n = KEYS[e.key.toLowerCase()];
+    if (n) { const d = cells[cur]; cells[cur] = d.includes(n) ? d.filter((x) => x !== n) : [...d, n]; save(); draw(); }
+    else if (e.key === ' ') { e.preventDefault(); cells.splice(cur + 1, 0, []); cur++; save(); draw(); }
+    else if (e.key === 'Backspace') { if (cells[cur].length) cells[cur] = []; else if (cells.length > 1) { cells.splice(cur, 1); cur = Math.max(0, cur - 1); } save(); draw(); }
+  };
+  draw();
+}
 
 // ---------- Title Case for headings ----------
 const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'per', 'the', 'to', 'vs', 'with']);
@@ -1308,13 +1427,19 @@ let tcQueued = false;
 new MutationObserver(() => { if (tcQueued) return; tcQueued = true; requestAnimationFrame(() => { tcQueued = false; applyTitleCase(); }); }).observe(document.body, { childList: true, subtree: true });
 
 // ---------- on-screen keyboard: size content to the visible area ----------
-if (window.visualViewport) {
+// On Android the page itself resizes with the keyboard, so the viewport alone can't tell; on a touch screen,
+// a focused text field means the keyboard is up.
+{
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|range|color|file)$/.test(a.type))); };
   const vv = window.visualViewport;
   const onVV = () => {
-    document.documentElement.style.setProperty('--vvh', vv.height + 'px');
-    document.body.classList.toggle('kb-open', vv.height < window.innerHeight * 0.78);
+    if (vv) document.documentElement.style.setProperty('--vvh', vv.height + 'px');
+    document.body.classList.toggle('kb-open', (touch && typing()) || (!!vv && vv.height < window.innerHeight * 0.78));
   };
-  vv.addEventListener('resize', onVV); onVV();
+  if (vv) vv.addEventListener('resize', onVV);
+  document.addEventListener('focusin', onVV); document.addEventListener('focusout', () => setTimeout(onVV, 50));
+  onVV();
 }
 
 // ---------- router ----------
