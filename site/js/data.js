@@ -1,5 +1,5 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=28';
+import { cellsOf } from './braille.js?v=29';
 
 export const SIGN_WORDS = [
   'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',

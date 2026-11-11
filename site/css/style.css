@@ -1590,3 +1590,20 @@ body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; b
 .ag-input .g-typed { flex: 1; min-width: 0; margin: 0; justify-content: flex-start; }
 .rain-field { height: clamp(220px, calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - 330px), 520px); }
 .game-rain .g-typed { margin-top: 10px; }
+
+/* v21: tighter game layouts */
+.g-bar:has(.ta-bar) { grid-template-columns: auto 1fr auto; }
+.g-bar .c:has(.ta-bar) { justify-self: stretch; display: flex; align-items: center; padding: 0 8px; }
+.g-bar .ta-bar { flex: 1; margin: 0; min-width: 60px; }
+.g-card.ta { position: relative; }
+.rain-typed { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 1; font-size: 1.3rem; letter-spacing: .08em; color: var(--ink); pointer-events: none; min-height: 1.4em; }
+.rain-typed.empty { display: none; }
+.rain-field { height: clamp(240px, calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - 280px), 540px); }
+.game-agent .ag-prog { margin: 0 2px 10px; }
+.ag-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ag-top .ag-title { margin: 0; }
+.ag-top #hint { padding: 5px 12px; font-size: .85rem; flex: none; }
+.ag-msg { --sw-bg: color-mix(in srgb, var(--surface) 65%, var(--surface-2)); background: var(--sw-bg); border: 1px solid var(--line); box-shadow: inset 0 0 14px rgba(40, 28, 16, .1); }
+:root[data-theme="dark"] .ag-msg { box-shadow: inset 0 0 16px rgba(0, 0, 0, .4); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ag-msg { box-shadow: inset 0 0 16px rgba(0, 0, 0, .4); } }
+.ag-w.cur .ag-l { color: var(--accent); font-weight: 500; }

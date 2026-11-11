@@ -1,10 +1,10 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=28';
-import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=28';
-import { WORDS } from './data.js?v=28';
-import { SNOWMAN_WORDS } from './snowman.js?v=28';
-import { AGENT_CASES } from './agentcases.js?v=28';
-import { COMMON_WORDS } from './wordlist.js?v=28';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=29';
+import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=29';
+import { WORDS } from './data.js?v=29';
+import { SNOWMAN_WORDS } from './snowman.js?v=29';
+import { AGENT_CASES } from './agentcases.js?v=29';
+import { COMMON_WORDS } from './wordlist.js?v=29';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -254,8 +254,9 @@ function rain(el, level) {
   const shortWords = WORDS.filter((w) => w.length <= 5);
   el.innerHTML = `${statBar('Level <b id="lv">1</b>', '<span class="lives" id="lives"></span>', scoreBest('rain.' + level))}
     <div class="rain-field card" id="field"><div class="g-overlay" id="ov"><button class="btn primary" id="go">Start</button><small>Type each letter before it lands.</small></div></div>
-    <div class="g-typed" id="typed" data-ph="Tap the letters"></div><div id="kb"></div>`;
+    <div id="kb"></div>`;
   const field = $('#field', el);
+  field.insertAdjacentHTML('beforeend', '<div class="rain-typed" id="typed" aria-live="polite"></div>');
   const inp = letterPad({ display: $('#typed', el), mount: $('#kb', el), onInput: () => check() });
   let items = [], raf = 0, last = 0, spawnT = 0, sc = 0, lives = 3, lv = 1, running = false;
   const H = () => field.clientHeight;
@@ -318,11 +319,9 @@ function timeAttack(el, level) {
   const pool = level === 'easy' ? [...AJ] : level === 'medium' ? [...AZ] : [...AZ, ...'0123456789'];
   const cellsOf = (x) => (/\d/.test(x) ? IND.number + LETTERS['jabcdefghi'[Number(x)]] : LETTERS[x]);
   const incl = { easy: 'the letters a to j.', medium: 'all 26 letters.', hard: 'all 26 letters and the digits 0 to 9, each with the number sign.' }[level];
-  el.innerHTML = `${statBar('<b id="tl">60</b> s', '', scoreBest('time.' + level))}
-    <div class="ta-bar"><i id="bar"></i></div>
-    <div class="card g-card ta" id="card"><div class="g-overlay" id="ov">${startScreen('Type what each braille cell says, as fast as you can. You have 60 seconds.', incl)}</div><div class="prompt-cells" id="cells"></div></div>
-    <div id="kb"></div>
-    <div class="g-actions"><button class="btn ghost" id="skip">Skip</button></div>`;
+  el.innerHTML = `${statBar('<b id="tl">60</b> s', '<div class="ta-bar"><i id="bar"></i></div>', scoreBest('time.' + level))}
+    <div class="card g-card ta" id="card"><button class="btn g-corner" id="skip">Skip</button><div class="g-overlay" id="ov">${startScreen('Type what each braille cell says, as fast as you can. You have 60 seconds.', incl)}</div><div class="prompt-cells" id="cells"></div></div>
+    <div id="kb"></div>`;
   const card = $('#card', el);
   const inp = letterPad({ mount: $('#kb', el), digits: level === 'hard', onInput: () => check() });
   let cur, sc = 0, end = 0, raf = 0, running = false;
@@ -382,20 +381,21 @@ function agent(el, level, ctx) {
     const words = m.msg.split(' ');
     let wi = 0;
     const hints = words.map(() => 0);
-    el.innerHTML = `<div class="card g-card ag">
-        <div class="ag-prog"><span>Mission ${mi + 1} of ${N}${m.grade === 2 ? ' · Grade 2' : ''}</span><span class="bar"><i style="width:${(mi / N) * 100}%"></i></span></div>
-        <b class="ag-title">${esc(m.title)}</b>
+    el.innerHTML = `<div class="ag-prog"><span>Mission ${mi + 1} of ${N}${m.grade === 2 ? ' · Grade 2' : ''}</span><span class="bar"><i style="width:${(mi / N) * 100}%"></i></span></div>
+      <div class="card g-card ag">
+        <div class="ag-top"><b class="ag-title">${esc(m.title)}</b><button class="btn ghost small-btn" id="hint">Hint</button></div>
         <p class="ag-brief">${esc(m.brief)}</p>
         <div class="ag-msg" id="msg">${words.map((w, i) => `<span class="ag-w" data-i="${i}">${line(w, { grade: m.grade })}<span class="ag-l"></span></span>`).join('')}</div>
-        <div class="ag-input"><div class="g-typed" id="typed" data-ph="Type the highlighted word"></div><button class="btn ghost" id="hint">Hint</button></div>
         <p class="ag-after" id="after" hidden></p>
       </div>
       <div id="kb"></div>
       <div class="g-actions"><button class="btn primary" id="nextM" hidden>${mi + 1 < N ? 'Next mission' : 'Close the case'}</button></div>`;
     const card = $('.ag', el);
     if (pad) pad.off();
-    const inp = pad = letterPad({ display: $('#typed', el), mount: $('#kb', el), digits: /\d/.test(m.msg),
-      onInput: () => { if (wi < words.length && norm(inp.value) === norm(words[wi])) solveWord(); },
+    // What you type appears under the highlighted word (after any hint letters).
+    const showTyped = () => { if (wi >= words.length) return; const t = words[wi].replace(/[^A-Za-z0-9]/g, ''); const h = t.slice(0, hints[wi]); $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = inp.value ? inp.value : h ? h + '…' : ''; };
+    const inp = pad = letterPad({ mount: $('#kb', el), digits: /\d/.test(m.msg),
+      onInput: () => { if (wi < words.length && norm(inp.value) === norm(words[wi])) solveWord(); else showTyped(); },
       onEnter: () => { if (inp.value.trim() && wi < words.length) glow(card, false); } });
     const mark = () => {
       $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
@@ -410,7 +410,7 @@ function agent(el, level, ctx) {
         glow(card, true); inp.disabled = true; $('#hint', el).disabled = true; $('#kb', el).hidden = true;
         $('#after', el).hidden = false; $('#after', el).textContent = m.after;
         store.set('agent.p.' + ci, mi + 1); pickCase();
-        $('.ag-prog .bar i', el).style.width = ((mi + 1) / N) * 100 + '%';
+        $('.ag-prog .bar i', el).style.width = ((mi + 1) / N) * 100 + '%'; $('.ag-prog span', el).textContent = `Mission ${mi + 1} of ${N} · solved`;
         $('#nextM', el).hidden = false;
       }
     };
@@ -418,7 +418,7 @@ function agent(el, level, ctx) {
       if (wi >= words.length) return;
       const target = words[wi].replace(/[^A-Za-z0-9]/g, '');
       hints[wi] = Math.min(target.length, hints[wi] + 1);
-      $(`.ag-w[data-i="${wi}"] .ag-l`, el).textContent = target.slice(0, hints[wi]) + '…';
+      showTyped();
     };
     $('#nextM', el).onclick = render;
     mark();
@@ -558,8 +558,7 @@ function mirror(el, level) {
   const HARD = [...'defhijrwstnzkoumxy', ...Object.keys(SIGN)];
   const cellFor = (x) => (SIGN[x] ? fromDotsLocal(SIGN[x]) : LETTERS[x]);
   const near = (a, b) => { const A = new Set(toDots(cellFor(a))), B = toDots(cellFor(b)); const same = B.filter((d) => A.has(d)).length; return same - Math.abs(A.size - B.length); };
-  el.innerHTML = `${statBar('Streak <b id="st">0</b>', '', scoreBest('mirror.' + level))}
-    <div class="ta-bar"><i id="bar"></i></div>
+  el.innerHTML = `${statBar('Streak <b id="st">0</b>', '<div class="ta-bar"><i id="bar"></i></div>', scoreBest('mirror.' + level))}
     <div class="card g-card mm" id="card"><div class="g-overlay" id="ov">${startScreen('Pick the letter each cell shows. Take your time on each one; you have 30 seconds in all.', cfg.incl)}</div><div class="prompt-cells" id="cells"></div><div class="choices" id="opts"></div></div>`;
   const card = $('#card', el);
   let target, sc = 0, st = 0, end = 0, raf = 0, running = false;
