@@ -1,14 +1,14 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=36';
+} from './braille.js?v=37';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=36';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=36';
-import { COMMON_WORDS } from './wordlist.js?v=36';
-import { G2_EXAMPLES } from './g2examples.js?v=36';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=36';
+} from './data.js?v=37';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=37';
+import { COMMON_WORDS } from './wordlist.js?v=37';
+import { G2_EXAMPLES } from './g2examples.js?v=37';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=37';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -686,7 +686,7 @@ function quizMode(mode, q) {
     // Contractions are colour coded like everywhere else; cells stay one size so nothing jumps around.
     const cellsHTML = cells.map((c, i) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1)}</span>`).join('');
     stage.innerHTML = `
-      <div class="w-top"><button class="btn small-btn" id="hint">Hint</button><button class="btn small-btn" id="skip">Skip</button></div>
+      <div class="w-top"><button class="link-btn pillish" id="hint">Hint</button><button class="link-btn pillish" id="skip">Skip</button></div>
       <div class="prompt-cells words many" id="wcells">${cellsHTML}</div>`;
     const lbls = $$('#wcells .lbl');
     const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');

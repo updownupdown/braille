@@ -1,12 +1,12 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=36';
-import { TRIVIA as TRIVIA_1, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=36';
-import { TRIVIA_MORE } from './trivia2.js?v=36';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=37';
+import { TRIVIA as TRIVIA_1, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=37';
+import { TRIVIA_MORE } from './trivia2.js?v=37';
 const TRIVIA = Object.fromEntries(Object.entries(TRIVIA_1).map(([k, v]) => [k, [...v, ...(TRIVIA_MORE[k] || [])]]));
-import { WORDS } from './data.js?v=36';
-import { SNOWMAN_WORDS } from './snowman.js?v=36';
-import { AGENT_CASES } from './agentcases.js?v=36';
-import { COMMON_WORDS } from './wordlist.js?v=36';
+import { WORDS } from './data.js?v=37';
+import { SNOWMAN_WORDS } from './snowman.js?v=37';
+import { AGENT_CASES } from './agentcases.js?v=37';
+import { COMMON_WORDS } from './wordlist.js?v=37';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -287,8 +287,8 @@ function riddles(el, level, ctx) {
   const solved = new Set(store.get(key, []));
   el.dataset.k = 'riddles';
   const tally = () => { const s = $('#qslot', el); if (s) s.innerHTML = `<span class="g-solved">Solved <b>${solved.size}</b> of ${items.length}</span>`; };
-  // Riddles never show print under the cells; Easy has three choices instead of four.
-  const stop = quiz(el, level, { labels: false, print: false, choices: level === 'easy' ? 3 : 4,
+  // Easy has three choices instead of four.
+  const stop = quiz(el, level, { choices: level === 'easy' ? 3 : 4,
     onAnswer: (item, ok) => { if (ok && !solved.has(item.q)) { solved.add(item.q); store.set(key, [...solved]); tally(); } },
     next: () => {
       // Riddles not yet solved at this level come first.
@@ -800,6 +800,6 @@ export const GAMES = {
   trivia: { name: 'Trivia', icon: 'help', range: 'Easy–Hard', desc: '1,000 questions on ten topics, with answers in braille', levels: LV3, run: trivia,
     help: ['Read the question, then pick the answer. The answers are written in braille.', 'Easy shows print under the cells, Medium is braille only, Hard uses Grade 2 contractions.', 'Rounds are ten questions. Choose a topic or play them all.'] },
   riddles: { name: 'Riddles', icon: 'bulb', range: 'Easy–Hard', desc: 'Over 100 riddles; pick the answer written in braille', levels: LV3, run: riddles,
-    help: ['Read the riddle, then pick the answer. The answers are written in braille only.', 'Easy has three choices, Medium four, and Hard uses Grade 2 contractions.'] },
+    help: ['Read the riddle, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Easy has three choices and shows letters under the cells. Medium has four, and Hard uses Grade 2 contractions.'] },
 };
 export const gameStore = store;
