@@ -1689,3 +1689,93 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 }
 @media (max-width: 360px) { .plate .cell { --s: 6px; } }
 @media (max-width: 380px) { .ref-back ~ #secDD .dd-lead { display: none !important; } .ref-back { width: 28px; } .ref-back ~ #secDD { min-width: 0; flex: 0 1 auto; } .ref-back ~ #secDD .dd-btn { max-width: 100%; } .ref-back ~ #secDD .dd-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } .subbar:has(.ref-back) { gap: 6px; } }
+
+/* v35: polish round */
+/* games list */
+.g-tiles.hrows .hrow:last-child { border-bottom: 1px solid var(--line); }
+.g-tiles .hrow-ic { width: 55px; height: 55px; border-radius: 16px; }
+/* stats row: an empty left slot takes no room */
+.g-bar:has(> .l:empty) { grid-template-columns: 1fr auto; }
+.g-bar > .l:empty { display: none; }
+.g-bar:has(> .l:empty) .c:has(.ta-bar) { padding-left: 0; }
+/* start screens: Includes under Start */
+.g-overlay .g-incl { margin-top: 2px; }
+/* Secret Agent: letters under each cell */
+.ag-w .lbl { font-size: .95rem; color: var(--ink-2); min-height: 1.25em; }
+.ag-w.cur .lbl { color: var(--accent); font-weight: 500; }
+.ag-w.done .lbl { color: var(--good); font-weight: 500; }
+.ag-w .lbl .bad, .stage .lbl .bad { color: var(--bad); }
+/* Maze */
+.mz-card .mz-target { margin: -10px 0 2px; }
+.mz-new { position: relative; overflow: hidden; isolation: isolate; }
+.mz-new .fill { position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--accent) 22%, transparent); transform: scaleX(0); transform-origin: left; }
+.mz-new.filling .fill { animation: mzfill 3s linear forwards; }
+@keyframes mzfill { to { transform: scaleX(1); } }
+/* quizzes */
+.quiz .quiz-q { margin-bottom: 10px; }
+.quiz-print { display: block; visibility: hidden; }
+.quiz.revealed .quiz-print { visibility: visible; }
+.g-solved { font-size: .92rem; color: var(--muted); }
+.g-solved b { color: var(--ink); font-weight: 600; }
+/* settings resets */
+.reset-list { display: grid; gap: 10px; margin-top: 10px; }
+.reset-list .reset-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reset-list .reset-row span { display: grid; gap: 2px; }
+.reset-list .reset-row small { color: var(--muted); font-size: .8rem; }
+.reset-list .reset-row .btn { flex: none; min-width: 92px; justify-content: center; }
+/* home: tally text only */
+.hprog .bar { display: none; }
+/* Learn tables: one cells column per table */
+.ctable.cw .crow, .ctable.narrow.cw .crow { grid-template-columns: var(--cw) minmax(0, 1fr) auto; }
+/* Grade 2 */
+.practise-row { display: flex; justify-content: flex-start; margin: 12px 0 4px; }
+.practise-btn { background: transparent; border: 1.5px solid var(--accent); color: var(--accent); gap: 4px; }
+.practise-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); text-decoration: none; }
+.crow b .pre { color: var(--muted); opacity: .6; font-weight: 400; margin-right: 1px; }
+.crow.has-ex .ex-tog { grid-column: 3; grid-row: 1; align-self: center; justify-self: end; background: none; border: 0; padding: 4px 2px; font: inherit; font-size: .8rem; color: var(--muted); cursor: pointer; }
+.crow.has-ex .ex-tog.open { color: var(--accent); }
+.crow-ex { grid-column: 1 / -1; display: grid; gap: 8px; margin: 10px 0 4px; }
+.crow-ex[hidden] { display: none; }
+.g2ex { display: grid; grid-template-columns: 22px auto minmax(0, 1fr); align-items: center; column-gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.g2ex-mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+.g2ex.ok .g2ex-mark { color: #fff; background: var(--good); }
+.g2ex.no { border-color: color-mix(in srgb, #c97a1a 45%, var(--line)); background: color-mix(in srgb, #c97a1a 7%, var(--surface)); }
+.g2ex.no .g2ex-mark { color: #c97a1a; border-radius: 0; }
+.g2ex-t { display: grid; gap: 1px; min-width: 0; }
+.g2ex-t b { font-weight: 600; }
+.g2ex.no .g2ex-t b { color: #b76a10; }
+.g2ex-t small { color: var(--muted); font-size: .8rem; }
+.g2ex-b .braille-line { flex-wrap: nowrap; }
+.g2-compare { padding: 0; overflow: hidden; }
+.g2c-scroll { overflow-x: auto; padding: 14px 16px; scrollbar-width: thin; }
+.g2c-grid { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content; column-gap: 14px; row-gap: 10px; align-items: end; width: max-content; }
+.g2-compare .g2c-k { display: grid; gap: 0; color: var(--muted); font-size: .78rem; line-height: 1.2; position: sticky; left: -16px; background: var(--surface); padding: 0 8px 4px 0; margin: 0; z-index: 1; align-self: stretch; align-content: end; }
+.g2c-k span { color: var(--ink-2); }
+.g2c-w .braille-line { flex-wrap: nowrap; }
+/* Translate: Clear all in the header */
+.subbar .tr-clear { margin-left: auto; }
+/* Practice: Type */
+.w-top { display: flex; justify-content: space-between; gap: 10px; width: 100%; margin-bottom: 8px; }
+.w-top .small-btn { padding: 5px 12px; font-size: .85rem; }
+.mode-words #wkb { margin-top: 12px; }
+.mode-words .stage .prompt-cells.words .lbl { min-height: 1.2em; }
+.mode-words .stage .prompt-cells.words .lbl:empty { min-height: 1.2em; }
+/* Practice: Read box centred in the space below the toggles */
+.practice-wrap.mode-sweep { display: flex; flex-direction: column; min-height: calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - env(safe-area-inset-bottom) - 22px); }
+.practice-wrap.mode-sweep #modeBody { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+/* Practice: Guess and Draw known count + pills */
+.mastery-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .92rem; color: var(--muted); }
+.mastery-h b { color: var(--ink); font-weight: 600; }
+.m-more { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); width: 34px; height: 30px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.m-more .ic { transition: transform .2s; }
+.m-more.open .ic { transform: rotate(180deg); }
+.mastery { position: relative; }
+.mastery.clamp { max-height: calc(28px * 4 + 4px * 3); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); mask-image: linear-gradient(to bottom, #000 62%, transparent); }
+/* Practice: Draw, one pad per cell */
+.pads { display: flex; gap: 12px; justify-content: center; flex-wrap: nowrap; }
+.pads .dotpad { transition: border-color .2s, background .2s; }
+.pads .dotpad.ok { border-color: color-mix(in srgb, var(--good) 60%, var(--line)); background: color-mix(in srgb, var(--good) 8%, var(--bg)); }
+.pads .dotpad.bad { animation: padbad .8s ease-out; }
+@keyframes padbad { 0%, 40% { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--bg)); } 100% { border-color: var(--line); } }
+.pads:not([style*="--n:1"]) .dotpad { --b: min(53px, calc((min(100vw, 720px) - 72px) / var(--n) / 2.75)); grid-template-columns: repeat(2, var(--b)); grid-template-rows: repeat(3, var(--b)); gap: calc(var(--b) * .19); padding: calc(var(--b) * .26); }
+.m-more[hidden] { display: none; }

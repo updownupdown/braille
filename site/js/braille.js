@@ -94,8 +94,8 @@ export const CONTRACTIONS = {
   'Lower groupsigns': {
     blurb: 'Cells using only the lower four dots. Position in the word matters.',
     items: [
-      ['ea', '2', 'inside a word only · tea'], ['bb', '23', 'inside only · rabbit'], ['cc', '25', 'inside only · accept'],
-      ['ff', '235', 'inside only · coffee'], ['gg', '2356', 'inside only · egg'], ['en', '26', 'anywhere in a word · ten'],
+      ['ea', '2', 'inside a word only · team'], ['bb', '23', 'inside only · rabbit'], ['cc', '25', 'inside only · accept'],
+      ['ff', '235', 'inside only · muffin'], ['gg', '2356', 'inside only · bigger'], ['en', '26', 'anywhere in a word · ten'],
       ['in', '35', 'anywhere in a word · pin'],
       ['be', '23', 'first syllable only · begin'], ['con', '25', 'first syllable only · concert'], ['dis', '256', 'first syllable only · dislike'],
     ],

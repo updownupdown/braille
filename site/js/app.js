@@ -1,13 +1,14 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=34';
+} from './braille.js?v=35';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=34';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=34';
-import { COMMON_WORDS } from './wordlist.js?v=34';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=34';
+} from './data.js?v=35';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=35';
+import { COMMON_WORDS } from './wordlist.js?v=35';
+import { G2_EXAMPLES } from './g2examples.js?v=35';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=35';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -35,6 +36,7 @@ const P = {
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   check: '<path d="m5 12 5 5 9-10"/>',
+  warn: '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/>',
   arrow: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   alpha: '<path d="M3 19 8 5l5 14"/><path d="M5 14h6"/><path d="M15 11.5c.5-1 1.4-1.5 2.5-1.5 1.7 0 2.5 1 2.5 2.6V19"/><path d="M20 15.2c-.6-.5-1.5-.7-2.5-.7-1.5 0-2.7.8-2.7 2.2s1 2.3 2.4 2.3c1.3 0 2.3-.7 2.8-1.6"/>',
@@ -118,12 +120,19 @@ function kindOf(c) {
 }
 const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, cls, { kind })).join('');
 // Compact row: cells · label · dot numbers · note (a button when it opens a detail sheet).
-function crowHTML(cells, label, { kind = '', note = '', i = null, added = null } = {}) {
+function crowHTML(cells, label, { kind = '', note = '', i = null, added = null, pre = '', ex = '' } = {}) {
   const tag = 'div';
-  return `<${tag} class="crow"><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span><span class="cnote">${esc(note)}</span></${tag}>`;
+  return `<${tag} class="crow${ex ? ' has-ex' : ''}"><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${pre ? `<span class="pre">${esc(pre)}</span>` : ''}${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span>${ex ? '<button type="button" class="ex-tog" aria-expanded="false">Examples</button>' : ''}<span class="cnote">${esc(note)}</span>${ex ? `<div class="crow-ex" hidden>${ex}</div>` : ''}</${tag}>`;
 }
 // Tables holding any multi-cell symbol collapse to one column sooner, so every row in a section lines up.
-function markMulti(root = document) { $$('.ctable', root).forEach((t) => t.classList.toggle('multi', !!t.querySelector('.cells .cell + .cell'))); }
+function markMulti(root = document) {
+  $$('.ctable', root).forEach((t) => {
+    const multi = !!t.querySelector('.cells .cell + .cell');
+    t.classList.toggle('multi', multi);
+    // Rows with one, two or three cells share one cells column, so the names line up down the table.
+    if (multi) { const w = Math.max(...$$('.crow .cells', t).map((c) => c.scrollWidth)); if (w > 0) { t.style.setProperty('--cw', w + 'px'); t.classList.add('cw'); } }
+  });
+}
 // Labelled groups: "cells:label cells:label _ cells:label" (_ = space)
 function groupsHTML(spec, cls = 'md', fixedKind = '') {
   return `<div class="braille-line groups">${spec.split(' ').map((g) => {
@@ -211,15 +220,19 @@ const COLOR_KEY = [['letter', 'Letters (Grade 1)'], ['digit', 'Numbers'], ['cont
 function openSettings() {
   const pv = (mode) => `<span class="cell pv-${mode}" aria-hidden="true">${[1, 2, 3, 4, 5, 6].map((d) => `<i class="${[1, 4, 5].includes(d) ? 'on' : ''}"></i>`).join('')}</span>`;
   openSheet(`<div class="settings">
-    <div class="set-group"><h3>General</h3>
+    <div class="set-group">
       <div class="set-row stack"><span>Appearance</span>${radios('theme', [['auto', `${icon('auto', 18)}Auto`], ['light', `${icon('sun', 18)}Light`], ['dark', `${icon('moon', 18)}Dark`]], S.theme)}</div>
       <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
       <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
     <div class="set-group"><h3>Your data</h3>
-      <p class="set-note">Resetting clears everything this site has saved on this device: practice progress, the daily review, game scores and levels, and these settings.</p>
-      <div class="row reset-row"><button class="btn" id="resetAll">Reset everything</button><button class="btn ghost" id="resetCancel" hidden>Cancel</button></div>
+      <p class="set-note">Everything is saved on this device only. Each reset asks you to tap again to confirm.</p>
+      <div class="reset-list">
+        <div class="reset-row" data-r="games"><span><b>Game progress</b><small>Scores, bests, levels, solved riddles and Secret Agent cases</small></span><button class="btn" type="button">Reset</button></div>
+        <div class="reset-row" data-r="learn"><span><b>Learning progress</b><small>Practice, the daily review and finished lessons</small></span><button class="btn" type="button">Reset</button></div>
+        <div class="reset-row" data-r="all"><span><b>Everything</b><small>All of the above, plus these settings</small></span><button class="btn" type="button">Reset</button></div>
+      </div>
     </div>
     <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p>
       <a class="gh-link" href="https://github.com/updownupdown/braille" target="_blank" rel="noopener">${icon('github', 16)} Source code on GitHub</a></div>
@@ -228,19 +241,22 @@ function openSettings() {
     if (k === 'color') { setS('color', v === '1'); $('.color-key', sheet).classList.toggle('off', v !== '1'); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
-  // Three taps to reset, with a way out.
-  let taps = 0;
-  const btn = $('#resetAll'), cancel = $('#resetCancel');
-  const label = ['Reset everything', 'Tap 2 more times to confirm', 'Tap once more to erase everything'];
-  const set = () => { btn.textContent = label[taps]; btn.classList.toggle('danger', taps > 0); cancel.hidden = taps === 0; };
-  btn.onclick = () => {
-    taps++;
-    if (taps < 3) { set(); return; }
-    try { Object.keys(localStorage).filter((k) => k.startsWith('dots.')).forEach((k) => localStorage.removeItem(k)); } catch {}
-    btn.textContent = 'Everything reset ✓'; cancel.hidden = true; btn.disabled = true;
-    setTimeout(() => location.reload(), 700);
+  // Each reset needs a second tap; it goes back to normal after a few seconds if left alone.
+  const WHICH = {
+    games: (k) => k.startsWith('dots.g.'),
+    learn: (k) => k.startsWith('dots.') && !k.startsWith('dots.g.') && k !== 'dots.settings',
+    all: (k) => k.startsWith('dots.'),
   };
-  cancel.onclick = () => { taps = 0; set(); };
+  $$('.reset-row', sheet).forEach((row) => {
+    const btn = $('button', row); let armed = 0;
+    btn.onclick = () => {
+      if (!armed) { btn.textContent = 'Tap to confirm'; btn.classList.add('danger'); armed = setTimeout(() => { armed = 0; btn.textContent = 'Reset'; btn.classList.remove('danger'); }, 4000); return; }
+      clearTimeout(armed);
+      try { Object.keys(localStorage).filter(WHICH[row.dataset.r]).forEach((k) => localStorage.removeItem(k)); } catch {}
+      btn.textContent = 'Done ✓'; btn.disabled = true; btn.classList.remove('danger');
+      setTimeout(() => location.reload(), 700);
+    };
+  });
 }
 
 // ---------- letter + symbol details ----------
@@ -367,7 +383,7 @@ views[''] = () => {
   const isNew = !seen.length && !pVisited && !played.length;
   const card = (href, k, t, d, go = false) => `<a class="hcard ${go ? 'go' : ''}" href="${href}"><span class="k">${k}</span><b>${t}</b><span class="d">${d}</span></a>`;
   const tile = (href, t, ic, cls = '') => `<a class="hl" href="${href}"><span class="hl-ic ${cls}">${icon(ic, 22)}</span><span class="hl-t">${t}</span>${icon('right', 18)}</a>`;
-  const head = (ic, t, href, prog) => `<div class="hsec-h"><h2 class="sec-h">${icon(ic, 26)} ${t}</h2><a href="${href}">See all</a></div>${prog ? `<div class="hprog"><span class="bar"><i style="width:${Math.round(prog[0] * 100)}%"></i></span><span>${prog[1]}</span></div>` : ''}`;
+  const head = (ic, t, href, prog) => `<div class="hsec-h"><h2 class="sec-h">${icon(ic, 26)} ${t}</h2><a href="${href}">See all</a></div>${prog ? `<div class="hprog"><span>${prog[1]}</span></div>` : ''}`;
   const carousel = (items) => `<div class="hlist">${items.join('')}</div>`;
 
   // Learn
@@ -521,10 +537,9 @@ function quizMode(mode, q) {
   const m = mastery();
   const picker = $('#picker'), body = $('#modeBody');
   body.innerHTML = `<div class="card stage" id="stage"></div>
-    ${mode === 'words' ? '' : `<div class="below-stage">
+    ${mode === 'words' ? '<div id="wkb"></div>' : `<div class="below-stage">
+      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery"></div>
-      <div class="stats-row"><div class="stats"><span>Streak <b id="sStreak">0</b></span><span>Correct <b id="sRight">0</b>/<b id="sTotal">0</b></span></div>
-      <span class="legend" title="Learning → known"><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i><small>known</small></span></div>
     </div>`}`;
   const stage = $('#stage');
   const items = () => {
@@ -557,10 +572,25 @@ function quizMode(mode, q) {
     state.cat = v; state.set = Object.keys(CATS[v].sets)[0]; saveSel(); renderPicker(); restart();
   });
   function restart() { state.last = null; renderMastery(); next(); }
+  // Pills for every symbol in the set, collapsed to four rows with a fade; the chevron only shows when there is more.
+  let mOpen = store.get('mOpen', false);
   function renderMastery() {
     if (mode === 'words') return;
-    $('#mastery').innerHTML = items().map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
+    const it = items(), box = $('#mastery');
+    box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
+    $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length; $('#kTotal').textContent = it.length;
+    fitMastery(); requestAnimationFrame(fitMastery);
   }
+  function fitMastery() {
+    const box = $('#mastery'), more = $('#mMore'); if (!box || !more) return;
+    box.classList.remove('clamp');
+    const first = box.firstElementChild;
+    const fits = !first || !first.offsetHeight || box.scrollHeight <= first.offsetHeight * 4 + 4 * 3 + 2;
+    more.hidden = fits;
+    box.classList.toggle('clamp', !fits && !mOpen);
+    more.setAttribute('aria-expanded', String(!fits && mOpen)); more.classList.toggle('open', mOpen);
+  }
+  if (mode !== 'words') $('#mMore').onclick = () => { mOpen = !mOpen; store.set('mOpen', mOpen); renderMastery(); };
   function nextItem() {
     const it = items();
     let pool = it.filter((x) => !state.last || x.key !== state.last.key);
@@ -578,7 +608,6 @@ function quizMode(mode, q) {
     }
     state.firstTry = false;
     if (mode === 'words') return;
-    $('#sStreak').textContent = state.streak; $('#sRight').textContent = state.right; $('#sTotal').textContent = state.total;
     renderMastery();
   }
   // Feedback is a coloured glow on the card (plus a shake when wrong).
@@ -615,40 +644,37 @@ function quizMode(mode, q) {
     const item = nextItem(); state.last = item; state.firstTry = true;
     stage.classList.remove('glow-good', 'glow-bad');
     const targets = [...item.cells];
-    let ci = 0, done = false;
-    const on = new Set();
+    let done = false, shown = false;
+    const on = targets.map(() => new Set()), ok = targets.map(() => false);
+    // Several cells sit side by side at full size; each one turns faintly green when it's right.
     stage.innerHTML = `
       <div class="target">${esc(item.answer)}</div>
-      ${targets.length > 1 ? `<div class="build" id="build">${targets.map(() => '<span class="slot"></span>').join('')}</div>` : ''}
-      <div class="dotpad" id="pad">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="dot ${d}">${d}</button>`).join('')}</div>
+      <div class="pads" style="--n:${targets.length}">${targets.map((_, ci) => `<div class="dotpad" data-c="${ci}">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="${targets.length > 1 ? `Cell ${ci + 1}, ` : ''}dot ${d}">${d}</button>`).join('')}</div>`).join('')}</div>
       <button class="link-btn corner" id="skip">Show me</button>`;
-    const pad = $('#pad');
-    const want = () => new Set(toDots(targets[ci]));
-    const paint = () => [1, 2, 3, 4, 5, 6].forEach((d) => $(`[data-d="${d}"]`, pad).classList.toggle('on', on.has(d)));
-    const markSlots = () => $$('#build .slot').forEach((s, i) => { s.innerHTML = i < ci ? cellHTML(targets[i], 'sm') : ''; s.classList.toggle('cur', i === ci); });
-    markSlots();
-    const evaluate = (added) => {
+    const pads = $$('.dotpad', stage);
+    const paint = (ci) => { [1, 2, 3, 4, 5, 6].forEach((d) => $(`[data-d="${d}"]`, pads[ci]).classList.toggle('on', on[ci].has(d))); pads[ci].classList.toggle('ok', ok[ci]); };
+    const evaluate = (ci, added) => {
       if (done) return;
-      const w = want();
-      if (added && !w.has(added)) { result(false, item); glow(false); return; }
-      if (on.size === w.size && [...w].every((d) => on.has(d))) {
-        ci++;
-        if (ci >= targets.length) { done = true; markSlots(); result(true, item); glow(true); setTimeout(next, 750); }
-        else { on.clear(); setTimeout(() => { paint(); markSlots(); }, 180); }
-      }
+      const w = new Set(toDots(targets[ci]));
+      if (added && !w.has(added)) { result(false, item); glow(false); pads[ci].classList.remove('bad'); void pads[ci].offsetWidth; pads[ci].classList.add('bad'); }
+      ok[ci] = on[ci].size === w.size && [...w].every((d) => on[ci].has(d)); paint(ci);
+      // After "Show me", stay three times as long so the answer can sink in.
+      if (ok.every(Boolean)) { done = true; result(true, item); glow(true); setTimeout(next, shown ? 2250 : 750); }
     };
-    const tog = (d) => {
+    const tog = (ci, d) => {
       if (done) return;
-      if (on.has(d)) { on.delete(d); paint(); evaluate(0); } else { on.add(d); paint(); evaluate(d); }
+      if (on[ci].has(d)) { on[ci].delete(d); paint(ci); evaluate(ci, 0); } else { on[ci].add(d); paint(ci); evaluate(ci, d); }
     };
-    pad.onclick = (e) => { const b = e.target.closest('button'); if (b) tog(Number(b.dataset.d)); };
+    stage.querySelector('.pads').onclick = (e) => { const b = e.target.closest('button[data-d]'); if (b) tog(Number(b.closest('.dotpad').dataset.c), Number(b.dataset.d)); };
     $('#skip').onclick = () => {
       if (done) return;
       if (state.firstTry) result(false, item);
-      on.clear(); toDots(targets[ci]).forEach((d) => on.add(d)); paint(); evaluate(0);
+      shown = true;
+      targets.forEach((t, ci) => { on[ci] = new Set(toDots(t)); });
+      targets.forEach((t, ci) => evaluate(ci, 0));
     };
     const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
-    state.key = (e) => { if (KEYS[e.key.toLowerCase()]) tog(KEYS[e.key.toLowerCase()]); };
+    state.key = (e) => { const d = KEYS[e.key.toLowerCase()]; if (!d) return; const ci = Math.max(0, ok.indexOf(false)); tog(ci, d); };
   }
 
   function renderWords() {
@@ -656,33 +682,33 @@ function quizMode(mode, q) {
     state.last = word; state.firstTry = true;
     stage.classList.remove('glow-good', 'glow-bad');
     const cells = toCells(translate(word, 'en', state.wgrade));
-    let shown = 0, done = false;
+    let done = false, hinting = false;
     // Contractions are colour coded like everywhere else; cells stay one size so nothing jumps around.
     const cellsHTML = cells.map((c, i) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1)}</span>`).join('');
-    // Keep the same input between words so the phone keyboard stays open.
-    if ($('#ans', stage) && $('#wcells', stage)) {
-      $('#wcells', stage).innerHTML = cellsHTML;
-      $('#ans', stage).value = '';
-    } else {
-      stage.innerHTML = `
-      <div class="prompt-cells words many" id="wcells">${cellsHTML}</div>
-      <div class="w-row"><button class="btn ghost" id="hint">Hint</button><input class="answer-input" id="ans" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type the word"><button class="btn ghost" id="skip">Skip</button></div>`;
-      // Tapping Hint or Skip shouldn't take focus away from the input (and close the keyboard).
-      $$('#hint, #skip', stage).forEach((b) => b.addEventListener('pointerdown', (e) => { if (document.activeElement === $('#ans', stage)) e.preventDefault(); }));
-    }
-    const ans = $('#ans');
-    if (matchMedia('(pointer: fine)').matches) ans.focus();
+    stage.innerHTML = `
+      <div class="w-top"><button class="btn small-btn" id="hint">Hint</button><button class="btn small-btn" id="skip">Skip</button></div>
+      <div class="prompt-cells words many" id="wcells">${cellsHTML}</div>`;
     const lbls = $$('#wcells .lbl');
-    const reveal = (n) => cells.slice(0, n).forEach((c, i) => { lbls[i].textContent = c.idx === 0 ? c.print || '·' : ''; });
-    ans.oninput = () => {
+    const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const check = () => {
       if (done) return;
-      if (ans.value.trim().toLowerCase() === word) { done = true; result(true, {}); glow(true); reveal(cells.length); setTimeout(next, 900); }
+      if (wpad.value === target) { done = true; result(true, {}); glow(true); paintTyped(lbls, cells, '', true); setTimeout(next, 900); }
+      else paintTyped(lbls, cells, wpad.value);
     };
-    ans.onkeydown = (e) => { if (e.key === 'Enter' && !done && ans.value.trim()) { result(false, {}); glow(false); } };
-    $('#hint').onclick = () => { state.firstTry = false; shown = Math.min(cells.length, shown + 1); reveal(shown); };
-    $('#skip').onclick = () => { done = true; reveal(cells.length); ans.value = word; setTimeout(next, 1300); };
+    wOnInput = () => { if (!hinting) check(); };
+    wOnEnter = () => { if (!done && wpad.value) { result(false, {}); glow(false); } };
+    wpad.value = ''; check();
+    $('#hint').onclick = () => {
+      if (done || hinting) return;
+      state.firstTry = false; hinting = true;
+      typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paintTyped(lbls, cells, wpad.value); }, () => done || state.last !== word);
+    };
+    $('#skip').onclick = () => { if (done) return; done = true; paintTyped(lbls, cells, '', true); setTimeout(next, 1300); };
     state.key = null;
   }
+  // Type mode: one on-screen keyboard for the whole session; each word plugs in its own handlers.
+  let wOnInput = () => {}, wOnEnter = () => {};
+  const wpad = mode === 'words' ? letterPad({ mount: $('#wkb'), onInput: () => wOnInput(), onEnter: () => wOnEnter() }) : null;
   let dead = false;
   function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
   const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; state.key && state.key(e); };
@@ -691,8 +717,9 @@ function quizMode(mode, q) {
   };
   document.addEventListener('keydown', onKey);
   window.addEventListener('settings', onSet);
+  window.addEventListener('resize', fitMastery);
   renderPicker(); renderMastery(); next();
-  return () => { dead = true; document.removeEventListener('keydown', onKey); window.removeEventListener('settings', onSet); };
+  return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); window.removeEventListener('settings', onSet); window.removeEventListener('resize', fitMastery); };
 }
 
 // ---------- sweep ----------
@@ -936,30 +963,51 @@ const G2_USE = { 'Alphabetic wordsigns': 'whole word', 'Strong contractions': 'w
 const G2_START = ['and', 'for', 'of', 'the', 'with', 'but', 'can', 'do', 'it', 'that', 'you', 'ing', 'st', 'sh', 'th', 'ch', 'er', 'ed'];
 function grade2Section() {
   const cats = Object.entries(CONTRACTIONS);
-  const row = (e, i) => {
-    const note = e.cat === 'Shortforms' ? (SHORT_SPELL[e.print] || '') : (e.note || (G2_EXAMPLE[e.print] ? 'e.g. ' + G2_EXAMPLE[e.print] : ''));
-    return crowHTML(e.cells, e.print, { kind: 'contraction', note });
+  // Examples for a sign: two right uses (green tick) and, where it helps, one place it doesn't apply (orange warning).
+  const exOf = (e) => G2_EXAMPLES[e.print + '|' + e.cat] || G2_EXAMPLES[e.print];
+  // be-, con- and dis- aren't produced by the translator, so those examples carry their braille; label the first cell with the prefix.
+  const fixedParts = (t, uni, pre) => {
+    const rest = t.slice(pre.length), cells = [...uni].slice(1), tr = translate(rest, 'en', 2);
+    const same = tr.map((x) => x.cells).join('') === cells.join('');
+    return [{ cells: [...uni][0], print: pre, kind: 'contraction' }, ...(same ? tr : [...rest].map((ch, i) => ({ cells: cells[i] || '', print: ch, kind: 'letter' })))];
   };
+  const exHTML = (x, pre = '') => !x ? '' : [...x.ok.map((t, i) => [t, 'ok', '', x.okBraille && x.okBraille[i]]), ...(x.no ? [[x.no.text, 'no', x.no.note]] : [])].map(([t, k, n, uni]) => `<div class="g2ex ${k}"><span class="g2ex-mark" aria-label="${k === 'ok' ? 'Correct use' : 'Not this sign'}">${k === 'ok' ? icon('check', 16) : icon('warn', 16)}</span><span class="g2ex-b">${lineHTML(uni ? fixedParts(t, uni, pre) : translate(t, 'en', 2), { cls: 'sm' })}</span><span class="g2ex-t"><b>${esc(t)}</b>${n ? `<small>${esc(n)}</small>` : ''}</span></div>`).join('');
+  // These three only ever follow other letters, so a pale hyphen goes in front.
+  const PRE = { ound: '-', ance: '-', sion: '-' };
+  const row = (e, i) => {
+    const x = exOf(e);
+    const note = e.cat === 'Shortforms' ? (SHORT_SPELL[e.print] || '') : (e.note || (!x && G2_EXAMPLE[e.print] ? 'e.g. ' + G2_EXAMPLE[e.print] : ''));
+    return crowHTML(e.cells, e.print, { kind: 'contraction', note, pre: e.cat === 'Final-letter groupsigns' ? PRE[e.print] || '' : '', ex: exHTML(x, e.print) });
+  };
+  const practiseBtn = (href, t = 'Practise these') => `<div class="practise-row"><a class="btn practise-btn" href="${href}">${t} ${icon('right', 16)}</a></div>`;
   const sample = 'The children went to the park with their father.';
   const g1 = unicodeOf(translate(sample, 'en', 1)).replace(/ /g, '').length;
   const g2 = unicodeOf(translate(sample, 'en', 2)).replace(/ /g, '').length;
+  // Word by word, so each Grade 2 word sits under its Grade 1 version and the saving shows as a gap.
+  const sWords = sample.split(' ');
   const html = `
     <p class="lead-p">Grade 2 uses about 180 contractions to make braille shorter. Most books and public signs in Canada use it. Many cells mean different things alone versus inside a word, so each table notes where a sign may go.</p>
-    <div class="g2-compare">
-      <div><small>Grade 1 · ${g1} cells</small>${lineHTML(translate(sample, 'en', 1), { cls: 'sm' })}</div>
-      <div><small>Grade 2 · ${g2} cells</small>${lineHTML(translate(sample, 'en', 2), { cls: 'sm' })}</div>
-    </div>
-    <div class="group-title"><h3>Start with these</h3><span>The most frequent signs. Learn a few at a time.</span>${practiseLink('#/practice/read?cat=contractions&set=start')}</div>
-    <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: G2_USE[DICT[i].cat] || DICT[i].cat }); }).join('')}</div>
+    <div class="g2-compare"><div class="g2c-scroll"><div class="g2c-grid">
+      <small class="g2c-k">Grade 1<span>${g1} cells</span></small><small class="g2c-k">Grade 2<span>${g2} cells</span></small>
+      ${sWords.map((w) => `<div class="g2c-w">${lineHTML(translate(w, 'en', 1), { cls: 'sm' })}</div><div class="g2c-w">${lineHTML(translate(w, 'en', 2), { cls: 'sm' })}</div>`).join('')}
+    </div></div></div>
+    <div class="group-title"><h3>Start with these</h3><span>The most frequent signs. Learn a few at a time.</span></div>
+    <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: G2_USE[DICT[i].cat] || DICT[i].cat }); }).join('')}</div>${practiseBtn('#/practice/read?cat=contractions&set=start')}
     <div class="group-title g2-all"><h3>All contractions</h3><span>Tap a group to open it.</span><button class="gt-link" id="g2Toggle" type="button">Open all</button></div>
     <div class="g2-groups">${cats.map(([cat, { blurb }], ci) => `<details class="g2-group" id="g2-${ci}"><summary><span class="g2-t"><h3>${esc(cat)}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><small>${esc(blurb)}</small></span>${icon('chevron', 20)}</summary>
-      <div class="g2-body">${practiseLink(`#/practice/read?cat=contractions&set=k${ci}`)}<div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div></details>`).join('')}</div>
+      <div class="g2-body"><div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div>${practiseBtn(`#/practice/read?cat=contractions&set=k${ci}`)}</div></details>`).join('')}</div>
     ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
   const bind = () => {
     const all = () => $$('.g2-group'), btn = $('#g2Toggle');
     const sync = () => { btn.textContent = all().every((d) => d.open) ? 'Close all' : 'Open all'; };
     btn.onclick = () => { const open = !all().every((d) => d.open); all().forEach((d) => { d.open = open; }); sync(); };
     all().forEach((d) => d.addEventListener('toggle', sync));
+    if (!view.dataset.exBound) view.addEventListener('click', (e) => {
+      const t = e.target.closest('.ex-tog'); if (!t) return;
+      const p = $('.crow-ex', t.closest('.crow')); const open = p.hidden;
+      p.hidden = !open; t.setAttribute('aria-expanded', String(open)); t.classList.toggle('open', open);
+    });
+    view.dataset.exBound = '1';
   };
   return { html, bind, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
 }
@@ -1186,7 +1234,7 @@ function quizQuestions(key) {
   if (key === 'numbers') return shuffle([...fromItems(CATS.symbols.sets.num[1](), 2), ...fromItems(CATS.symbols.sets.punct[1](), 2), ...fromItems(CATS.symbols.sets.ind[1](), 1)]);
   return fromItems(CATS.contractions.sets.start[1](), QUIZ_LEN);
 }
-const quizHTML = (key) => `<div class="sg lq-wrap" id="check"><div class="group-title"><h3>Check yourself${lessonsDone().includes(key) ? '<span class="count lq-done">Done</span>' : ''}</h3><span>${QUIZ_LEN} quick questions. Get ${QUIZ_PASS} right to complete this lesson.</span></div><div class="card lq" id="lq"></div></div>`;
+const quizHTML = (key) => `<div class="sg lq-wrap" id="check"><div class="group-title"><h3>Test Yourself${lessonsDone().includes(key) ? '<span class="count lq-done">Done</span>' : ''}</h3><span>${QUIZ_LEN} quick questions. Get ${QUIZ_PASS} right to complete this lesson.</span></div><div class="card lq" id="lq"></div></div>`;
 function bindQuiz(key) {
   const box = $('#lq'); if (!box) return;
   let qs, n, right, first;
@@ -1246,7 +1294,7 @@ views.reference = (q, sub, sub2) => {
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
   const lesson = isLesson(key);
-  if (lesson) sec.jumps = [...(sec.jumps || []), { value: 'check', label: 'Check yourself' }];
+  if (lesson) sec.jumps = [...(sec.jumps || []), { value: 'check', label: 'Test Yourself' }];
   setTitle('Learn');
   setSub(`<a class="back-link ref-back" href="#/reference" aria-label="All Learn sections">${icon('right', 18)}</a><div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
   dropdown($('#secDD'), { lead: 'book', options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t, group: isLesson(k) ? 'Lessons' : 'Reference' })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
@@ -1267,7 +1315,7 @@ views.games = (q, sub) => {
   const g = GAMES[sub];
   if (!g) {
     setTitle('Games'); setSub('');
-    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div><span class="hrow-ic gc-${k}">${icon(x.icon, 26)}</span></a>`; };
+    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div><span class="hrow-ic gc-${k}">${icon(x.icon, 31)}</span></a>`; };
     view.innerHTML = `<p class="lead-p g-intro">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
       ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${t}</h2><div class="hrows g-tiles">${ks.map(row).join('')}</div>`).join('')}`;
     return;
@@ -1435,7 +1483,7 @@ views.translate = (q) => {
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
   let dir = store.get('trDir', 'text');
-  setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${dirIcon(v)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div>`);
+  setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${dirIcon(v)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div><button type="button" class="btn small-btn tr-clear" id="trClear" hidden>Clear all</button>`);
   view.innerHTML = `
     <div id="trText">
       <div class="tr-ex" id="exDD"></div>
@@ -1449,10 +1497,11 @@ views.translate = (q) => {
     <div id="trDots"></div>`;
   const showDir = () => {
     $('#trText').hidden = dir !== 'text'; $('#trDots').hidden = dir !== 'dots';
-    $('#langDD').hidden = dir !== 'text';
+    $('#langDD').hidden = dir !== 'text'; $('#trClear').hidden = dir !== 'dots';
     if (dir === 'dots') dotsEditor($('#trDots'));
   };
   bindRadios($('.tr-dir'), (k, v) => { dir = v; store.set('trDir', v); showDir(); });
+  $('#trClear').onclick = () => { if (dotsClear) dotsClear(); };
   const inp = $('#trIn');
   const render = () => {
     const [lang, grade] = mode.startsWith('en') ? ['en', Number(mode[2])] : [mode, 1];
@@ -1475,7 +1524,7 @@ views.translate = (q) => {
 };
 
 // Braille to text: tap dots across one or more cells; every possible reading is listed.
-let dotsKey = null;
+let dotsKey = null, dotsClear = null;
 function dotsEditor(root) {
   let cells = store.get('trDots', [[5], [1, 2, 4]]);
   if (!Array.isArray(cells) || !cells.length) cells = [[]];
@@ -1483,11 +1532,11 @@ function dotsEditor(root) {
   const uni = (d) => (d.length ? fromDots(d.slice().sort().join('')) : '⠀');
   const save = () => store.set('trDots', cells);
   const POS = [1, 4, 2, 5, 3, 6];
+  dotsClear = () => { cells = [[]]; cur = 0; save(); draw(); };
   function draw() {
     root.innerHTML = `
       <div class="tb-row" id="tbRow">${cells.map((d, i) => `<div class="tb-col"><div class="tb-cell" data-c="${i}">${POS.map((n) => `<button type="button" class="tb-dot ${d.includes(n) ? 'on' : ''}" data-n="${n}" aria-label="Cell ${i + 1}, dot ${n}" aria-pressed="${d.includes(n)}"></button>`).join('')}</div><button type="button" class="tb-del" data-del="${i}" aria-label="Remove cell ${i + 1}">${icon('trash', 18)}</button></div>`).join('')}
         <button type="button" class="tb-add" id="tbAdd"><span>+</span>Add cell</button></div>
-      <div class="tb-tools"><button class="link-btn pillish" id="tbClear">Clear all</button></div>
       <div id="tbOut" class="tb-out"></div>`;
     $('#tbRow', root).onclick = (e) => {
       const add = e.target.closest('#tbAdd');
@@ -1500,7 +1549,6 @@ function dotsEditor(root) {
       if (b) { const n = Number(b.dataset.n), d = cells[cur]; cells[cur] = d.includes(n) ? d.filter((x) => x !== n) : [...d, n]; save(); }
       draw();
     };
-    $('#tbClear', root).onclick = () => { cells = [[]]; cur = 0; save(); draw(); };
     results();
   }
   function results() {
