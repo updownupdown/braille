@@ -1,10 +1,10 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=33';
-import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=33';
-import { WORDS } from './data.js?v=33';
-import { SNOWMAN_WORDS } from './snowman.js?v=33';
-import { AGENT_CASES } from './agentcases.js?v=33';
-import { COMMON_WORDS } from './wordlist.js?v=33';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=34';
+import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=34';
+import { WORDS } from './data.js?v=34';
+import { SNOWMAN_WORDS } from './snowman.js?v=34';
+import { AGENT_CASES } from './agentcases.js?v=34';
+import { COMMON_WORDS } from './wordlist.js?v=34';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
