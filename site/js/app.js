@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=32';
+} from './braille.js?v=33';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=32';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=32';
-import { COMMON_WORDS } from './wordlist.js?v=32';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=32';
+} from './data.js?v=33';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=33';
+import { COMMON_WORDS } from './wordlist.js?v=33';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=33';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -373,16 +373,19 @@ views[''] = () => {
   // Learn
   const secs = REF_SECTIONS.filter(([k]) => k !== 'cheatsheet');
   const secName = (k) => REF_SECTIONS.find(([x]) => x === k)[1];
-  const nextSec = secs.find(([k]) => !seen.includes(k));
   const lastSec = store.get('refSec', null);
+  const doneL = lessonsDone();
+  // Up next: the first unfinished section after the one being read, wrapping round to earlier ones.
+  const li = Math.max(0, secs.findIndex(([k]) => k === lastSec));
+  const nextSec = [...secs.slice(li + 1), ...secs.slice(0, li)].find(([k]) => (isLesson(k) ? !doneL.includes(k) : !seen.includes(k)));
   let lA, lB;
   if (!seen.length) { lA = card('#/reference/overview', 'Start here', 'Overview', SEC_DESC.overview, true); lB = card('#/reference/alphabet', 'Then', 'Alphabet', 'a–j first'); }
   else {
     lA = card(`#/reference/${lastSec}`, 'Continue', secName(lastSec), SEC_DESC[lastSec]);
-    lB = nextSec ? card(`#/reference/${nextSec[0]}`, 'Up next', nextSec[1], SEC_DESC[nextSec[0]], true) : card('#/reference/cheatsheet', 'All read', 'Cheat Sheet', SEC_DESC.cheatsheet, true);
+    lB = nextSec ? card(`#/reference/${nextSec[0]}`, 'Up next', nextSec[1], SEC_DESC[nextSec[0]], true) : card('#/reference/cheatsheet', 'All done', 'Cheat Sheet', SEC_DESC.cheatsheet, true);
   }
   const lUsed = [!seen.length ? 'overview' : lastSec, !seen.length ? 'alphabet' : (nextSec ? nextSec[0] : 'cheatsheet')];
-  const learn = `${head('book', 'Learn', '#/reference', seen.length ? [Math.min(1, seen.length / secs.length), `${Math.min(seen.length, secs.length)} of ${secs.length} sections`] : null)}
+  const learn = `${head('book', 'Learn', '#/reference', seen.length ? [doneL.length / LESSONS.length, `${doneL.length} of ${LESSONS.length} lessons done`] : null)}
     <div class="hsplit">${lA}${lB}</div>
     ${carousel(REF_SECTIONS.filter(([k]) => !lUsed.includes(k)).map(([k, t]) => tile(`#/reference/${k}`, t, SEC_ICON[k])))}`;
 
@@ -948,10 +951,17 @@ function grade2Section() {
     </div>
     <div class="group-title"><h3>Start with these</h3><span>The most frequent signs. Learn a few at a time.</span>${practiseLink('#/practice/read?cat=contractions&set=start')}</div>
     <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: G2_USE[DICT[i].cat] || DICT[i].cat }); }).join('')}</div>
-    ${cats.map(([cat, { blurb }], ci) => `<div class="sg" id="g2-${ci}"><div class="group-title"><h3>${esc(cat)}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><span>${esc(blurb)}</span>${practiseLink(`#/practice/read?cat=contractions&set=k${ci}`)}</div>
-      <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div>`).join('')}
+    <div class="group-title g2-all"><h3>All contractions</h3><span>Tap a group to open it.</span><button class="gt-link" id="g2Toggle" type="button">Open all</button></div>
+    <div class="g2-groups">${cats.map(([cat, { blurb }], ci) => `<details class="g2-group" id="g2-${ci}"><summary><span class="g2-t"><h3>${esc(cat)}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><small>${esc(blurb)}</small></span>${icon('chevron', 20)}</summary>
+      <div class="g2-body">${practiseLink(`#/practice/read?cat=contractions&set=k${ci}`)}<div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div></div></details>`).join('')}</div>
     ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
-  return { html, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
+  const bind = () => {
+    const all = () => $$('.g2-group'), btn = $('#g2Toggle');
+    const sync = () => { btn.textContent = all().every((d) => d.open) ? 'Close all' : 'Open all'; };
+    btn.onclick = () => { const open = !all().every((d) => d.open); all().forEach((d) => { d.open = open; }); sync(); };
+    all().forEach((d) => d.addEventListener('toggle', sync));
+  };
+  return { html, bind, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
 }
 
 // ---------- reference ----------
@@ -1149,19 +1159,102 @@ function refSection(key, sub) {
   return { html: '' };
 }
 
+
+// ---------- Learn: lessons, reference and the end-of-lesson check ----------
+// The first four sections are lessons (read in order, each ends with a short check); the rest is look-up material.
+const LESSONS = ['overview', 'alphabet', 'numbers', 'grade2'];
+const isLesson = (k) => LESSONS.includes(k);
+const lessonsDone = () => store.get('learnDone', []).filter(isLesson);
+const QUIZ_LEN = 5, QUIZ_PASS = 4;
+const OVERVIEW_QUIZ = [
+  { q: 'How many dots can one braille cell have?', a: '6', x: ['4', '8', '12'] },
+  { q: 'Which dots run down the left side of a cell?', a: '1-2-3', x: ['4-5-6', '1-4', '2-5'] },
+  { q: 'Braille is…', a: 'a way of writing', x: ['a language', 'a typeface', 'a sign language'] },
+  { q: 'What does Grade 2 add?', a: 'Contractions', x: ['Capital letters', 'Numbers', 'Punctuation'] },
+  { q: 'Which dot is raised here?', cells: LETTERS.a, a: 'dot 1', x: ['dot 2', 'dot 4', 'dot 6'] },
+  { q: 'This cell can be b, “but” or 2. What decides?', cells: LETTERS.b, a: 'The cells around it', x: ['How big the dots are', 'Which line it is on', 'How hard it is pressed'] },
+  { q: 'Who invented braille?', a: 'Louis Braille', x: ['Charles Barbier', 'Helen Keller', 'Valentin Haüy'] },
+];
+function quizQuestions(key) {
+  const pick = (arr, n) => shuffle(arr).slice(0, n);
+  const fromItems = (items, n) => pick(items, n).map((it) => ({
+    cells: it.cells, answer: it.answer,
+    choices: shuffle([it, ...pick(items.filter((x) => x.cells !== it.cells && x.answer !== it.answer), 3)]).map((x) => ({ t: x.answer, small: x.label })),
+  }));
+  if (key === 'overview') return pick(OVERVIEW_QUIZ, QUIZ_LEN).map((o) => ({ q: o.q, cells: o.cells, answer: o.a, choices: shuffle([o.a, ...o.x]).map((t) => ({ t })) }));
+  if (key === 'alphabet') return fromItems(CATS.letters.sets.az[1](), QUIZ_LEN);
+  if (key === 'numbers') return shuffle([...fromItems(CATS.symbols.sets.num[1](), 2), ...fromItems(CATS.symbols.sets.punct[1](), 2), ...fromItems(CATS.symbols.sets.ind[1](), 1)]);
+  return fromItems(CATS.contractions.sets.start[1](), QUIZ_LEN);
+}
+const quizHTML = (key) => `<div class="sg lq-wrap" id="check"><div class="group-title"><h3>Check yourself${lessonsDone().includes(key) ? '<span class="count lq-done">Done</span>' : ''}</h3><span>${QUIZ_LEN} quick questions. Get ${QUIZ_PASS} right to complete this lesson.</span></div><div class="card lq" id="lq"></div></div>`;
+function bindQuiz(key) {
+  const box = $('#lq'); if (!box) return;
+  let qs, n, right, first;
+  const start = () => { qs = quizQuestions(key); n = 0; right = 0; show(); };
+  const pips = () => `<div class="lq-pips" aria-label="Question ${Math.min(n + 1, QUIZ_LEN)} of ${QUIZ_LEN}">${qs.map((_, i) => `<i class="${i < n ? 'past' : i === n ? 'now' : ''}"></i>`).join('')}</div>`;
+  function show() {
+    box.classList.remove('glow-good', 'glow-bad');
+    const Q = qs[n]; first = true;
+    const long = Q.choices.some((c) => c.t.length > 2 || c.small);
+    box.innerHTML = `${pips()}${Q.q ? `<p class="lq-q">${esc(Q.q)}</p>` : ''}${Q.cells ? `<div class="prompt-cells">${[...Q.cells].map((c) => cellHTML(c)).join('')}</div>` : ''}
+      <div class="choices ${long ? 'words' : ''}">${Q.choices.map((c) => `<button class="choice" data-t="${esc(c.t)}">${esc(c.t)}${c.small ? `<small>${esc(c.small)}</small>` : ''}</button>`).join('')}</div>`;
+  }
+  function finish() {
+    const pass = right >= QUIZ_PASS;
+    if (pass) { const d = store.get('learnDone', []); if (!d.includes(key)) store.set('learnDone', [...d, key]); }
+    const i = REF_SECTIONS.findIndex(([k]) => k === key), nx = REF_SECTIONS[i + 1];
+    box.classList.remove('glow-good', 'glow-bad');
+    box.innerHTML = `<div class="lq-score ${pass ? 'pass' : ''}">${pass ? icon('check', 30) : ''}<b>${right} of ${QUIZ_LEN}</b></div>
+      <p class="lq-q">${pass ? 'Lesson complete.' : `Get ${QUIZ_PASS} right to complete this lesson.`}</p>
+      <div class="row lq-row">${pass && nx ? `<a class="btn primary" href="#/reference/${nx[0]}">Next: ${nx[1]}</a>` : ''}<button class="btn ${pass ? '' : 'primary'}" id="lqAgain">Try again</button></div>`;
+    if (pass) { const h = $('#check h3'); if (h && !$('.lq-done', h)) h.insertAdjacentHTML('beforeend', '<span class="count lq-done">Done</span>'); }
+    $('#lqAgain').onclick = start;
+  }
+  box.onclick = (e) => {
+    const b = e.target.closest('.choice');
+    if (!b || b.classList.contains('right') || b.classList.contains('wrong') || $('.choice.right', box)) return;
+    const ok = b.dataset.t === qs[n].answer;
+    if (ok && first) right++;
+    first = false;
+    box.classList.remove('glow-good', 'glow-bad'); void box.offsetWidth;
+    box.classList.add(ok ? 'glow-good' : 'glow-bad');
+    b.classList.add(ok ? 'right' : 'wrong');
+    if (ok) setTimeout(() => { if (!box.isConnected) return; n++; if (n < QUIZ_LEN) show(); else finish(); }, 650);
+  };
+  start();
+}
+// Learn landing page: the lessons in order with progress, then the reference sections.
+function learnIndex() {
+  setTitle('Learn'); setSub('');
+  const done = lessonsDone();
+  const row = (k, t, n) => `<a class="hrow g-tile ${done.includes(k) ? 'li-done' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(done.includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${n ? `${n}. ` : ''}${t}</b><span>${done.includes(k) ? 'Done · ' : ''}${SEC_DESC[k]}</span></div>${icon('right', 18)}</a>`;
+  const les = REF_SECTIONS.filter(([k]) => isLesson(k)), ref = REF_SECTIONS.filter(([k]) => !isLesson(k));
+  view.innerHTML = `<h2 class="sec-h li-h">Lessons</h2>
+    <p class="lead-p li-p">Four short lessons, from the six-dot cell to contractions. Each one ends with a quick check.</p>
+    <div class="hprog li-prog"><span class="bar"><i style="width:${Math.round(done.length / les.length * 100)}%"></i></span><span>${done.length} of ${les.length} done</span></div>
+    <div class="hrows g-tiles">${les.map(([k, t], i) => row(k, t, i + 1)).join('')}</div>
+    <h2 class="sec-h">Reference</h2>
+    <p class="lead-p li-p">Look things up when you need them.</p>
+    <div class="hrows g-tiles">${ref.map(([k, t]) => row(k, t)).join('')}</div>`;
+}
+
 views.reference = (q, sub, sub2) => {
-  const key = REF_SECTIONS.find(([k]) => k === sub) ? sub : store.get('refSec', 'overview');
+  if (!REF_SECTIONS.find(([k]) => k === sub)) return learnIndex();
+  const key = sub;
   store.set('refSec', key);
   { const seen = store.get('learnSeen', []); if (!seen.includes(key)) store.set('learnSeen', [...seen, key]); }
   const i = REF_SECTIONS.findIndex(([k]) => k === key);
   const sec = refSection(key, sub2);
+  const lesson = isLesson(key);
+  if (lesson) sec.jumps = [...(sec.jumps || []), { value: 'check', label: 'Check yourself' }];
   setTitle('Learn');
-  setSub(`<div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
-  dropdown($('#secDD'), { lead: 'book', options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
-  if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
-  view.innerHTML = `${sec.html}
+  setSub(`<a class="back-link ref-back" href="#/reference" aria-label="All Learn sections">${icon('right', 18)}</a><div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
+  dropdown($('#secDD'), { lead: 'book', options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t, group: isLesson(k) ? 'Lessons' : 'Reference' })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
+  if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (!el) return; if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
+  view.innerHTML = `${sec.html}${lesson ? quizHTML(key) : ''}
       <div class="pager">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
   if (sec.bind) sec.bind();
+  if (lesson) bindQuiz(key);
   markMulti(view);
   view.onclick = (ev) => {
     const l = ev.target.closest('.letter[data-l]'); if (l) openSheet(letterDetail(l.dataset.l), { title: 'Letter ' + l.dataset.l });
