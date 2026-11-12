@@ -1144,9 +1144,10 @@ body.s-dotfill :is(.cell.ghost, .cell.blank) i:not(.on) { background: transparen
 body[data-page="games"] main { padding-bottom: 14px; }
 .game-wrap { display: flex; flex-direction: column; min-height: calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - env(safe-area-inset-bottom) - 24px); }
 .game-wrap > .game { flex: 1; display: flex; flex-direction: column; }
-.game::before { content: ''; margin-top: auto; order: -1; }
+.game::before, .game::after { content: ''; flex: 1 1 0; order: -1; }
+.game::after { order: 1; }
 .game > :is(.g-pick, .ta-bar, .ag-chips) { order: -2; }
-.game > .g-foot { order: 1; margin-top: auto; }
+.game > .g-foot { order: 2; }
 .g-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding-top: 18px; }
 .g-foot:not(:has(.g-stats)) { justify-content: center; }
 .g-foot .g-stats, .g-foot .g-actions { margin: 0; }
@@ -1640,3 +1641,9 @@ body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; b
 .mz-target b.won span { color: var(--good); }
 .ag-l .bad { color: var(--bad, #c0392b); }
 .g-tiles:last-child { margin-bottom: 42px; }
+
+/* v31: a label that covers several cells runs across them, with a line after the letters to the end of the last cell.
+   Cells sit edge to edge (no column gap), so n × the cell width is exactly the span. 18% matches the cell's side padding. */
+.lbl.span { display: flex; align-items: center; align-self: flex-start; box-sizing: border-box; width: calc(var(--n) * 100%); padding: 0 18%; text-align: left; position: relative; z-index: 1; }
+.lbl.span::after { content: ''; flex: 1 1 auto; min-width: 0; height: 1.5px; margin-left: .3em; border-radius: 1px; background: currentColor; opacity: .45; }
+.lbl.span:empty::after { display: none; }

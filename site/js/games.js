@@ -1,10 +1,10 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=31';
-import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=31';
-import { WORDS } from './data.js?v=31';
-import { SNOWMAN_WORDS } from './snowman.js?v=31';
-import { AGENT_CASES } from './agentcases.js?v=31';
-import { COMMON_WORDS } from './wordlist.js?v=31';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=32';
+import { TRIVIA, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=32';
+import { WORDS } from './data.js?v=32';
+import { SNOWMAN_WORDS } from './snowman.js?v=32';
+import { AGENT_CASES } from './agentcases.js?v=32';
+import { COMMON_WORDS } from './wordlist.js?v=32';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -30,11 +30,14 @@ function cell(c, cls = '') {
 function line(text, { grade = 1, labels = false, cls = '' } = {}) {
   let out = '', word = '';
   const flush = () => { if (word) out += `<span class="bword">${word}</span>`; word = ''; };
-  for (const c of toCells(translate(text, 'en', grade))) {
+  const list = toCells(translate(text, 'en', grade));
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
     if (c.kind === 'space') { word += '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'; flush(); continue; }
     if (c.kind === 'newline') continue;
     const l = labels && c.idx === 0 ? (c.print || '') : '';
-    word += `<span class="bw">${cell(c.cell, cls)}${labels ? `<span class="lbl">${esc(l)}</span>` : ''}</span>`;
+    let n = 1; if (c.idx === 0) while (list[i + n] && list[i + n].idx > 0 && list[i + n].kind !== 'space') n++;
+    word += `<span class="bw">${cell(c.cell, cls)}${labels ? `<span class="lbl${n > 1 ? ' span" style="--n:' + n : ''}">${esc(l)}</span>` : ''}</span>`;
   }
   flush();
   return `<span class="braille-line" role="img" aria-label="${esc(text)} in braille">${out}</span>`;

@@ -1,13 +1,13 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=31';
+} from './braille.js?v=32';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=31';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=31';
-import { COMMON_WORDS } from './wordlist.js?v=31';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=31';
+} from './data.js?v=32';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js?v=32';
+import { COMMON_WORDS } from './wordlist.js?v=32';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=32';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -93,14 +93,20 @@ function cellHTML(cell, cls = '', opts = {}) {
   return `<span class="cell ${cls}${opts.kind ? ' k-' + opts.kind : ''}" role="img" aria-label="${esc(dotsLabel(cell))}">${dots}</span>`;
 }
 const cellsHTML = (str, cls = '') => [...str].map((c) => (c === ' ' || c === '⠀' ? '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>' : cellHTML(c, cls))).join('');
+// How many cells one print label covers (a contraction like "ity" or "mother" takes two).
+const spanOf = (list, i) => { let n = 1; while (list[i + n] && list[i + n].idx > 0 && list[i + n].kind !== 'space' && list[i + n].kind !== 'newline') n++; return n; };
+// Label element; when it covers several cells it stretches across them with a line after the letters.
+const lblTag = (n, text = '') => `<span class="lbl${n > 1 ? ' span" style="--n:' + n : ''}">${text}</span>`;
 function lineHTML(parts, { labels = true, cls = '' } = {}) {
   let out = '', word = '';
   const flush = () => { if (word) out += `<span class="bword">${word}</span>`; word = ''; };
-  for (const c of toCells(parts)) {
+  const list = toCells(parts);
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
     if (c.kind === 'newline') { flush(); out += '<span class="bw-break"></span>'; continue; }
     if (c.kind === 'space') { word += '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'; flush(); continue; }
     const lbl = c.idx === 0 ? (c.print || (c.kind === 'indicator' ? '·' : '')) : '';
-    word += `<span class="bw kind-${c.kind}" title="${esc((c.group.print || '') + ' ' + (c.note || ''))}">${cellHTML(c.cell, cls, { kind: kindOf(c) })}${labels ? `<span class="lbl">${esc(lbl)}</span>` : ''}</span>`;
+    word += `<span class="bw kind-${c.kind}" title="${esc((c.group.print || '') + ' ' + (c.note || ''))}">${cellHTML(c.cell, cls, { kind: kindOf(c) })}${labels ? lblTag(c.idx === 0 ? spanOf(list, i) : 1, esc(lbl)) : ''}</span>`;
   }
   flush();
   return `<div class="braille-line">${out}</div>`;
@@ -649,7 +655,7 @@ function quizMode(mode, q) {
     const cells = toCells(translate(word, 'en', state.wgrade));
     let shown = 0, done = false;
     // Contractions are colour coded like everywhere else; cells stay one size so nothing jumps around.
-    const cellsHTML = cells.map((c) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}<span class="lbl"></span></span>`).join('');
+    const cellsHTML = cells.map((c, i) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1)}</span>`).join('');
     // Keep the same input between words so the phone keyboard stays open.
     if ($('#ans', stage) && $('#wcells', stage)) {
       $('#wcells', stage).innerHTML = cellsHTML;
@@ -725,7 +731,7 @@ function sweepMode(q) {
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
       ? `<div class="sc space" data-i="${i}"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`
-      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}<span class="lbl">${esc(c.idx === 0 ? (c.print || '·') : '')}</span></div>`).join('');
+      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1, esc(c.idx === 0 ? (c.print || '·') : ''))}</div>`).join('');
     requestAnimationFrame(() => { measure(); reset(); });
   }
   function measure() {
