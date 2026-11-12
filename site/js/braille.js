@@ -339,6 +339,8 @@ export function translateEnglish(text, grade = 1) {
 }
 
 // ---------- Other languages (uncontracted / grade 1) ----------
+// Checked against the official codes: CBFU 2008 (French), ONCE/CBE (Spanish), Das System der deutschen
+// Brailleschrift (German Basisschrift), Russian braille, and modern Greek braille.
 const A_J = 'abcdefghij';
 const LANG = {
   fr: {
@@ -347,26 +349,34 @@ const LANG = {
     number: 'antoine',
     extra: {
       é: '123456', à: '12356', è: '2346', ù: '23456', â: '16', ê: '126', î: '146', ô: '1456', û: '156',
-      ë: '1246', ï: '12456', ü: '1256', ç: '12346', œ: '246', w: '2456',
+      ë: '1246', ï: '12456', ü: '1256', ç: '12346', œ: '246', æ: '345', w: '2456',
     },
-    punct: { ',': '2', ';': '23', ':': '25', '.': '256', '?': '26', '!': '235', "'": '3', '’': '3', '-': '36', '«': '2356', '»': '2356', '(': '236', ')': '356' },
+    punct: {
+      ',': '2', ';': '23', ':': '25', '.': '256', '?': '26', '!': '235', "'": '3', '’': '3', '-': '36', '/': '34',
+      '«': '2356', '»': '2356', '"': '2356', '“': '2356', '”': '2356', '(': '236', ')': '356',
+    },
   },
   es: {
     name: 'Español',
     capital: fromDots('46'),
     number: 'standard',
     extra: { á: '12356', é: '2346', í: '34', ó: '346', ú: '23456', ü: '1256', ñ: '12456' },
-    punct: { ',': '2', ';': '23', ':': '25', '.': '3', '?': '26', '¿': '26', '!': '235', '¡': '235', '-': '36', '(': '126', ')': '345', '"': '236' },
+    punct: {
+      ',': '2', ';': '23', ':': '25', '.': '3', '?': '26', '¿': '26', '!': '235', '¡': '235', '-': '36',
+      '(': '126', ')': '345', '"': '236', '“': '236', '”': '236', '«': '236', '»': '236',
+    },
   },
   de: {
     name: 'Deutsch',
+    // A capital sign (dots 4-6) exists, but ordinary German braille leaves capitals unmarked.
     capital: null,
     number: 'standard',
     extra: { ä: '345', ö: '246', ü: '1256', ß: '2346' },
-    punct: { ',': '2', ';': '23', ':': '25', '.': '3', '?': '26', '!': '235', '-': '36' },
+    punct: { ',': '2', ';': '23', ':': '25', '.': '3', '?': '26', '!': '235', '-': '36', '(': '2356', ')': '2356', '„': '236', '“': '356', "'": '6', '’': '6' },
   },
   ru: {
     name: 'Русский',
+    // Ordinary Russian braille text leaves capitals unmarked.
     capital: null,
     number: 'standard',
     map: {
@@ -375,18 +385,21 @@ const LANG = {
       ф: '124', х: '125', ц: '14', ч: '12345', ш: '156', щ: '1346', ъ: '12356', ы: '2346', ь: '23456',
       э: '246', ю: '1256', я: '1246',
     },
-    punct: { ',': '2', ';': '23', ':': '25', '.': '256', '?': '26', '!': '235', '-': '36' },
+    punct: { ',': '2', ';': '23', ':': '25', '.': '256', '?': '26', '!': '235', '-': '36', '—': '36', '–': '36', '«': '236', '»': '356', '(': '126', ')': '345' },
   },
   el: {
     name: 'Ελληνικά',
-    capital: null,
+    capital: fromDots('46'),
     number: 'standard',
     map: {
       α: '1', β: '12', γ: '1245', δ: '145', ε: '15', ζ: '1356', η: '345', θ: '1456', ι: '24', κ: '13', λ: '123',
-      μ: '134', ν: '1345', ξ: '1346', ο: '135', π: '1234', ρ: '1235', σ: '234', ς: '234', τ: '2345', υ: '136',
-      φ: '124', χ: '12346', ψ: '13456', ω: '2456',
+      μ: '134', ν: '1345', ξ: '1346', ο: '135', π: '1234', ρ: '1235', σ: '234', ς: '234', τ: '2345', υ: '13456',
+      φ: '124', χ: '125', ψ: '12346', ω: '245',
     },
-    punct: { ',': '2', '.': '256', ';': '26', '!': '235', '-': '36' },
+    // Vowel pairs written as one cell. The accent (tonos) is dot 5, placed before the vowel or pair.
+    digraphs: { αι: '126', ει: '146', οι: '246', υι: '12456', αυ: '16', ευ: '156', ηυ: '1256', ου: '136' },
+    accent: '5',
+    punct: { ',': '2', '.': '256', ';': '26', ';': '26', '·': '23', '·': '23', ':': '25', '!': '235', '-': '36', "'": '3', '’': '3', '(': '2356', ')': '2356', '«': '236', '»': '356' },
   },
 };
 export const LANGS = LANG;
@@ -395,7 +408,14 @@ export function translateOther(text, code) {
   const L = LANG[code];
   const parts = [];
   let numMode = false;
-  for (const ch of text) {
+  // Greek: split an accented vowel into its base letter and marks (tonos, dialytika).
+  const split = (c) => {
+    const d = c.normalize('NFD');
+    return { base: [...d][0], tonos: d.includes('́'), dia: d.includes('̈') };
+  };
+  const chars = [...(L.accent ? text.normalize('NFC') : text)];
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
     const low = ch.toLocaleLowerCase();
     if (/\s/.test(ch)) { numMode = false; parts.push(ch === '\n' ? P('\n', '↵', 'newline') : P('⠀', ' ', 'space')); continue; }
     if (isDigit(ch)) {
@@ -411,10 +431,34 @@ export function translateOther(text, code) {
       continue;
     }
     numMode = false;
+    if (L.accent && !L.map[low]) {
+      const a = split(low);
+      if (L.map[a.base] && (a.tonos || a.dia)) {
+        if (ch !== low) parts.push(P(L.capital, '', 'indicator', 'capital'));
+        if (a.tonos) parts.push(P(fromDots(L.accent), '', 'indicator', 'accent'));
+        parts.push(P(fromDots(L.map[a.base]), ch, 'letter'));
+        continue;
+      }
+    }
+    if (L.digraphs && L.map[low] && i + 1 < chars.length) {
+      // A pair is one cell unless the second vowel carries a dialytika (ϊ, ϋ).
+      const b = split(chars[i + 1].toLocaleLowerCase());
+      const dg = !b.dia && L.digraphs[low + b.base];
+      if (dg) {
+        if (ch !== low) parts.push(P(L.capital, '', 'indicator', 'capital'));
+        if (b.tonos) parts.push(P(fromDots(L.accent), '', 'indicator', 'accent'));
+        parts.push(P(fromDots(dg), ch + chars[i + 1], 'letter'));
+        i++;
+        continue;
+      }
+    }
     const isUpper = ch !== low && L.capital;
-    if (isUpper) parts.push(P(L.capital, '', 'indicator', 'capital'));
     let dots = (L.map && L.map[low]) || (L.extra && L.extra[low]) || (!L.map && LETTER_DOTS[low]);
-    if (dots) { parts.push(P(fromDots(dots), ch, 'letter')); continue; }
+    if (dots) {
+      if (isUpper) parts.push(P(L.capital, '', 'indicator', 'capital'));
+      parts.push(P(fromDots(dots), ch, 'letter'));
+      continue;
+    }
     if (L.punct[ch]) { parts.push(P(fromDots(L.punct[ch]), ch, 'punct')); continue; }
     parts.push(P(fromDots(''), ch, 'unknown', 'not in this table'));
   }

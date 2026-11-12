@@ -1,5 +1,5 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=37';
+import { cellsOf } from './braille.js?v=38';
 
 export const SIGN_WORDS = [
   'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',
@@ -52,31 +52,32 @@ export const LANG_INFO = {
   },
   fr: {
     title: 'Français — Code braille français uniformisé',
-    blurb: 'Used in France, Quebec and across French Canada. Accented letters get their own cells (é is a full cell ⠿). Numbers use a one-dot number sign ⠠ and “Antoine” digits — letters a–j with the lower-right dot added. On bilingual federal signs across Canada you will often see this beside or below the English.',
+    blurb: 'Used in France, Quebec and across French Canada. Accented letters get their own cells (é is a full cell ⠿), and ⠨ marks a capital. Numbers use a one-dot number sign ⠠ and “Antoine” digits: 1–9 are the letters a–i with the lower-right dot added, and 0 is ⠼. On bilingual federal signs across Canada you will often see this beside or below the English.',
     phrases: ['Bonjour', 'Merci', 'Sortie', 'Toilettes', 'Ascenseur', 'Étage 2'],
-    letters: 'abcdefghijklmnopqrstuvwxyzéàèùâêîôûëïüçœ',
+    letters: 'abcdefghijklmnopqrstuvwxyzàâçèéêëîïôùûüœæ',
   },
   es: {
     title: 'Español',
-    blurb: 'Spanish braille keeps the same a–z and number system as English, adds accented vowels and ñ, and uses ⠨ as the capital sign. The period is a single dot ⠄.',
+    blurb: 'Spanish braille keeps the same a–z and number system as English, adds accented vowels, ü and ñ, and uses ⠨ as the capital sign. The period is a single dot ⠄, and the opening and closing marks of ¿ ? (⠢) and ¡ ! (⠖) share one cell each.',
     phrases: ['Hola', 'Gracias', 'Salida', '¿Dónde está el baño?', 'Ascensor'],
     letters: 'abcdefghijklmnñopqrstuvwxyzáéíóúü',
   },
   de: {
     title: 'Deutsch',
-    blurb: 'German braille adds umlauts and ß. Everyday German braille (Vollschrift / Kurzschrift) traditionally doesn’t mark capitals at all.',
+    blurb: 'German braille adds ä, ö, ü and ß. Shown here is Basisschrift, which spells every letter. Vollschrift adds eight signs for au, eu, ei, äu, ie, ch, sch and st, and Kurzschrift is the contracted form used in most books. Capitals are normally not marked; a capital sign ⠨ exists for when it matters. The period is a single dot ⠄.',
     phrases: ['Hallo', 'Danke', 'Ausgang', 'Aufzug', 'Grüße'],
     letters: 'abcdefghijklmnopqrstuvwxyzäöüß',
   },
   ru: {
     title: 'Русский — Russian',
-    blurb: 'Cyrillic braille reuses Latin patterns by sound where it can (а = a, б = b, д = d), and fills the rest with new cells.',
+    blurb: 'Russian braille reuses Latin patterns by sound where it can (а = a, б = b, д = d), and fills the rest with other cells. Numbers work as in English (⠼ then a–j). Ordinary text usually leaves capitals unmarked, and there is no contracted form in use.',
     phrases: ['Привет', 'Спасибо', 'Выход'],
     letters: 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя',
   },
   el: {
     title: 'Ελληνικά — Greek',
-    blurb: 'Greek braille maps letters to their Latin look-alikes or sound-alikes (α = a, β = b, π = p). Also used for Greek letters in maths and science.',
+    blurb: 'Greek braille maps most letters to their Latin sound-alikes (α = a, β = b, π = p). Eight vowel pairs have a cell of their own: αι ⠣, ει ⠩, οι ⠪, υι ⠻, αυ ⠡, ευ ⠱, ηυ ⠳ and ου ⠥. The accent is dot 5 ⠐ before the vowel or pair, ⠨ marks a capital, and numbers work as in English. The Greek letters used in English maths and science follow a slightly different international table.',
+    digraphs: [['αι', '126'], ['ει', '146'], ['οι', '246'], ['υι', '12456'], ['αυ', '16'], ['ευ', '156'], ['ηυ', '1256'], ['ου', '136']],
     phrases: ['Γεια σου', 'Ευχαριστώ', 'Έξοδος'],
     letters: 'αβγδεζηθικλμνξοπρστυφχψω',
   },
@@ -88,11 +89,11 @@ const JROWS = [['', ''], ['k', '6'], ['s', '56'], ['t', '35'], ['n', '3'], ['h',
 const JNAMES = { si: 'shi', ti: 'chi', tu: 'tsu', hu: 'fu' };
 const jcell = (d) => String.fromCharCode(0x2800 + [...d].reduce((v, n) => v | (1 << (Number(n) - 1)), 0));
 export const JAPANESE = {
-  blurb: 'Japanese braille (tenji 点字) is built on kana syllables, not letters. The five vowels use only the top dots; each consonant row adds its own dots to the vowel shape. Kanji are written by their reading.',
+  blurb: 'Japanese braille (tenji 点字) is built on kana syllables, not letters. The five vowels use only dots 1, 2 and 4 (the upper-left corner); each consonant row adds its own dots from 3, 5 and 6 to the vowel shape. The y- and w- kana are irregular. The voiced and p- marks are written before the kana they change. Kanji are written by their reading.',
   rows: [
     ...JROWS.map(([c, add]) => [c ? c + '-' : 'vowels', Object.entries(JV).map(([v, d]) => [JNAMES[c + v] || c + v, jcell(d + add)])]),
     ['y-, w-, n', [['ya', jcell('34')], ['yu', jcell('346')], ['yo', jcell('345')], ['wa', jcell('3')], ['wo', jcell('35')], ['n', jcell('356')]]],
-    ['marks', [['voiced ゛', jcell('5')], ['p- ゜', jcell('6')], ['number', jcell('3456')]]],
+    ['marks', [['voiced ゛', jcell('5')], ['p- ゜', jcell('6')], ['small tsu っ', jcell('2')], ['long vowel ー', jcell('25')], ['number', jcell('3456')]]],
   ],
 };
 
@@ -113,7 +114,7 @@ export const SYSTEMS = [
   ]},
   { group: 'Other scripts', items: [
     ['Cyrillic (Russian and others)', 'Russia, Eastern Europe, Central Asia', 'Letters are mapped to Latin cells by sound where possible (б = b, д = d); the rest get new cells. Ukrainian, Bulgarian and others vary slightly.', 'ru'],
-    ['Greek', 'Greece, Cyprus', 'Letters map to Latin look-alikes or sound-alikes (α = a, π = p). Greek letters in maths use the same cells after a Greek indicator.', 'el'],
+    ['Greek', 'Greece, Cyprus', 'Letters map to Latin look-alikes or sound-alikes (α = a, π = p). Eight vowel pairs (αι, ει, οι, υι, αυ, ευ, ηυ, ου) have their own cells, and the accent is dot 5.', 'el'],
     ['Arabic', 'Middle East, North Africa', 'Print reads right-to-left, but Arabic braille is read left-to-right. Many letters share cells with their Latin sound-alikes.', 'ar'],
     ['Hebrew', 'Israel', 'Also read left-to-right in braille, with letters loosely matched to Latin sounds.'],
     ['Bharati braille', 'India, Nepal, Sri Lanka, Bangladesh', 'Standardised in 1951. One system shared by Hindi, Bengali, Tamil, Telugu, Punjabi and more: the same sound gets the same cell whatever the print script.'],

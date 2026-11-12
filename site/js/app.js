@@ -1,14 +1,15 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=37';
+} from './braille.js?v=38';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=37';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=37';
-import { COMMON_WORDS } from './wordlist.js?v=37';
-import { G2_EXAMPLES } from './g2examples.js?v=37';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=37';
+} from './data.js?v=38';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=38';
+import { COMMON_WORDS } from './wordlist.js?v=38';
+import { LANG_CONTRACTIONS } from './langcontractions.js?v=38';
+import { G2_EXAMPLES } from './g2examples.js?v=38';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=38';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -1147,11 +1148,21 @@ function charsTable(k, { examples = false } = {}) {
     return `<p class="muted">${esc(JAPANESE.blurb)}</p>${examples ? exTiles(words.map(([p, sy]) => `<div class="example"><div class="print">${esc(p)}</div>${groupsHTML(sy.map((x) => `${kana[x]}:${x}`).join(' '), 'sm', 'letter')}</div>`)) : ''}${kanaTable()}`;
   }
   const info = LANG_INFO[k];
+  // Other languages show only what differs from English: a letter is left out when it has the same cell as the English letter.
+  const cellOf = (x) => unicodeOf(translate(x, k, 1));
+  const enCell = (x) => unicodeOf(translate(x, 'en', 1));
+  const letters = k === 'en' ? [...info.letters] : [...info.letters].filter((l) => !/[a-z]/.test(l) || cellOf(l) !== enCell(l));
+  const sameLetters = k !== 'en' && letters.length < [...info.letters].length;
+  const digits = '1234567890'.split('');
+  const sameDigits = k !== 'en' && digits.every((d) => cellOf(d) === enCell(d));
+  const C = LANG_CONTRACTIONS[k];
   return `<p class="muted">${esc(info.blurb)}</p>${examples ? exTiles(info.phrases.map((p) => `<div class="example"><div class="print">${esc(p)}</div>${lineHTML(translate(p, k, k === 'en' ? 2 : 1), { cls: 'sm' })}</div>`)) : ''}
-    <div class="group-title"><h3>Letters</h3></div>
-    <div class="ctable narrow">${[...info.letters].map((l) => crowHTML(translate(l, k, 1)[0].cells, l, { kind: 'letter' })).join('')}</div>
-    <div class="group-title"><h3>Digits</h3></div>
-    <div class="ctable narrow">${'1234567890'.split('').map((d) => crowHTML(unicodeOf(translate(d, k, 1)), d, { kind: 'digit' })).join('')}</div>`;
+    <div class="group-title"><h3>${sameLetters ? 'Letters That Differ From English' : 'Letters'}</h3>${sameLetters ? '<span>The rest of a–z are the same as in English.</span>' : ''}</div>
+    ${letters.length ? `<div class="ctable narrow">${letters.map((l) => crowHTML(cellOf(l), l, { kind: 'letter' })).join('')}</div>` : ''}
+    ${info.digraphs ? `<div class="group-title"><h3>Vowel Pairs</h3><span>Each pair is written as one cell.</span></div><div class="ctable narrow">${info.digraphs.map(([pr, d]) => crowHTML(cellsOf(d), pr, { kind: 'letter' })).join('')}</div>` : ''}
+    ${sameDigits ? '<p class="muted small">Digits are written the same way as in English: the number sign, then a–j.</p>' : `<div class="group-title"><h3>Digits</h3></div>
+    <div class="ctable narrow">${digits.map((d) => crowHTML(cellOf(d), d, { kind: 'digit' })).join('')}</div>`}
+    ${C ? `<div class="group-title"><h3>${esc(C.name)}</h3><span>${esc(C.blurb)}</span></div>${C.groups.map(([t, items]) => `<h4 class="ex-h">${esc(t)}</h4><div class="ctable narrow">${items.map(([pr, d, n]) => crowHTML(cellsOf(d), pr, { kind: 'contraction', note: n || '' })).join('')}</div>`).join('')}` : ''}`;
 }
 const LANG_NAMES = () => ({ ...Object.fromEntries(Object.keys(LANG_INFO).map((k) => [k, k === 'en' ? 'English (UEB)' : LANGS[k].name])), ja: '日本語 Japanese' });
 const CHART_NAMES = () => ({ ...LANG_NAMES(), ...Object.fromEntries(Object.entries(EXTRA_CHARTS).map(([k, x]) => [k, x.name])) });

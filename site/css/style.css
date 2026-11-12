@@ -1785,3 +1785,6 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* quieter Known chevron */
 .m-more { border: 0; background: none; width: 30px; height: 28px; color: var(--muted); }
 .m-more:hover { color: var(--ink); }
+/* v38: Cheat Sheet Print on the right */
+.cs-head .row { flex: 1 1 100%; }
+.cs-head #csPrint { margin-left: auto; }
