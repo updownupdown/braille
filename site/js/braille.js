@@ -160,7 +160,7 @@ for (const [cat, { items }] of Object.entries(CONTRACTIONS)) {
 }
 // Common words where naive longest-match picks the wrong contraction.
 const EXCEPTIONS = {
-  then: '1456 26', when: '156 26', them: '2346 134', themselves: '2346 134 1236 234',
+  then: '2346 1345', when: '156 26', them: '2346 134', themselves: '2346 134 1236 234',
   whenever: '156 26 5 15', ourselves: '1256 1235 1236 234',
 };
 
@@ -179,6 +179,35 @@ g('en', '26'); g('in', '35');
 g('ea', '2', 'middle'); g('bb', '23', 'middle'); g('cc', '25', 'middle'); g('ff', '235', 'middle'); g('gg', '2356', 'middle');
 GROUPS.sort((a, b) => b[0].length - a[0].length);
 
+// Words where a sign would cut across syllables or change the sound, so it is not used there.
+const BLOCK = {
+  fever: ['ever'], fevers: ['ever'], feverish: ['ever'], severe: ['ever'], severely: ['ever'], severity: ['ever'],
+  bothered: ['there'], bothering: ['there'], sentiment: ['time'], sentiments: ['time'], sentimental: ['time'],
+  tournament: ['name'], tournaments: ['name'], ornament: ['name'], ornaments: ['name'], ornamental: ['name'],
+  nowhere: ['ow'], wherever: ['where'],
+  mishap: ['sh'], mishaps: ['sh'], dishearten: ['sh'], fruity: ['ity'],
+};
+// be-, con- and dis- go only at the start of a word, and only when they make the first syllable.
+const PREFIX = [['dis', fromDots('256')], ['con', fromDots('25')], ['be', fromDots('23')]];
+const VOWEL = /[aeiouy]/;
+const BE_YES = new Set(['being', 'been']);
+const BE_NOT = new Set(['bedroom', 'bedrooms', 'bedrock', 'beneficial', 'beneficiary', 'benefited', 'benefit', 'benefits', 'beverage', 'beverages', 'bevel', 'beret', 'beryl', 'beta', 'bevy', 'beluga', 'begonia']);
+function prefixOf(s) {
+  for (const [p, cell] of PREFIX) {
+    if (!s.startsWith(p) || s.length <= p.length) continue;
+    const rest = s.slice(p.length);
+    if (!VOWEL.test(rest)) continue; // "disk", "best": no second syllable
+    if (p === 'be' && !BE_YES.has(s) && (BE_NOT.has(s) || !/^([^aeiou][aeiouy]|[bcdfgpt][rl])/.test(rest) || rest[0] === rest[1])) continue; // be-gin, be-tray; not best, bell
+    if (p === 'con' && /^[aeiouy]/.test(rest)) continue; // cone, conic
+    if (p === 'dis' && rest[0] === 'h') continue; // dish
+    return [p, cell];
+  }
+  return null;
+}
+// Shortforms and whole-word-only initial-letter signs also work with these endings: friends, goodness, words, theirs.
+const SUFFIX_OK = new Set([...CONTRACTIONS.Shortforms.items, ...CONTRACTIONS['Initial-letter contractions'].items].map(([w]) => w));
+const SUFFIXES = ['ness', 'ly', 's'];
+
 const LABELS = {}; // cell string -> readable name for grade 2 parts
 for (const [cat, { items }] of Object.entries(CONTRACTIONS)) for (const [w, d] of items) LABELS[w] = cat;
 
@@ -188,14 +217,26 @@ const P = (cells, print, kind, note = '') => ({ cells, print, kind, note });
 function contractRun(s, whole) {
   if (whole && EXCEPTIONS[s]) return [P(cellsOf(EXCEPTIONS[s]), s, 'contraction', 'whole word')];
   if (whole && WORDSIGN[s]) return [P(WORDSIGN[s], s, 'contraction', LABELS[s] || 'wordsign')];
+  if (whole) {
+    for (const suf of SUFFIXES) {
+      const base = s.slice(0, -suf.length);
+      if (s.endsWith(suf) && base.length > 1 && SUFFIX_OK.has(base) && WORDSIGN[base]) return [P(WORDSIGN[base], base, 'contraction', LABELS[base] || 'wordsign'), ...contractRun('x' + suf, false).slice(1)];
+    }
+  }
+  const block = BLOCK[s] || [];
   const out = [];
   let i = 0;
+  const pre = prefixOf(s);
+  if (pre) { out.push(P(pre[1], pre[0], 'contraction', 'groupsign')); i = pre[0].length; }
   while (i < s.length) {
     let hit = null;
     for (const [p, cells, rule] of GROUPS) {
       if (!s.startsWith(p, i)) continue;
+      if (block.includes(p)) continue;
       if (rule === 'notStart' && i === 0) continue;
       if (rule === 'middle' && (i === 0 || i + p.length >= s.length)) continue;
+      // A lower sign (ea, bb…) gives way to an upper one that starts on its second letter: n-e-ar, not n-ea-r.
+      if (rule === 'middle' && GROUPS.some(([q, , r]) => r !== 'middle' && q.length > 1 && s.startsWith(q, i + 1) && !block.includes(q))) continue;
       if (whole && p === s) continue; // whole-word forms handled above
       hit = [p, cells];
       break;
@@ -248,7 +289,12 @@ export function translateEnglish(text, grade = 1) {
         if (numMode && /^[a-j]/.test(run)) parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (letter after number)'));
         numMode = false;
         const lower = run.toLowerCase();
-        const whole = run === lettersOnly;
+        // it's, that's, you'll, can't: the wordsign is still used before the apostrophe.
+        const apos = lettersOnly.match(/^([A-Za-z]+)['’](s|ll|d|re|ve|m|t)$/);
+        let whole = run === lettersOnly || (apos && run === apos[1] && i === w.indexOf(apos[1]));
+        // be, were, his and was are spelled out when punctuation touches them.
+        if (whole && ['be', 'were', 'his', 'was'].includes(lower) && lettersOnly !== w) whole = false;
+        const spellOut = !whole && ['be', 'were', 'his', 'was'].includes(lower) && run === lettersOnly;
         // capitals
         if (allCaps) {
           if (!capsWordDone) { parts.push(P(IND.capital + IND.capital, '', 'indicator', 'capitals word')); capsWordDone = true; }
@@ -266,7 +312,7 @@ export function translateEnglish(text, grade = 1) {
             parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (lone letter)'));
             parts.push(P(LETTERS[lower], run, 'letter'));
           } else {
-            const cp = contractRun(lower, whole);
+            const cp = spellOut ? [...lower].map((ch) => P(LETTERS[ch], ch, 'letter')) : contractRun(lower, whole);
             // carry original case for display
             let k = 0;
             for (const p of cp) { p.print = run.slice(k, k + p.print.length); k += p.print.length; parts.push(p); }

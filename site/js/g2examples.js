@@ -4,8 +4,6 @@
 // ok    = two examples where UEB correctly uses the sign.
 // no    = optional counter-example: the sign is NOT used (or the same dots mean
 //         something else); note explains why.
-// okBraille = correct UEB for the ok examples, given only where the site
-//         translator cannot produce it (be-, con-, dis- groupsigns).
 // Every other example was checked against translate(text, 'en', 2).
 export const G2_EXAMPLES = {
   // Alphabetic wordsigns
@@ -70,9 +68,9 @@ export const G2_EXAMPLES = {
   'gg': { ok: ['bigger', 'giggle'], no: { text: 'egg', note: 'Never at the end of a word' } },
   'en': { ok: ['ten', 'enjoy'], no: { text: 'enough', note: 'Standing alone, ⠢ means the word enough' } },
   'in': { ok: ['pin', 'window'], no: { text: 'king', note: 'The ing sign wins: k + ing' } },
-  'be': { ok: ['begin', 'become'], okBraille: ['⠆⠛⠔', '⠆⠉⠕⠍⠑'], no: { text: 'best', note: 'Only when be is the first syllable' } },
-  'con': { ok: ['concert', 'control'], okBraille: ['⠒⠉⠻⠞', '⠒⠞⠗⠕⠇'], no: { text: 'bacon', note: 'Only at the start of a word' } },
-  'dis': { ok: ['dislike', 'discuss'], okBraille: ['⠲⠇⠊⠅⠑', '⠲⠉⠥⠎⠎'], no: { text: 'dish', note: 'Only when dis is the first syllable' } },
+  'be': { ok: ['begin', 'become'], no: { text: 'best', note: 'Only when be is the first syllable' } },
+  'con': { ok: ['concert', 'control'], no: { text: 'bacon', note: 'Only at the start of a word' } },
+  'dis': { ok: ['dislike', 'discuss'], no: { text: 'dish', note: 'Only when dis is the first syllable' } },
 
   // Lower wordsigns
   'be|Lower wordsigns': { ok: ['to be', 'be kind'], no: { text: 'bee', note: 'Not standing alone, so spell it out' } },

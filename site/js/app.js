@@ -1,14 +1,14 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=35';
+} from './braille.js?v=36';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=35';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=35';
-import { COMMON_WORDS } from './wordlist.js?v=35';
-import { G2_EXAMPLES } from './g2examples.js?v=35';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=35';
+} from './data.js?v=36';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=36';
+import { COMMON_WORDS } from './wordlist.js?v=36';
+import { G2_EXAMPLES } from './g2examples.js?v=36';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=36';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
