@@ -522,6 +522,14 @@ export const TRIVIA = {
   ],
 };
 
+// Answers that could also fit each other's riddles, so they are never offered together as right and wrong choices.
+export const RIDDLE_CLASH = [
+  ['clock', 'watch'], ['piano', 'keyboard'], ['keyboard', 'remote', 'phone'], ['comb', 'zipper', 'saw'], ['bottle', 'shirt'],
+  ['table', 'bed'], ['bed', 'trouble'], ['book', 'dictionary', 'newspaper', 'library'], ['cold', 'breath'],
+  ['river', 'riverbed', 'road', 'fence'], ['hole', 'hole in it'], ['tree', 'pine', 'palm'], ['voice', 'noise', 'echo', 'silence'],
+  ['promise', 'silence', 'word', 'joke', 'noise'], ['tomorrow', 'future'], ['age', 'stairs'], ['artichoke', 'deck of cards'],
+  ['light', 'noise', 'breath', 'voice'], ['needle', 'potato', 'eye'], ['cloud', 'flag'], ['name', 'word'],
+];
 // "riddle|answer"
 export const RIDDLES = [
   'What has keys but can’t open locks, and makes music?|piano',

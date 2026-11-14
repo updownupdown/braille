@@ -171,7 +171,8 @@ const g = (p, d, rule = 'any') => GROUPS.push([p, cellsOf(d), rule]);
 for (const [p, d] of CONTRACTIONS['Strong contractions'].items) g(p, d);
 for (const [p, d] of CONTRACTIONS['Strong groupsigns'].items) g(p, d, p === 'ing' ? 'notStart' : 'any');
 for (const [p, d] of CONTRACTIONS['Final-letter groupsigns'].items) g(p, d, 'notStart');
-['one', 'some', 'ever', 'day', 'part', 'time', 'name', 'work', 'there', 'mother', 'father', 'ought', 'through', 'where', 'under', 'know', 'here', 'right'].forEach((w) => {
+['one', 'some', 'ever', 'day', 'part', 'time', 'name', 'work', 'there', 'mother', 'father', 'ought', 'through', 'where', 'under', 'know', 'here', 'right',
+  'lord', 'question', 'young', 'character', 'word', 'world', 'spirit', 'many'].forEach((w) => {
   const it = CONTRACTIONS['Initial-letter contractions'].items.find((x) => x[0] === w);
   g(w, it[1]);
 });
@@ -247,6 +248,7 @@ function contractRun(s, whole) {
   return out;
 }
 
+const HYPHENS = ['-', '–', '—'];
 const isLetter = (c) => /[a-z]/i.test(c);
 const isDigit = (c) => /[0-9]/.test(c);
 
@@ -289,12 +291,16 @@ export function translateEnglish(text, grade = 1) {
         if (numMode && /^[a-j]/.test(run)) parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (letter after number)'));
         numMode = false;
         const lower = run.toLowerCase();
+        // A hyphen or dash also bounds a word: so-called, x-ray, mother-in-law.
+        const segStart = Math.max(...HYPHENS.map((h) => (i ? w.lastIndexOf(h, i - 1) : -1))) + 1;
+        const segEnd = Math.min(...HYPHENS.map((h) => { const k = w.indexOf(h, j); return k < 0 ? w.length : k; }));
+        const seg = w.slice(segStart, segEnd);
+        const segLetters = seg.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '');
         // it's, that's, you'll, can't: the wordsign is still used before the apostrophe.
-        const apos = lettersOnly.match(/^([A-Za-z]+)['’](s|ll|d|re|ve|m|t)$/);
-        let whole = run === lettersOnly || (apos && run === apos[1] && i === w.indexOf(apos[1]));
-        // be, were, his and was are spelled out when punctuation touches them.
+        const apos = segLetters.match(/^([A-Za-z]+)['’](s|ll|d|re|ve|m|t)$/);
+        let whole = run === segLetters || (apos && run === apos[1] && i === segStart + seg.indexOf(apos[1]));
+        // be, were, his and was are spelled out (other contractions still apply: w-er-e) when punctuation touches them.
         if (whole && ['be', 'were', 'his', 'was'].includes(lower) && lettersOnly !== w) whole = false;
-        const spellOut = !whole && ['be', 'were', 'his', 'was'].includes(lower) && run === lettersOnly;
         // capitals
         if (allCaps) {
           if (!capsWordDone) { parts.push(P(IND.capital + IND.capital, '', 'indicator', 'capitals word')); capsWordDone = true; }
@@ -312,7 +318,7 @@ export function translateEnglish(text, grade = 1) {
             parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (lone letter)'));
             parts.push(P(LETTERS[lower], run, 'letter'));
           } else {
-            const cp = spellOut ? [...lower].map((ch) => P(LETTERS[ch], ch, 'letter')) : contractRun(lower, whole);
+            const cp = contractRun(lower, whole);
             // carry original case for display
             let k = 0;
             for (const p of cp) { p.print = run.slice(k, k + p.print.length); k += p.print.length; parts.push(p); }
@@ -322,6 +328,11 @@ export function translateEnglish(text, grade = 1) {
         }
         i = j;
         continue;
+      }
+      // A number that starts with its decimal point: .5 is the number sign, then the point.
+      if (c === '.' && !numMode && isDigit(w[i + 1] || '')) {
+        parts.push(P(IND.number, '#', 'indicator', 'number sign'), P(fromDots('256'), '.', 'punct', 'decimal point'));
+        numMode = true; i++; continue;
       }
       numMode = false;
       if (c === '"') {
