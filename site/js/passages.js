@@ -1,6 +1,7 @@
 // Graded reading passages for Practice > Read > Passages, easiest first.
 // Levels 1–2 use short everyday words and short sentences; 3–4 add longer words, numbers and punctuation;
 // 5 is ordinary prose. Read in Grade 1 or Grade 2 with the grade toggle.
+// Entries marked 'g2' are written to be full of contractions (and, the, with, ing, ou, ch…): good Grade 2 practice.
 export const PASSAGES = [
   // Level 1: short words, short sentences
   [1, 'The cat sat on the mat. It was a big red mat. The cat had a nap in the sun.'],
@@ -27,4 +28,21 @@ export const PASSAGES = [
   [5, 'Reading braille well takes practice. Beginners often press too hard and move one finger slowly. Experienced readers use a light touch, both hands, and a steady sweep along the line.'],
   [5, 'The northern lights are caused by particles from the sun striking the upper atmosphere. In the Yukon and the Northwest Territories they can be seen on most clear winter nights.'],
   [5, 'Contractions make braille shorter and faster to read. A single cell can stand for a common word like and or the, and groups of letters such as ing or ou often share one cell.'],
+  // Grade 2 practice: short, then longer, each packed with common contractions
+  [1, 'The child and the mother went out for a walk with the dog.', 'g2'],
+  [1, 'It was a bright morning. The children were singing in the yard.', 'g2'],
+  [2, 'Our father thinks the weather will change by the evening, so we should bring our coats.', 'g2'],
+  [2, 'There is a little shop on the other side of the street that sells good bread and cheese.', 'g2'],
+  [2, 'Which one would you rather have, the chocolate or the strawberry? I would like both!', 'g2'],
+  [3, 'Every Saturday our family goes to the market. We buy fresh fruit, flowers and something sweet for the ride home.', 'g2'],
+  [3, 'The teacher read us a story about a knight who could not find his sword. Everyone laughed at the ending.', 'g2'],
+  [3, 'Through the window we could see the ship sailing out of the harbour, its lights shining on the water.', 'g2'],
+  [3, 'Thank you for coming to our party. It was such a pleasure to see so many friends and neighbours together.', 'g2'],
+  [4, 'Although the question seemed difficult, she knew the answer straight away and explained it to the whole class.', 'g2'],
+  [4, 'The spirit of the season was everywhere: lights in the windows, music in the streets and people sharing their time.', 'g2'],
+  [4, 'Before the meeting, the members agreed to keep the discussion short, because many of them had to catch the evening train.', 'g2'],
+  [4, 'His grandfather told him that patience and kindness matter more than strength, and that lesson stayed with him all his life.', 'g2'],
+  [5, 'Braille readers recognise contractions as quickly as sighted readers recognise whole words: the shape of the word becomes familiar, and the meaning follows without any conscious effort.', 'g2'],
+  [5, 'Ontario has thousands of lakes. In the summer, cottage country fills with families, and the sound of loons echoes across the water long after the sun has gone down.', 'g2'],
+  [5, 'The knowledge that something is possible often changes how people behave. Once one person showed that braille could be read quickly, others followed, and the whole world of reading opened up.', 'g2'],
 ];

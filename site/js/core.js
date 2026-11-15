@@ -74,6 +74,7 @@ export const P = {
   auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>',
   keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 13.5h.01M18 13.5h.01M9 14h6"/>',
   github: '<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
+  stats: '<path d="M4 20h16"/><rect x="5" y="11" width="3.4" height="6" rx="1"/><rect x="10.3" y="5" width="3.4" height="12" rx="1"/><rect x="15.6" y="8" width="3.4" height="9" rx="1"/>',
   sweep: '<circle cx="5" cy="8" r="1.6" fill="currentColor"/><circle cx="10" cy="8" r="1.6" fill="currentColor"/><circle cx="15" cy="8" r="1.6" fill="currentColor"/><path d="M3 16h15"/><path d="m15 13 3 3-3 3"/>',
 };
 export const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
@@ -223,18 +224,18 @@ export function openSettings() {
       <div class="set-row stack"><span>Appearance</span>${radios('theme', [['auto', `${icon('auto', 18)}Auto`], ['light', `${icon('sun', 18)}Light`], ['dark', `${icon('moon', 18)}Dark`]], S.theme)}</div>
       <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
-      <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key (F D S J K L)']], S.sixKey ? '1' : '0')}</div>
-      <p class="set-note six-note">Six-key types braille like a Perkins brailler: hold the keys for one cell together, then let go. Works in Guess, Type, the games and Braille to text, from the next screen you open.</p>
       <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
+      <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key (F D S J K L)']], S.sixKey ? '1' : '0')}</div>
+      <p class="set-note six-note">Six-key types braille like a Perkins brailler: hold the keys for one cell together, then let go. Works in Guess, Type, the games and Braille to text.</p>
     </div>
     <div class="set-group"><h3>Your data</h3>
       <p class="set-note">Everything is saved on this device only. Save a backup file to keep it safe or move it to another device. Each reset asks you to tap again to confirm.</p>
       <div class="reset-list">
-        <div class="reset-row backup-row"><span><b>Backup</b><small>Progress, scores and settings in one small file</small></span><span class="row"><button class="btn" type="button" id="bkSave">Save</button><button class="btn" type="button" id="bkLoad">Restore</button></span></div>
+        <div class="reset-row backup-row"><span><b>Backup</b><small>Progress, scores and settings in one small file</small></span><span class="row"><button class="btn small-btn" type="button" id="bkSave">Save</button><button class="btn small-btn" type="button" id="bkLoad">Restore</button></span></div>
         <input type="file" id="bkFile" accept=".json,application/json" hidden>
-        <div class="reset-row" data-r="games"><span><b>Game progress</b><small>Scores, bests, levels, solved riddles and Secret Agent cases</small></span><button class="btn" type="button">Reset</button></div>
-        <div class="reset-row" data-r="learn"><span><b>Learning progress</b><small>Practice, Auto and finished lessons</small></span><button class="btn" type="button">Reset</button></div>
-        <div class="reset-row" data-r="all"><span><b>Everything</b><small>All of the above, plus these settings</small></span><button class="btn" type="button">Reset</button></div>
+        <div class="reset-row" data-r="games"><span><b>Game progress</b><small>Scores, bests, levels, solved riddles and Secret Agent cases</small></span><button class="btn small-btn" type="button">Reset</button></div>
+        <div class="reset-row" data-r="learn"><span><b>Learning progress</b><small>Practice, Auto and finished lessons</small></span><button class="btn small-btn" type="button">Reset</button></div>
+        <div class="reset-row" data-r="all"><span><b>Everything</b><small>All of the above, plus these settings</small></span><button class="btn small-btn" type="button">Reset</button></div>
       </div>
     </div>
     <div class="set-group about"><h3>About Learn Braille</h3><p>A resource for sighted folks to learn the braille writing system. Braille follows Unified English Braille unless noted. Made for learning — for official transcription, consult a certified braille transcriber.</p>

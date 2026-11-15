@@ -1626,6 +1626,7 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .reset-list .reset-row span { display: grid; gap: 2px; }
 .reset-list .reset-row small { color: var(--muted); font-size: .8rem; }
 .reset-list .reset-row .btn { flex: none; min-width: 92px; justify-content: center; }
+.reset-list .btn.small-btn { height: 32px; min-width: 72px; padding: 0 12px; font-size: .82rem; border-radius: 999px; }
 /* home: tally text only */
 .hprog .bar { display: none; }
 /* Learn tables: one cells column per table */
@@ -1744,14 +1745,10 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
   .stage .prompt-cells.many .cell { --s: 16px; }
 }
 /* Games list: best score or Played, beside the chevron */
-.g-status { flex: none; font-size: .8rem; font-weight: 500; color: var(--ink-2); background: var(--surface-2); border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
-@media (max-width: 400px) { .g-status { display: none; } }
 /* Type mode score line, between the card and the keyboard */
 .w-score { display: flex; justify-content: center; gap: 18px; font-size: .88rem; color: var(--muted); margin: 12px 0 2px; }
 .w-score b { color: var(--ink); font-weight: 600; }
 /* Home: one overall progress line under the logo */
-.h-overall { margin: 6px 0 0; color: var(--muted); font-size: .92rem; }
-.h-overall b { color: var(--ink); font-weight: 600; }
 /* Long Learn pages fold by section (Numbers, Signs) */
 .fold .g2-body { padding: 0 0 22px; }
 .fold .g2-body > .group-title:first-child h3 { display: none; }
@@ -1809,7 +1806,6 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .st-key span:first-child { margin-left: 0; }
 .st-row { margin-top: 16px; }
 .mastery-h .st-link { margin-left: 10px; font-size: .85rem; }
-.h-overall .st-link { margin-left: 6px; }
 /* Sign Hunt: a directory plate whose lines are buttons */
 :is(.gc-signhunt, a[href="#/games/signhunt"] .hrow-ic) { --gc: #2b6f8f; }
 .hunt-q { margin: 0; font-size: 1.1rem; text-align: center; }
@@ -1821,3 +1817,21 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .hunt-line .cell { --on: #f4f0e8; --off: rgba(255, 255, 255, .1); }
 .hunt-plate .btn { align-self: center; }
 .sw-info { text-align: center; color: var(--muted); font-size: .88rem; margin: 12px 0 0; min-height: 1.3em; } .sw-info b { color: var(--ink); }
+
+/* ---------- Home Stats section and the Stats modal ---------- */
+.h-stats { display: grid; gap: 10px; margin-top: 12px; }
+.hs-top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 4px; }
+.hs-top > div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+.hs-top b { font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+.hs-top span { color: var(--muted); font-size: .82rem; }
+.hs-row { display: grid; grid-template-columns: 7.5em 1fr auto; align-items: center; gap: 12px; color: var(--ink-2); font-size: .92rem; }
+.hs-row:hover { text-decoration: none; }
+.hs-row .st-track { height: 10px; }
+.hs-n { min-width: 56px; text-align: right; color: var(--muted); font-size: .85rem; }
+.hs-n b { color: var(--ink); font-weight: 600; font-size: .95rem; }
+.h-stats .st-key { margin: 2px 0 0; }
+.sheet:has(.st-page) { width: min(600px, calc(100vw - 32px)); }
+.sheet .st-page .sec-h { margin: 24px 0 10px; font-size: 1.1rem; }
+.sheet .st-page .st-top b { font-size: 1.5rem; }
+/* Translate: the language picker sits on the right of the header */
+.subbar #langDD { margin-left: auto; }

@@ -1,10 +1,10 @@
-// Home page and the Practice stats page.
+// Home page and the Stats modal.
 import { LETTERS } from './braille.js';
 
 import { GAMES, gameStore } from './games.js';
 
 import { AUTO_GAP, CATS, MODES } from './practice.js';
-import { $, titleCase, cellHTML, crowHTML, icon, level, markMulti, mastery, setSub, setTitle, store, view, views } from './core.js';
+import { $, titleCase, openSheet, cellHTML, crowHTML, icon, level, markMulti, mastery, setSub, setTitle, store, view, views } from './core.js';
 import { LESSONS, REF_SECTIONS, isLesson, lessonsDone } from './learn.js';
 // 0 untried · 1–3 blues · 4+ known (green)
 
@@ -23,10 +23,10 @@ export function dayStreak(days) {
   while (days[dayKey(d)]) { n++; d.setDate(d.getDate() - 1); }
   return n;
 }
-// Stats: what is known per group in Guess and Draw, the last 12 weeks of practice, Auto's boxes and the most-missed signs.
-export function statsView() {
-  setTitle('Practice');
-  setSub(`<a class="back-link" href="#/practice">${icon('right', 18)} Practice</a>`);
+// Stats modal: what is known per group in Guess and Draw, the last 12 weeks of practice, Auto's boxes and the most-missed signs.
+// Opened from Home's Stats section, the Known line in Practice, or #/practice/stats; any [data-stats] link opens it.
+export function openStats() { openSheet(statsHTML(), { title: 'Stats' }); }
+export function statsHTML() {
   const m = mastery(), misses = store.get('misses', {}), days = store.get('days', {});
   const groups = PROG_GROUPS();
   const count = (pre, items) => { let k = 0, l = 0; items.forEach((x) => { const v = level(m[pre + x.key] || 0); if (v >= 4) k++; else if (v > 0) l++; }); return [k, l]; };
@@ -42,7 +42,7 @@ export function statsView() {
   const BOX = ['New', 'Box 2', 'Box 3', 'Box 4', 'Box 5', 'Box 6', 'Long term'];
   const DICT_BY_KEY = Object.fromEntries(Object.entries(CATS).filter(([k]) => k !== 'auto').flatMap(([, c]) => Object.values(c.sets)).flatMap(([, f]) => { try { return f('r:'); } catch { return []; } }).map((x) => [x.key, x]));
   const missed = Object.entries(misses).map(([k, n]) => [k.slice(2), k[0], n]).filter(([k]) => DICT_BY_KEY[k]).sort((a, b) => b[2] - a[2]).slice(0, 12);
-  view.innerHTML = `<div class="st-page">
+  return `<div class="st-page">
     <div class="st-top">
       <div><b>${streak}</b><span>day streak</span></div>
       <div><b>${daysPractised}</b><span>days practised</span></div>
@@ -60,7 +60,6 @@ export function statsView() {
     ${missed.length ? `<div class="ctable narrow">${missed.map(([k, pre, n]) => crowHTML(DICT_BY_KEY[k].cells, DICT_BY_KEY[k].answer, { note: `${n} miss${n > 1 ? 'es' : ''} in ${pre === 'w' ? 'Draw' : 'Guess'}` })).join('')}</div>
       <div class="row st-row"><a class="btn primary" href="#/practice/read?cat=auto&set=all">Practise with Auto</a></div>` : '<p class="muted">Nothing missed yet.</p>'}
   </div>`;
-  markMulti(view);
 }
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
 export const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
@@ -128,9 +127,27 @@ views[''] = () => {
     <div class="home-head">
       <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
-    ${isNew ? '' : `<p class="h-overall">${[`<b>${knownL}</b> of 26 letters known`, `<b>${doneL.length}</b> of ${LESSONS.length} lessons`, `<b>${played.length}</b> of ${GAME_ORDER.length} games played`].join('<span aria-hidden="true"> · </span>')} <a class="st-link" href="#/practice/stats">Stats</a></p>`}
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>
-    <section class="hsec">${games}</section>`;
+    <section class="hsec">${games}</section>
+    ${isNew ? '' : `<section class="hsec">${homeStats(knownL, doneL.length, played.length)}</section>`}`;
 };
+// Home's Stats section: a few progress bars and the streak; See all opens the full Stats modal.
+function homeStats(knownL, lessons, games) {
+  const m = mastery(), days = store.get('days', {});
+  const g2 = CATS.contractions.sets.all[1]('r:');
+  const g2k = g2.filter((x) => level(m['r:' + x.key] || 0) >= 4).length, g2l = g2.filter((x) => { const v = level(m['r:' + x.key] || 0); return v > 0 && v < 4; }).length;
+  const azl = [...'abcdefghijklmnopqrstuvwxyz'].filter((l) => { const v = level(m['r:' + l] || 0); return v > 0 && v < 4; }).length;
+  const bar = (label, k, n, l = 0, href = '') => `<${href ? `a href="${href}"` : 'div'} class="hs-row"><span class="hs-l">${label}</span><span class="st-track"><i class="k" style="width:${(k / n) * 100}%"></i><i class="l" style="width:${(l / n) * 100}%"></i></span><span class="hs-n"><b>${k}</b> / ${n}</span></${href ? 'a' : 'div'}>`;
+  const streak = dayStreak(days), practised = Object.keys(days).length;
+  return `<div class="hsec-h"><h2 class="sec-h">${icon('stats', 26)} Stats</h2><a href="#/practice/stats" data-stats>See all</a></div>
+    <div class="h-stats">
+      <div class="hs-top"><div><b>${streak}</b><span>day streak</span></div><div><b>${practised}</b><span>days practised</span></div><div><b>${Object.values(days).reduce((a, b) => a + b, 0)}</b><span>answers</span></div></div>
+      ${bar('Letters', knownL, 26, azl, '#/practice/read?cat=letters&set=az')}
+      ${bar('Grade 2 signs', g2k, g2.length, g2l, '#/practice/read?cat=contractions&set=all')}
+      ${bar('Lessons', lessons, LESSONS.length, 0, '#/reference')}
+      ${bar('Games played', games, GAME_ORDER.length, 0, '#/games')}
+      <p class="muted small st-key"><span class="k"></span> known or done <span class="l"></span> learning</p>
+    </div>`;
+}

@@ -1,12 +1,12 @@
 // App entry: the Games page wrapper, global search, Title Case, the on-screen keyboard fit and the router.
 // The view modules register themselves on `views` when loaded.
-import './home.js';
+import { openStats } from './home.js';
 import './practice.js';
 import './learn.js';
 import './translate.js';
 import { toDots, translate, unicodeOf, LANGS } from './braille.js';
 import { SCIENCE_SYMBOLS, LANG_INFO, SYSTEMS, HISTORY, SIGN_REGIONS } from './data.js';
-import { GAMES, GAME_GROUPS, gameStore, gameStatus } from './games.js';
+import { GAMES, GAME_GROUPS, gameStore } from './games.js';
 
 import { $, $$, titleCase, DICT, SEC_OF_GROUP, applySettings, bindRadios, cellsHTML, cellsK, closeDD, closeSheet, dropdown, esc, helpBtn, icon, letterDetail, lineHTML, openSettings, openSheet, radios, setSub, setTitle, store, symbolDetail, syncHeadH, view, views } from './core.js';
 import { G2_LESSONS, LANG_NAMES, REF_SECTIONS, charsTable } from './learn.js';
@@ -16,8 +16,8 @@ views.games = (q, sub) => {
   const g = GAMES[sub];
   if (!g) {
     setTitle('Games'); setSub('');
-    // Same card as the Learn index: icon, name and line, then the best score (or Played) and a chevron.
-    const row = (k) => { const x = GAMES[k], st = gameStatus(k); return `<a class="hrow g-tile" href="#/games/${k}"><span class="hrow-ic gc-${k}">${icon(x.icon, 24)}</span><div class="hrow-text"><b>${titleCase(x.name)}</b><span>${x.desc}</span></div>${st ? `<span class="g-status">${esc(st)}</span>` : ''}${icon('right', 20)}</a>`; };
+    // Same card as the Learn index: icon, name and line, then a chevron.
+    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><span class="hrow-ic gc-${k}">${icon(x.icon, 24)}</span><div class="hrow-text"><b>${titleCase(x.name)}</b><span>${x.desc}</span></div>${icon('right', 20)}</a>`; };
     view.innerHTML = `<p class="lead-p g-intro">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
       ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${titleCase(t)}</h2><div class="hrows g-tiles">${ks.map(row).join('')}</div>`).join('')}`;
     return;
@@ -136,6 +136,8 @@ $('#searchBtn').onclick = () => (searchBar.hidden ? openSearch() : closeSearch()
   document.addEventListener('focusin', onVV); document.addEventListener('focusout', () => setTimeout(onVV, 50));
   onVV();
 }
+// Any [data-stats] link opens the Stats modal in place.
+document.addEventListener('click', (e) => { if (e.target.closest('[data-stats]')) { e.preventDefault(); openStats(); } });
 // ---------- router ----------
 export let cleanup = null;
 export const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Learn · Learn Braille', translate: 'Translate · Learn Braille', games: 'Games · Learn Braille' };

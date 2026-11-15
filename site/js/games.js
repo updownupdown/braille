@@ -6,7 +6,7 @@ const TRIVIA = Object.fromEntries(Object.entries(TRIVIA_1).map(([k, v]) => [k, [
 import { WORDS } from './data.js';
 import { SNOWMAN_WORDS } from './snowman.js';
 import { AGENT_CASES } from './agentcases.js';
-import { chord, sixKeyOn } from './sixkey.js';
+import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
@@ -55,7 +55,7 @@ const bestLow = (k, v) => { const b = store.get('best.' + k, null); if (v != nul
 // With six-key input on (Settings), F D S J K L chords arrive as the letter they spell, so every game takes braille typing.
 function keys(fn) {
   const skip = (e) => e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT' || !document.getElementById('sheet').hidden;
-  const six = sixKeyOn() ? chord((dots, cell, letter) => { if (letter) fn({ key: letter, preventDefault() {}, target: document.body }); }) : null;
+  const six = chord((dots, cell, letter) => { if (letter) fn({ key: letter, preventDefault() {}, target: document.body }); });
   const h = (e) => { if (skip(e)) return; if (six && six.down(e)) return; fn(e); };
   const u = (e) => { if (!skip(e) && six) six.up(e); };
   document.addEventListener('keydown', h); document.addEventListener('keyup', u);
@@ -862,14 +862,3 @@ export const GAMES = {
     help: ['Read the riddle, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Easy has three choices and shows letters under the cells. Medium has four, and Hard uses Grade 2 contractions.'] },
 };
 export { gameStore };
-// One short line for a game's card on the Games page: the best score at any level, cases solved, or "Played".
-export function gameStatus(k) {
-  const lv = ['easy', 'medium', 'hard'];
-  const top = (pre, low = false) => { const v = lv.map((l) => store.get('best.' + pre + l, null)).filter((x) => x != null); return v.length ? (low ? Math.min(...v) : Math.max(...v)) : null; };
-  const n = { rain: top('rain.'), time: top('time.'), mirror: top('mirror.'), trivia: top('quiz.trivia'), signhunt: top('hunt.') }[k];
-  if (n != null) return `Best ${n}`;
-  if (k === 'memory') { const m = top('mem.', true); if (m != null) return `Best ${m} moves`; }
-  if (k === 'riddles') { const s = lv.reduce((a, l) => a + store.get('riddles.solved.' + l, []).length, 0); if (s) return `${s} solved`; }
-  if (k === 'agent') { const s = CASES.filter((c, i) => store.get('agent.p.' + i, 0) >= c.missions.length).length; if (s) return `${s} of ${CASES.length} cases`; }
-  return store.get('played', []).includes(k) ? 'Played' : '';
-}

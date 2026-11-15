@@ -4,6 +4,7 @@ import { cellsOf } from './braille.js';
 export const WORDS = [
   'cab', 'bed', 'dig', 'fig', 'hide', 'jade', 'milk', 'lamp', 'snow', 'quiz', 'yes', 'zero', 'wave', 'jump',
   'park', 'tree', 'blue', 'fox', 'cozy', 'map', 'rain', 'lake', 'home', 'warm', 'maple', 'canoe', 'north',
+  'bike', 'cake', 'duck', 'frog', 'gift', 'hat', 'ice', 'jam', 'kite', 'leaf', 'moon', 'owl', 'pine', 'quilt', 'rose', 'sun', 'tent', 'van', 'wind', 'yak', 'zip', 'cloud', 'fern', 'hike', 'loon', 'moose', 'trail', 'bay', 'pond', 'sled', 'mitt', 'toque', 'syrup',
 ];
 
 // Hand-checked technical examples (Grade 1 context). Groups: "cells:label", "_" = space.
@@ -34,38 +35,38 @@ export const LANG_INFO = {
   en: {
     title: 'English — Unified English Braille (UEB)',
     blurb: 'The standard in Canada, the US, the UK, Australia, New Zealand, South Africa, Ireland and more. Grade 1 spells every letter; Grade 2 (contracted) adds about 180 contractions and is what you will see on most signs and in books.',
-    phrases: ['Hello', 'Thank you', 'Exit', 'Washroom', 'Where is the elevator?', 'Welcome to Ontario'],
+    phrases: ['Hello', 'Thank you', 'Exit', 'Washroom', 'Where is the elevator?', 'Welcome to Ontario', 'Push to open', 'Please knock'],
     letters: 'abcdefghijklmnopqrstuvwxyz',
   },
   fr: {
     title: 'Français — Code braille français uniformisé',
     blurb: 'Used in France, Quebec and across French Canada. Accented letters get their own cells (é is a full cell ⠿), and ⠨ marks a capital. Numbers use a one-dot number sign ⠠ and “Antoine” digits: 1–9 are the letters a–i with the lower-right dot added, and 0 is ⠼. On bilingual federal signs across Canada you will often see this beside or below the English.',
-    phrases: ['Bonjour', 'Merci', 'Sortie', 'Toilettes', 'Ascenseur', 'Étage 2'],
+    phrases: ['Bonjour', 'Merci', 'Sortie', 'Toilettes', 'Ascenseur', 'Étage 2', 'Bienvenue', 'Sortie de secours'],
     letters: 'abcdefghijklmnopqrstuvwxyzàâçèéêëîïôùûüœæ',
   },
   es: {
     title: 'Español',
     blurb: 'Spanish braille keeps the same a–z and number system as English, adds accented vowels, ü and ñ, and uses ⠨ as the capital sign. The period is a single dot ⠄, and the opening and closing marks of ¿ ? (⠢) and ¡ ! (⠖) share one cell each.',
-    phrases: ['Hola', 'Gracias', 'Salida', '¿Dónde está el baño?', 'Ascensor'],
+    phrases: ['Hola', 'Gracias', 'Salida', '¿Dónde está el baño?', 'Ascensor', 'Bienvenido', 'Buenos días', 'Salida de emergencia'],
     letters: 'abcdefghijklmnñopqrstuvwxyzáéíóúü',
   },
   de: {
     title: 'Deutsch',
     blurb: 'German braille adds ä, ö, ü and ß. Shown here is Basisschrift, which spells every letter. Vollschrift adds eight signs for au, eu, ei, äu, ie, ch, sch and st, and Kurzschrift is the contracted form used in most books. Capitals are normally not marked; a capital sign ⠨ exists for when it matters. The period is a single dot ⠄.',
-    phrases: ['Hallo', 'Danke', 'Ausgang', 'Aufzug', 'Grüße'],
+    phrases: ['Hallo', 'Danke', 'Ausgang', 'Aufzug', 'Grüße', 'Willkommen', 'Guten Tag', 'Notausgang'],
     letters: 'abcdefghijklmnopqrstuvwxyzäöüß',
   },
   ru: {
     title: 'Русский — Russian',
     blurb: 'Russian braille reuses Latin patterns by sound where it can (а = a, б = b, д = d), and fills the rest with other cells. Numbers work as in English (⠼ then a–j). Ordinary text usually leaves capitals unmarked, and there is no contracted form in use.',
-    phrases: ['Привет', 'Спасибо', 'Выход'],
+    phrases: ['Привет', 'Спасибо', 'Выход', 'Вход', 'Лифт', 'Туалет', 'Добро пожаловать', 'Доброе утро'],
     letters: 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя',
   },
   el: {
     title: 'Ελληνικά — Greek',
     blurb: 'Greek braille maps most letters to their Latin sound-alikes (α = a, β = b, π = p). Eight vowel pairs have a cell of their own: αι ⠣, ει ⠩, οι ⠪, υι ⠻, αυ ⠡, ευ ⠱, ηυ ⠳ and ου ⠥. The accent is dot 5 ⠐ before the vowel or pair, ⠨ marks a capital, and numbers work as in English. The Greek letters used in English maths and science follow a slightly different international table.',
     digraphs: [['αι', '126'], ['ει', '146'], ['οι', '246'], ['υι', '12456'], ['αυ', '16'], ['ευ', '156'], ['ηυ', '1256'], ['ου', '136']],
-    phrases: ['Γεια σου', 'Ευχαριστώ', 'Έξοδος'],
+    phrases: ['Γεια σου', 'Ευχαριστώ', 'Έξοδος', 'Είσοδος', 'Τουαλέτα', 'Ανελκυστήρας', 'Καλημέρα', 'Καλώς ήρθατε'],
     letters: 'αβγδεζηθικλμνξοπρστυφχψω',
   },
 };

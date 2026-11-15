@@ -11,15 +11,16 @@ export const sixKeyOn = () => !!(store.get('settings', {}) || {}).sixKey;
 
 // Returns { down(e), up(e) }: each returns true when it consumed the event.
 // onCell(dots[], cell, letter) gets the chord once every key is released.
+// The setting is read on every key, so turning it on or off in Settings works on the screen you're on.
 export function chord(onCell) {
   const held = new Set(); let dots = new Set();
   return {
     down(e) {
-      const d = DOT[e.key.toLowerCase()]; if (!d) return false;
+      const d = DOT[e.key.toLowerCase()]; if (!d || !sixKeyOn()) return false;
       e.preventDefault(); if (!e.repeat) { held.add(d); dots.add(d); } return true;
     },
     up(e) {
-      const d = DOT[e.key.toLowerCase()]; if (!d) return false;
+      const d = DOT[e.key.toLowerCase()]; if (!d || (!held.has(d) && !sixKeyOn())) return false;
       e.preventDefault(); held.delete(d);
       if (!held.size && dots.size) { const ds = [...dots].sort(); dots = new Set(); const cell = fromDots(ds.join('')); onCell(ds, cell, LETTER_OF[cell] || null); }
       return true;

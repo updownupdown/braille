@@ -5,11 +5,11 @@ import { letterPad, paintTyped, typeHint } from './games.js';
 import { COMMON_WORDS } from './wordlist.js';
 
 import { PHRASES, signLine, numberLine } from './phrases.js';
-import { chord, sixKeyOn } from './sixkey.js';
+import { chord } from './sixkey.js';
 import { PASSAGES } from './passages.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
 import { $, $$, INDICATORS, S, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
-import { logDay, statsView } from './home.js';
+import { logDay, openStats } from './home.js';
 // ---------- practice data ----------
 export const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
 // The note is only shown in the help sheet's list, never in the quiz.
@@ -240,7 +240,7 @@ export const HELP_KEYS = {
 };
 export const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_KEYS[k] ? `<p class="help-keys">${icon('keyboard', 18)}<span>${esc(HELP_KEYS[k])}</span></p>` : '');
 views.practice = (q, sub) => {
-  if (sub === 'stats') return statsView();
+  if (sub === 'stats') { const r = views.practice(q); openStats(); return r; }
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
   store.set('pmode', mode); store.set('pvisited', true);
   setTitle('Practice');
@@ -261,7 +261,7 @@ export function quizMode(mode, q) {
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
-      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span><a class="st-link" href="#/practice/stats">Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
+      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery"></div>
     </div>`}`;
   const stage = $('#stage');
@@ -486,7 +486,7 @@ export function quizMode(mode, q) {
   let dead = false;
   function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
   // Six-key input in Guess: a chord spelling one of the answers picks it (Draw already uses F D S J K L for its dots).
-  const six = mode === 'read' && sixKeyOn() ? chord((ds, cell, letter) => { if (letter && state.key) state.key({ key: letter, preventDefault() {} }); }) : null;
+  const six = mode === 'read' ? chord((ds, cell, letter) => { if (letter && state.key) state.key({ key: letter, preventDefault() {} }); }) : null;
   const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; if (six && six.down(e)) return; state.key && state.key(e); };
   const onKeyUp = (e) => { if (six && sheet.hidden) six.up(e); };
   document.addEventListener('keyup', onKeyUp);
@@ -531,17 +531,21 @@ export function sweepMode(q) {
     if (src === 'words') return Array.from({ length: 7 }, nextWord).join(' ');
     if (src === 'phrases') return nextPhrase();
     if (src === 'numbers') return numberLine();
-    if (src === 'passages') return PASSAGES[passIdx][1];
+    if (src === 'passages') return passList()[passIdx][1];
     return [signLine(), signLine(), signLine()].join(', ');
   };
-  // Passages go in order, easiest first; Next moves on and the place is remembered.
-  let passIdx = Math.min(PASSAGES.length - 1, store.get('swPass', 0));
+  // Passages go in order, easiest first; Next moves on and the place is remembered (per grade).
+  // Grade 2 adds the contraction-rich passages, first within each level.
+  const passList = () => (S.swGrade === 2 ? [...PASSAGES].sort((a, b) => a[0] - b[0] || (b[2] ? 1 : 0) - (a[2] ? 1 : 0)) : PASSAGES.filter((x) => !x[2]));
+  const passKey = () => 'swPass' + S.swGrade;
+  const loadPass = () => Math.min(passList().length - 1, store.get(passKey(), 0));
+  let passIdx = loadPass();
   // Reading speed: timed from the first touch to passing the last cell, in words a minute (best kept per grade).
   let t0 = 0, tDone = 0;
   const words = () => text.split(/\s+/).filter(Boolean).length;
   const info = (extra = '') => {
     const el = $('#swInfo'); if (!el) return;
-    const pass = src === 'passages' ? `Passage ${passIdx + 1} of ${PASSAGES.length} · level ${PASSAGES[passIdx][0]}` : '';
+    const pl = passList(), pass = src === 'passages' ? `Passage ${passIdx + 1} of ${pl.length} · level ${pl[passIdx][0]}${pl[passIdx][2] ? ' · contractions' : ''}` : '';
     const b = store.get('swBest' + S.swGrade, 0);
     el.innerHTML = [pass, extra || `${words()} words${b ? ` · best ${b} words a minute` : ''}`].filter(Boolean).join(' · ');
   };
@@ -657,10 +661,13 @@ export function sweepMode(q) {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
   }
   $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); t0 = 0; tDone = 0; info(); };
-  $('#shuffleBtn').onclick = () => { if (src === 'passages') { passIdx = (passIdx + 1) % PASSAGES.length; store.set('swPass', passIdx); } text = textFor(); build(); };
+  $('#shuffleBtn').onclick = () => { if (src === 'passages') { passIdx = (passIdx + 1) % passList().length; store.set(passKey(), passIdx); } text = textFor(); build(); };
   $('.sweep-top', box).addEventListener('pointerdown', (e) => e.stopPropagation());
   const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
-  const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); };
+  const onSet = (e) => {
+    if (e.detail === 'swGrade' && src === 'passages') { passIdx = loadPass(); text = textFor(); }
+    if (['swGrade', 'swSize'].includes(e.detail)) build();
+  };
   window.addEventListener('resize', onResize); window.addEventListener('settings', onSet);
   build(); settle();
   return () => { active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); cancelAnimationFrame(settleRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); };

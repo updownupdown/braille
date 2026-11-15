@@ -674,7 +674,10 @@ export const MISSIONS = [
 ];
 
 export const ANAGRAM_WORDS = {
-  easy: ['cat', 'dog', 'sun', 'map', 'pen', 'cup', 'hat', 'bed', 'fox', 'owl', 'jam', 'box', 'lake', 'tree', 'frog', 'milk', 'rain', 'snow', 'bird', 'fish', 'cake', 'door', 'kite', 'moon', 'star', 'ship', 'lamp', 'wolf'],
-  medium: ['apple', 'beach', 'bread', 'chair', 'cloud', 'dance', 'eagle', 'flame', 'grape', 'horse', 'lemon', 'maple', 'ocean', 'piano', 'river', 'stone', 'tiger', 'train', 'whale', 'garden', 'planet', 'basket', 'candle', 'forest', 'island', 'pencil', 'rocket', 'winter'],
-  hard: ['blanket', 'chicken', 'diamond', 'giraffe', 'kitchen', 'lantern', 'monster', 'penguin', 'rainbow', 'thunder', 'volcano', 'airplane', 'elephant', 'mountain', 'sandwich', 'treasure', 'umbrella', 'dinosaur', 'squirrel', 'computer'],
+  easy: ['cat', 'dog', 'sun', 'map', 'pen', 'cup', 'hat', 'bed', 'fox', 'owl', 'jam', 'box', 'lake', 'tree', 'frog', 'milk', 'rain', 'snow', 'bird', 'fish', 'cake', 'door', 'kite', 'moon', 'star', 'ship', 'lamp', 'wolf',
+    'egg', 'leaf', 'duck', 'corn', 'sock', 'bell', 'drum', 'hill', 'wind', 'road', 'swan', 'gift', 'jar', 'web', 'boat', 'sand', 'bath', 'plum'],
+  medium: ['apple', 'beach', 'bread', 'chair', 'cloud', 'dance', 'eagle', 'flame', 'grape', 'horse', 'lemon', 'maple', 'ocean', 'piano', 'river', 'stone', 'tiger', 'train', 'whale', 'garden', 'planet', 'basket', 'candle', 'forest', 'island', 'pencil', 'rocket', 'winter',
+    'bridge', 'button', 'dragon', 'jacket', 'kettle', 'ladder', 'meadow', 'parrot', 'pillow', 'rabbit', 'saddle', 'tomato', 'turtle', 'violin', 'zebra', 'cookie'],
+  hard: ['blanket', 'chicken', 'diamond', 'giraffe', 'kitchen', 'lantern', 'monster', 'penguin', 'rainbow', 'thunder', 'volcano', 'airplane', 'elephant', 'mountain', 'sandwich', 'treasure', 'umbrella', 'dinosaur', 'squirrel', 'computer',
+    'backpack', 'blizzard', 'calendar', 'cucumber', 'envelope', 'firework', 'hospital', 'kangaroo', 'mushroom', 'notebook', 'pancake', 'skeleton', 'tortoise', 'vacation'],
 };
