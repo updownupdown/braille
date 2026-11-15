@@ -46,7 +46,9 @@ function line(text, { grade = 1, labels = false, cls = '', blank = false } = {})
 }
 const letterCell = (l, cls = '') => cell(LETTERS[l], cls);
 const fromDotsLocal = (d) => String.fromCharCode(0x2800 + [...d].reduce((m, n) => m | (1 << (Number(n) - 1)), 0));
-const glow = (el, ok) => { el.classList.remove('glow-good', 'glow-bad'); void el.offsetWidth; el.classList.add(ok ? 'glow-good' : 'glow-bad'); };
+// Spoken feedback for screen readers (live region in index.html); the visible cue is the glow plus a check or cross badge.
+const announce = (t) => { const el = document.getElementById('srLive'); if (!el) return; el.textContent = ''; setTimeout(() => { el.textContent = t; }, 30); };
+const glow = (el, ok) => { el.classList.remove('glow-good', 'glow-bad'); void el.offsetWidth; el.classList.add(ok ? 'glow-good' : 'glow-bad'); announce(ok ? 'Correct' : 'Not quite'); };
 const best = (k, v) => { const b = store.get('best.' + k, null); if (v != null && (b == null || v > b)) { store.set('best.' + k, v); return v; } return b; };
 const bestLow = (k, v) => { const b = store.get('best.' + k, null); if (v != null && (b == null || v < b)) { store.set('best.' + k, v); return v; } return b; };
 // Keyboard listener that ignores typing in inputs and open dialogs.

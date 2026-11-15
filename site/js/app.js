@@ -22,6 +22,9 @@ const store = {
 const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
+// Short spoken feedback for screen readers (a polite live region in index.html).
+function announce(text) { const el = document.getElementById('srLive'); if (!el) return; el.textContent = ''; setTimeout(() => { el.textContent = text; }, 30); }
+
 // ---------- icons ----------
 const P = {
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
@@ -471,6 +474,8 @@ const CATS = {
     g2: ['Grade 2', (pre) => autoItems(pre, 'g2'), 'Contractions only'],
   } },
 };
+// Auto comes first in the picker: it is the best way to learn, introducing and bringing back signs on its own.
+const CAT_ORDER = ['auto', ...Object.keys(CATS).filter((k) => k !== 'auto')];
 // ---------- Auto: spaced practice ----------
 // The course in teaching order: Grade 1 (letters, numbers, punctuation, indicators, maths) then Grade 2
 // (the starter signs, then each contraction group). An item appears once, at its first place.
@@ -679,7 +684,7 @@ views.practice = (q, sub) => {
 };
 
 function quizMode(mode, q) {
-  const saved = store.get('psel', { cat: 'letters', set: 'aj' });
+  const saved = store.get('psel', { cat: 'auto', set: 'g1' });
   if (saved.cat === 'review') saved.cat = 'auto';
   const state = { cat: (q.get('cat') === 'review' ? 'auto' : q.get('cat')) || saved.cat, set: q.get('set') || saved.set, wgrade: store.get('pwgrade', 1), wlen: store.get('pwlen', 'medium'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
   if (!CATS[state.cat]) state.cat = 'letters';
@@ -689,7 +694,7 @@ function quizMode(mode, q) {
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
-      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
+      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery"></div>
     </div>`}`;
   const stage = $('#stage');
@@ -715,7 +720,7 @@ function quizMode(mode, q) {
       picker.innerHTML = '<div class="sw-row fit">' + radios('wgrade', [[1, 'Grade 1'], [2, 'Grade 2']], state.wgrade) + radios('wlen', Object.entries(WORD_LEN).map(([k, [n]]) => [k, n]), state.wlen) + '</div>';
       wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[state.wlen][1]));
     } else {
-      picker.innerHTML = radios('cat', Object.entries(CATS).map(([k, c]) => [k, c.name]), state.cat) + '<div id="setDD"></div>';
+      picker.innerHTML = radios('cat', CAT_ORDER.map((k) => [k, CATS[k].name]), state.cat) + '<div id="setDD"></div>';
       dropdown($('#setDD'), { options: Object.entries(CATS[state.cat].sets).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
     }
   }
@@ -733,7 +738,10 @@ function quizMode(mode, q) {
     const it = items(), box = $('#mastery');
     box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
     // Auto lists only the signs met so far, but counts against the whole course.
-    $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
+    $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length;
+    // Signs on their way (one to three right in a row) count too, so progress shows from the first answers.
+    const learning = it.filter((x) => { const l = level(score(x.key)); return l > 0 && l < 4; }).length;
+    $('#mLearn').innerHTML = learning ? ` <span class="m-sep">·</span> Learning: <b>${learning}</b>` : ''; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
     fitMastery(); requestAnimationFrame(fitMastery);
   }
   function fitMastery() {
@@ -768,9 +776,11 @@ function quizMode(mode, q) {
     renderMastery();
   }
   // Feedback is a coloured glow on the card (plus a shake when wrong).
+  // A check or cross badge rides on the glow (CSS), so colour is never the only cue; screen readers hear it too.
   const glow = (ok) => {
     stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth;
     stage.classList.add(ok ? 'glow-good' : 'glow-bad');
+    announce(ok ? 'Correct' : 'Not quite');
   };
 
   // Auto: a new sign is shown with its answer before it is asked.
@@ -804,12 +814,15 @@ function quizMode(mode, q) {
     stage.innerHTML = `
       <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
       <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
+    let misses = 0;
     const choose = (btn) => {
-      if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong')) return;
+      if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong') || $('.choice.right', stage)) return;
       const ok = btn.dataset.k === item.key;
       result(ok, item); glow(ok);
       btn.classList.add(ok ? 'right' : 'wrong');
       if (ok) setTimeout(next, 650);
+      // After a second miss, outline the right answer; it still has to be tapped to move on.
+      else if (++misses >= 2) { const r = $$('.choice', stage).find((b) => b.dataset.k === item.key); if (r) r.classList.add('reveal'); }
     };
     stage.onclick = (e) => choose(e.target.closest('.choice'));
     state.key = (e) => {
@@ -1474,7 +1487,9 @@ function bindQuiz(key) {
     first = false;
     box.classList.remove('glow-good', 'glow-bad'); void box.offsetWidth;
     box.classList.add(ok ? 'glow-good' : 'glow-bad');
+    announce(ok ? 'Correct' : 'Not quite');
     b.classList.add(ok ? 'right' : 'wrong');
+    if (!ok && $$('.choice.wrong', box).length >= 2) { const r = $$('.choice', box).find((x) => x.dataset.t === qs[n].answer); if (r) r.classList.add('reveal'); }
     if (ok) setTimeout(() => { if (!box.isConnected) return; n++; if (n < QUIZ_LEN) show(); else finish(); }, 650);
   };
   start();
