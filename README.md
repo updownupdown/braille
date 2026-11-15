@@ -18,9 +18,13 @@ A small, dependency-free website for learning to read braille, starting with Uni
 site/            static site (deployed as-is)
   index.html
   css/style.css
-  js/braille.js  braille data + translators
-  js/data.js     reference content
-  js/app.js      views and router
+  js/app.js        entry: router, search, Games page wrapper (loads the view modules)
+  js/core.js       shared UI: cells, sheet, drop-downs, header, Settings, symbol dictionary, titleCase
+  js/home.js       Home and Practice stats      js/practice.js  Practice modes and Auto
+  js/learn.js      Learn lessons and reference  js/translate.js Translate
+  js/storage.js    everything saved (localStorage "dots.*"): key list, schema version, backup, resets
+  js/braille.js    braille data + translators   js/data.js      reference content
+  js/games.js      games (data in gamedata.js and friends)
 .github/workflows/pages.yml   deploys site/ on every push to main
 ```
 
@@ -34,6 +38,8 @@ Every pull request and every push to main runs `.github/workflows/pages.yml`:
 - `node tests/smoke.mjs` (needs `npm install --no-save playwright`) opens every route at phone and laptop sizes and fails on any page error or sideways scroll. Add new routes to its `ROUTES` list.
 
 Pushes to main deploy only when both pass. There are no cache version numbers to bump: the service worker fetches the app's files network-first (cached copy offline), and the deploy stamps `site/version.json` so an open app can show an "Updated · Reload" bar.
+
+Headings are Title Case: write literal headings that way, and wrap heading text that comes from data in `titleCase()`. A storage change that renames or reshapes a key needs a new entry in `MIGRATIONS` in `js/storage.js` and a bump of `SCHEMA`; backups carry the schema they were saved with.
 
 The Grade 2 translator follows the main UEB contraction rules but is simplified; treat it as a learning aid, not a transcription tool.
 

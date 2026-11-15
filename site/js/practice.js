@@ -1,0 +1,667 @@
+// Practice: the sets, Auto (spaced practice), Guess / Draw / Type, and Read (the finger sweep).
+import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, translate, toCells } from './braille.js';
+
+import { letterPad, paintTyped, typeHint } from './games.js';
+import { COMMON_WORDS } from './wordlist.js';
+
+import { PHRASES, signLine, numberLine } from './phrases.js';
+import { chord, sixKeyOn } from './sixkey.js';
+import { PASSAGES } from './passages.js';
+import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
+import { $, $$, INDICATORS, S, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
+import { logDay, statsView } from './home.js';
+// ---------- practice data ----------
+export const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
+// The note is only shown in the help sheet's list, never in the quiz.
+export const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d, n]) => ({ key: (cat === 'Lower wordsigns' && (w === 'be' || w === 'in') ? 'cw' : 'c') + w, cells: cellsOf(d), answer: w, kind: 'contraction', grp: cat,
+  note: n || (cat === 'Shortforms' ? SHORT_SPELL[w] || '' : G2_EXAMPLE[w] ? 'e.g. ' + G2_EXAMPLE[w] : '') }));
+// Short everyday words spelled letter by letter (Grade 1), for drawing whole words cell by cell. 40 per session.
+export let SHORT_POOL = null;
+export const SHORT_WORDS = () => { SHORT_POOL = SHORT_POOL || shuffle(COMMON_WORDS.filter((w) => /^[a-z]{3,4}$/.test(w))).slice(0, 40); return SHORT_POOL; };
+export const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
+export const CATS = {
+  letters: { name: 'ABC', sets: {
+    aj: ['a–j', L('abcdefghij')], kt: ['k–t', L('klmnopqrst')], uz: ['u–z', L('uvwxyz')],
+    az: ['All letters', L('abcdefghijklmnopqrstuvwxyz')], mirror: ['Mirror pairs', L('dfeihjrw'), 'd/f, e/i, h/j, r/w'],
+    words: ['Words', () => SHORT_WORDS().map((w) => ({ key: 'sw' + w, cells: [...w].map((l) => LETTERS[l]).join(''), answer: w, kind: 'letter' })), 'Three and four letters, Grade 1'],
+  } },
+  symbols: { name: '!?#', sets: {
+    num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d, kind: 'digit' }))],
+    punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1], kind: 'punct' }))],
+    signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: p === '-' ? 'pminus' : 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1], kind: 'math' }))],
+    ind: ['Indicators', () => INDICATORS.map(([p, d, n]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p, kind: 'indicator', note: n }))],
+  } },
+  contractions: { name: 'Grade 2', sets: {
+    start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean)],
+    ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
+    all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
+  } },
+  // Auto: the set is the signs introduced so far (per mode), drawn from the whole course or one grade of it.
+  auto: { name: 'Auto', sets: {
+    all: ['All', (pre) => autoItems(pre, 'all'), 'Grade 1, then Grade 2'],
+    g1: ['Grade 1', (pre) => autoItems(pre, 'g1'), 'Letters, numbers, punctuation'],
+    g2: ['Grade 2', (pre) => autoItems(pre, 'g2'), 'Contractions only'],
+  } },
+};
+// Auto comes first in the picker: it is the best way to learn, introducing and bringing back signs on its own.
+export const CAT_ORDER = ['auto', ...Object.keys(CATS).filter((k) => k !== 'auto')];
+// ---------- Auto: spaced practice ----------
+// The course in teaching order: Grade 1 (letters, numbers, punctuation, indicators, maths) then Grade 2
+// (the starter signs, then each contraction group). An item appears once, at its first place.
+export let AUTO_COURSE = null;
+export function autoCourse() {
+  if (AUTO_COURSE) return AUTO_COURSE;
+  const S = CATS.symbols.sets, G = CATS.contractions.sets;
+  const tag = (src, list) => list.map((x) => ({ ...x, src }));
+  const g1 = [CATS.letters.sets.aj, CATS.letters.sets.kt, CATS.letters.sets.uz, S.num, S.punct, S.ind, S.signs].flatMap(([n, f]) => tag(n, f()));
+  const g2order = ['Strong contractions', 'Alphabetic wordsigns', 'Strong groupsigns', 'Strong wordsigns', 'Lower groupsigns', 'Lower wordsigns', 'Initial-letter contractions', 'Final-letter groupsigns', 'Shortforms'];
+  const g2 = [...tag('start', G.start[1]()), ...g2order.flatMap((c) => tag(c, C(c)()))];
+  const seen = new Set(), out = [];
+  for (const [g, list] of [[1, g1], [2, g2]]) for (const it of list) if (!seen.has(it.key)) { seen.add(it.key); out.push({ ...it, g }); }
+  AUTO_COURSE = out;
+  return out;
+}
+export const autoList = (scope) => autoCourse().filter((x) => scope === 'g1' ? x.g === 1 : scope === 'g2' ? x.g === 2 : true);
+// Each sign sits in a box; a right answer moves it up a box and it comes back after that many more turns.
+// A miss sends it back to the first box.
+export const AUTO_GAP = [1, 3, 6, 12, 25, 50, 100];
+export const AUTO_NEW_AT_ONCE = 3; // signs still in the first two boxes before another new one arrives
+export function autoState(pre) {
+  const all = store.get('auto', {}), k = pre[0];
+  if (!all[k]) {
+    // First visit: signs already known from other practice start further along, so they're only reviewed.
+    const m = mastery(), st = { turn: 0, s: {} };
+    autoCourse().forEach((x, i) => { if ((m[pre + x.key] || 0) >= 4) st.s[x.key] = [3, 4 + (i % 20)]; });
+    all[k] = st; store.set('auto', all);
+  }
+  return all[k];
+}
+export const autoSave = (pre, st) => { const all = store.get('auto', {}); all[pre[0]] = st; store.set('auto', all); };
+export function autoItems(pre, scope) { const st = autoState(pre || 'r:'); return autoList(scope).filter((x) => st.s[x.key]); }
+export function autoPick(pre, scope, lastKey) {
+  const st = autoState(pre), list = autoList(scope);
+  const met = list.filter((x) => st.s[x.key]);
+  const learning = met.filter((x) => st.s[x.key][0] < 2).length;
+  let fresh = list.find((x) => !st.s[x.key]);
+  // Before showing a sign as new, check what you already know of it from other practice and lessons.
+  if (fresh && learning < AUTO_NEW_AT_ONCE) {
+    const m = mastery(), other = pre === 'w:' ? 'r:' : 'w:', done = store.get('learnDone', []);
+    const lesson = (x) => (done.includes('alphabet') && x.kind === 'letter') || (done.includes('numbers') && ['digit', 'punct', 'indicator'].includes(x.kind)) || (done.includes('grade2') && x.src === 'start');
+    let n = learning, changed = false;
+    while (fresh && n < AUTO_NEW_AT_ONCE) {
+      const a = m[pre + fresh.key] || 0, b = m[other + fresh.key] || 0;
+      if (a >= 4) st.s[fresh.key] = [3, st.turn + 4 + Math.floor(Math.random() * 12)];
+      else if (b >= 4) st.s[fresh.key] = [2, st.turn + 2 + Math.floor(Math.random() * 6)];
+      else if (a > 0 || b > 0 || lesson(fresh)) { st.s[fresh.key] = [1, st.turn]; n++; }
+      else break;
+      changed = true;
+      fresh = list.find((x) => !st.s[x.key]);
+    }
+    if (changed) { autoSave(pre, st); return autoPick(pre, scope, lastKey); }
+    if (fresh) return { ...fresh, isNew: true };
+  }
+  const pool = met.filter((x) => x.key !== lastKey);
+  if (!pool.length) return met[0] || (fresh && { ...fresh, isNew: true });
+  // Most overdue first; among signs due on the same turn, a random one.
+  const due = (x) => st.s[x.key][1];
+  const best = Math.min(...pool.map(due));
+  const tied = pool.filter((x) => due(x) === best);
+  return tied[Math.floor(Math.random() * tied.length)];
+}
+export function autoMeet(pre, key) { const st = autoState(pre); if (!st.s[key]) st.s[key] = [0, st.turn]; autoSave(pre, st); }
+export function autoResult(pre, key, ok) {
+  const st = autoState(pre);
+  st.turn++;
+  const box = ok ? Math.min(AUTO_GAP.length - 1, ((st.s[key] || [0])[0]) + 1) : 0;
+  st.s[key] = [box, st.turn + (ok ? AUTO_GAP[box] : 2)];
+  autoSave(pre, st);
+}
+// ---------- Guess: context and confusable answers ----------
+// A sign is shown in a context: on its own (bare), or beside pale placeholder cells that stand for the rest of a word.
+// Pale cells after it = start of a word, on both sides = inside a word, before it = end of a word.
+// The context is picked so only one answer is right; the wrong answers favour the signs most easily confused with it.
+export const CTX_ALL = ['alone', 'start', 'mid', 'end'];
+export const CTX_NAME = { alone: 'on its own', start: 'at the start of a word', mid: 'inside a word', end: 'at the end of a word' };
+export const LOWER_MID = ['ea', 'bb', 'cc', 'ff', 'gg'], LOWER_START = ['be', 'con', 'dis'];
+export function ctxOf(x, uni) {
+  if (x.kind === 'digit' || x.kind === 'math') return ['alone'];
+  if (x.kind === 'indicator') return ['start'];
+  if (x.kind === 'punct') return [x.answer === '(' ? 'start' : 'end'];
+  if (x.kind === 'letter') {
+    // A lone letter reads as its wordsign once that wordsign is in play (b alone is "but").
+    const ws = uni.some((u) => u.key !== x.key && u.cells === x.cells && u.kind === 'contraction' && ctxOf(u, uni).includes('alone'));
+    return ws ? ['start', 'mid', 'end'] : CTX_ALL;
+  }
+  switch (x.grp) {
+    case 'Alphabetic wordsigns': case 'Strong wordsigns': case 'Lower wordsigns': case 'Shortforms': return ['alone'];
+    case 'Strong groupsigns': return x.answer === 'ing' ? ['mid', 'end'] : ['start', 'mid', 'end'];
+    case 'Lower groupsigns': return LOWER_MID.includes(x.answer) ? ['mid'] : LOWER_START.includes(x.answer) ? ['start'] : ['start', 'mid', 'end'];
+    case 'Final-letter groupsigns': return ['mid', 'end'];
+    default: return CTX_ALL;
+  }
+}
+// Other readings of the same cells that would also be right in this context.
+export const rivals = (x, ctx, uni) => uni.filter((u) => u.cells === x.cells && u.answer !== x.answer && ctxOf(u, uni).includes(ctx));
+export function pickCtx(x, uni) {
+  const ok = ctxOf(x, uni).filter((c) => !rivals(x, c, uni).length);
+  const list = ok.length ? ok : ctxOf(x, uni);
+  // Plain letters, digits and maths signs sit on their own whenever that's unambiguous.
+  if (list.includes('alone') && ['letter', 'digit', 'math'].includes(x.kind)) return 'alone';
+  return list[Math.floor(Math.random() * list.length)];
+}
+export const GHOST = () => cellHTML('⠿', 'ghost');
+export const ctxCellsHTML = (cells, ctx) => `${ctx === 'mid' || ctx === 'end' ? GHOST() : ''}${[...cells].map((c) => cellHTML(c)).join('')}${ctx === 'mid' || ctx === 'start' ? GHOST() : ''}`;
+// How alike two signs look: same cells (another context), mirror image, moved up or down a row, one dot apart.
+export const dotSet = (cells) => [...cells].map((c) => new Set(toDots(c)));
+export function likeness(a, b) {
+  if (a.cells === b.cells) return 100;
+  const A = dotSet(a.cells), B = dotSet(b.cells);
+  if (A.length !== B.length) return a.src && a.src === b.src ? 10 : 0;
+  const same = (f) => A.every((s, i) => { const t = new Set([...s].map(f)); return t.size === B[i].size && [...t].every((d) => B[i].has(d)); });
+  if (same((d) => (d <= 3 ? d + 3 : d - 3))) return 60;
+  const down = (d) => (d === 3 || d === 6 ? 0 : d + 1), up = (d) => (d === 1 || d === 4 ? 0 : d - 1);
+  if (A.every((s) => ![...s].includes(3) && ![...s].includes(6)) && same(down)) return 50;
+  if (A.every((s) => ![...s].includes(1) && ![...s].includes(4)) && same(up)) return 50;
+  const diff = A.reduce((n, s, i) => n + [...s].filter((d) => !B[i].has(d)).length + [...B[i]].filter((d) => !s.has(d)).length, 0);
+  const firstSame = A.length > 1 && [...A[0]].length === B[0].size && [...A[0]].every((d) => B[0].has(d));
+  return (diff === 1 ? 40 : diff === 2 ? 15 : 0) + (firstSame ? 20 : 0) + (a.src && a.src === b.src ? 10 : 0);
+}
+export function guessOptions(item, ctx, pool, uni) {
+  const bad = new Set([item.answer, ...rivals(item, ctx, uni).map((u) => u.answer)]);
+  const seen = new Set(), cands = [];
+  for (const x of [...pool, ...uni.filter((u) => u.cells === item.cells)]) {
+    if (bad.has(x.answer) || seen.has(x.answer)) continue;
+    seen.add(x.answer); cands.push([likeness(item, x) + Math.random() * 9, x]);
+  }
+  return cands.sort((p, q) => q[0] - p[0]).slice(0, 3).map(([, x]) => x);
+}
+// ---------- practice help: what the chosen set is ----------
+export const LOWER_NOTE = 'Lower signs are the shapes of a–j moved down one row, so they never use the top dots.';
+export const SET_HELP = {
+  'letters.aj': ['Letters a–j', ['The first ten letters use only the top four dots of the cell. They are the pattern the rest of the alphabet is built on, so they are worth knowing well.', 'After a number sign, the same ten cells are the digits 1 to 0.']],
+  'letters.kt': ['Letters k–t', ['k to t are a to j with the lower-left dot added: k is a plus that dot, l is b plus it, and so on to t, which is j plus it.', 'If you know a–j, you only need to spot the extra dot.']],
+  'letters.uz': ['Letters u–z', ['u, v, x, y and z are a to e with both bottom dots added.', 'w is the odd one out. French had no w when Louis Braille made the system, so it was added later and doesn’t follow the pattern: it is j plus the lower-right dot.']],
+  'letters.az': ['All letters', ['The alphabet comes in three rows of ten. a–j use only the top four dots. k–t add the lower-left dot. u, v, x, y, z add both bottom dots to a–e, and w is j plus the lower-right dot.']],
+  'letters.mirror': ['Mirror pairs', ['These letters are left-to-right mirror images of each other, so they are the easiest to mix up: d and f, e and i, h and j, r and w.', 'Look at which side of the cell the dots lean towards.']],
+  'letters.words': ['Words', ['Everyday words of three or four letters, written letter by letter as in Grade 1.', 'In Draw, fill every cell of the word: each cell turns faintly green when it is right. In Guess, read the whole word.']],
+  'symbols.num': ['Numbers', ['There are no separate digit cells. A number sign in front turns a–j into digits: a is 1, b is 2 and so on to i for 9 and j for 0.', 'One number sign covers the whole number, so 25 is the number sign, then b, then e. A comma or decimal point inside a number keeps it going; a space ends it.']],
+  'symbols.punct': ['Punctuation', ['Most punctuation marks are lower signs. ' + LOWER_NOTE + ' The comma is a moved down, the period is d moved down, the exclamation mark is f.', 'The dash and the brackets take two cells: a prefix, then the sign. In Grade 2 the same lower cells are also contractions; where they sit in the word tells you which it is.']],
+  'symbols.signs': ['Maths & money signs', ['These take two cells: a prefix, then a cell that names the sign.', 'Plus, minus, times, divided by, equals and the asterisk share the same prefix (the middle-right dot), so it is the second cell that tells them apart. Dollar, at and ampersand use the top-right dot instead: dollar is that dot plus s, at is that dot plus a.']],
+  'symbols.ind': ['Indicators', ['Indicators are not printed characters. They change how the next cells are read.', 'The capital sign makes the next letter a capital; two make the whole word capitals, and three a whole passage, closed by the terminator. The number sign starts digits. The grade 1 indicator says the next cell is a plain letter, not a contraction. Italic and bold mark emphasis.']],
+  'contractions.start': ['Starter signs', ['The 18 signs that turn up most in everyday text: the five strong contractions (and, for, of, the, with), a few one-letter wordsigns (but, can, do, it, that, you) and the commonest letter groups (ing, st, sh, th, ch, er, ed).', 'Knowing these makes most Grade 2 text much easier to read.']],
+  'contractions.all': ['All contractions', ['Grade 2 uses about 180 contractions to make braille shorter. Many cells mean different things alone and inside a word, so each sign has rules for where it may go.', 'Learn them group by group; this set mixes every group.']],
+  'Alphabetic wordsigns': ['Alphabetic wordsigns', ['When a letter stands alone, with a space or punctuation on each side, it means a whole word: b alone is “but”, c is “can”, d is “do”.', 'Inside a word the letter is just a letter. a, i and o are already words, so they have no wordsign; x is “it”, y is “you” and z is “as”.']],
+  'Strong contractions': ['Strong contractions', ['and, for, of, the and with each have their own cell. They are “strong” because they can go anywhere: as a whole word (the) or inside one (them, form, often, without).', 'They fill the cell from the top, so they are easy to tell apart from the lower signs.']],
+  'Strong groupsigns': ['Strong groupsigns', ['Common letter groups get one cell each and can be used anywhere in a word: ch in chip, ed in edit, ar in park.', 'The one exception is ing, which never starts a word. Where a group spans two parts of a compound word (like the t and h in pothole), the letters are written out.']],
+  'Strong wordsigns': ['Strong wordsigns', ['Six of the strong groupsigns double as whole words when they stand alone: ch is “child”, sh is “shall”, th is “this”, wh is “which”, ou is “out” and st is “still”.', 'Inside a word they go back to being the letter group.']],
+  'Lower groupsigns': ['Lower groupsigns', [LOWER_NOTE + ' ea is a moved down, bb is b, cc is c, en is e, in is i.', 'Because they look alike, position matters. ea, bb, cc, ff and gg go only in the middle of a word, never first or last. en and in can go anywhere. be, con and dis only start a word, as its first syllable. The same cell can mean two things by position: one is both bb and be, another both cc and con.']],
+  'Lower wordsigns': ['Lower wordsigns', ['be, enough, were, his, in and was each use one lower cell when they stand alone as a word. ' + LOWER_NOTE, 'A word made only of lower cells is hard to place in the line, so these are only used when nothing touches them. Next to punctuation the word is written another way.']],
+  'Initial-letter contractions': ['Initial-letter contractions', ['A prefix from the right-hand column of the cell, then the first letter (or groupsign) of the word: the middle-right dot plus d is “day”, plus m is “mother”.', 'There are three prefixes, each with its own list: the middle-right dot alone, the top and middle-right dots, and the whole right column. They work as words and inside words: someone, daytime, mother’s.']],
+  'Final-letter groupsigns': ['Final-letter groupsigns', ['Common word endings: a prefix, then the last letter of the ending. ound, ance, sion, less and ount use the top-right and bottom-right dots as the prefix; ence, ong, ful, tion, ness, ment and ity use the middle-right and bottom-right dots.', 'They only ever follow letters, never start a word: pound, dance, nation, city.']],
+  'Shortforms': ['Shortforms', ['Shortforms are abbreviated spellings of common words: about is ab, could is cd, braille is brl. Each one is listed with its spelling.', 'They are mainly used as whole words, and some take endings (friends, braille’s). Inside longer words only some are allowed, so learn them as words first.']],
+  'auto': ['Auto', ['Auto teaches you braille a few signs at a time, in the order most courses use: letters, numbers and punctuation first, then Grade 2 contractions.', 'Each new sign is shown to you before it is asked. Signs you get right come back less and less often; a miss brings a sign back soon. A new one arrives once the last few are settling in.', 'Use the drop-down to stick to Grade 1 or Grade 2. Guess and Draw keep their own progress, and signs you already know from other practice start as known.']],
+};
+export const setHelpKey = (cat, set) => cat === 'auto' ? 'auto' : cat === 'contractions' && /^k\d+$/.test(set) ? Object.keys(CONTRACTIONS)[Number(set.slice(1))] : `${cat}.${set}`;
+export const helpTitle = (cat, set) => (SET_HELP[setHelpKey(cat, set)] || [MODES.read])[0];
+export function practiceHelp(mode, cat, set) {
+  const info = SET_HELP[setHelpKey(cat, set)];
+  const pre = mode === 'write' ? 'w:' : 'r:';
+  const sets = CATS[cat] && CATS[cat].sets;
+  const list = sets && sets[set] ? sets[set][1](pre) : [];
+  const rows = list.map((x) => crowHTML(x.cells, x.answer, { kind: x.kind || '', note: x.label || x.note || '' })).join('');
+  const listH = cat === 'auto' ? (list.length ? `Signs so far <span class="count">${list.length} of ${autoList(set).length}</span>` : 'Signs so far') : `Signs in this set <span class="count">${list.length}</span>`;
+  return `<div class="help">
+    ${info ? info[1].map((t) => `<p>${esc(t)}</p>`).join('') : ''}
+    <details class="help-mode"><summary><span>How ${esc(MODES[mode])} works</span>${icon('chevron', 18)}</summary><div>${helpHTML(mode)}</div></details>
+    <h3 class="help-h">${listH}</h3>
+    ${rows ? `<div class="ctable help-list">${rows}</div>` : '<p class="muted">Your first sign is on its way.</p>'}
+  </div>`;
+}
+export const SWEEP_SRC = { words: 'Words', phrases: 'Phrases', numbers: 'Numbers', signs: 'Signs', passages: 'Passages' };
+// Mode keys stay as they were (URLs, saved progress); only the names changed.
+export const MODES = { read: 'Guess', write: 'Draw', words: 'Type', sweep: 'Read' };
+// A shuffled deck: every item comes up once before any repeats.
+export function deck(list) {
+  let d = [];
+  return () => { if (!d.length) d = shuffle(list); return d.pop(); };
+}
+export const WORD_LEN = { short: ['Short', (w) => w.length >= 2 && w.length <= 4], medium: ['Medium', (w) => w.length >= 5 && w.length <= 7], long: ['Long', (w) => w.length >= 8] };
+export const HELP = {
+  read: ['A braille cell appears. Pick what it says.', 'Pale cells stand for the rest of a word: a sign between them is inside a word, before them starts a word, after them ends one. A sign with nothing around it stands alone, as a word of its own. Only one answer fits.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
+  write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
+  words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
+  sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
+};
+export const HELP_KEYS = {
+  read: 'Press 1, 2, 3 or 4 to pick an answer.',
+  write: 'F, D and S are the left column, top to bottom; J, K and L are the right column, like a Perkins brailler. Backspace clears.',
+  words: 'Just type the word; there is no need to press Enter.',
+  sweep: 'Move the mouse along the line, or use the arrow keys.',
+};
+export const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_KEYS[k] ? `<p class="help-keys">${icon('keyboard', 18)}<span>${esc(HELP_KEYS[k])}</span></p>` : '');
+views.practice = (q, sub) => {
+  if (sub === 'stats') return statsView();
+  const mode = MODES[sub] ? sub : store.get('pmode', 'read');
+  store.set('pmode', mode); store.set('pvisited', true);
+  setTitle('Practice');
+  setSub(`<div class="seg radios modes" role="radiogroup">${Object.entries(MODES).map(([k, v]) => `<a role="radio" aria-checked="${k === mode}" class="${k === mode ? 'on' : ''}" href="#/practice/${k}">${icon(k, 20)}<span>${v}</span></a>`).join('')}</div>`);
+  helpBtn.hidden = false;
+  helpBtn.onclick = () => openSheet(`<div class="help">${helpHTML(mode)}</div>`, { title: MODES[mode] });
+  view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
+  return mode === 'sweep' ? sweepMode(q) : quizMode(mode, q);
+};
+export function quizMode(mode, q) {
+  const saved = store.get('psel', { cat: 'auto', set: 'g1' });
+  if (saved.cat === 'review') saved.cat = 'auto';
+  const state = { cat: (q.get('cat') === 'review' ? 'auto' : q.get('cat')) || saved.cat, set: q.get('set') || saved.set, wgrade: store.get('pwgrade', 1), wlen: store.get('pwlen', 'medium'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
+  if (!CATS[state.cat]) state.cat = 'letters';
+  if (!CATS[state.cat].sets[state.set]) state.set = Object.keys(CATS[state.cat].sets)[0];
+  const m = mastery();
+  const picker = $('#picker'), body = $('#modeBody');
+  if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
+  body.innerHTML = `<div class="card stage" id="stage"></div>
+    ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
+      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span><a class="st-link" href="#/practice/stats">Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
+      <div class="mastery" id="mastery"></div>
+    </div>`}`;
+  const stage = $('#stage');
+  const pre = mode === 'write' ? 'w:' : 'r:';
+  const auto = () => state.cat === 'auto';
+  // Auto never merges: its options already skip anything with the same cells as the answer.
+  const items = () => {
+    const it = CATS[state.cat].sets[state.set][1](pre);
+    return it;
+  };
+  // Every sign that could be meant (for picking a context with one right answer), by category.
+  const universe = () => auto() ? autoItems(pre, state.set) : state.cat === 'contractions' ? autoCourse() : autoList('g1');
+  const score = (k) => m[pre + k] || 0;
+  const bump = (k, d) => {
+    m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m);
+    if (d < 0) { const ms = store.get('misses', {}); ms[pre + k] = (ms[pre + k] || 0) + 1; store.set('misses', ms); }
+  };
+
+  let wordDeck = null;
+  function renderPicker() {
+    if (mode === 'words') {
+      if (!WORD_LEN[state.wlen]) state.wlen = 'medium';
+      picker.innerHTML = '<div class="sw-row fit">' + radios('wgrade', [[1, 'Grade 1'], [2, 'Grade 2']], state.wgrade) + radios('wlen', Object.entries(WORD_LEN).map(([k, [n]]) => [k, n]), state.wlen) + '</div>';
+      wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[state.wlen][1]));
+    } else {
+      picker.innerHTML = radios('cat', CAT_ORDER.map((k) => [k, CATS[k].name]), state.cat) + '<div id="setDD"></div>';
+      dropdown($('#setDD'), { options: Object.entries(CATS[state.cat].sets).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
+    }
+  }
+  const saveSel = () => store.set('psel', { cat: state.cat, set: state.set });
+  bindRadios(picker, (k, v) => {
+    if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); wScore(); next(); return; }
+    if (k === 'wlen') { state.wlen = v; store.set('pwlen', v); wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[v][1])); next(); return; }
+    state.cat = v; state.set = Object.keys(CATS[v].sets)[0]; saveSel(); renderPicker(); restart();
+  });
+  function restart() { state.last = null; renderMastery(); next(); }
+  // Pills for every symbol in the set, collapsed to four rows with a fade; the chevron only shows when there is more.
+  let mOpen = store.get('mOpen', false);
+  function renderMastery() {
+    if (mode === 'words') return;
+    const it = items(), box = $('#mastery');
+    box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
+    // Auto lists only the signs met so far, but counts against the whole course.
+    $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length;
+    // Signs on their way (one to three right in a row) count too, so progress shows from the first answers.
+    const learning = it.filter((x) => { const l = level(score(x.key)); return l > 0 && l < 4; }).length;
+    $('#mLearn').innerHTML = learning ? ` <span class="m-sep">·</span> Learning: <b>${learning}</b>` : ''; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
+    fitMastery(); requestAnimationFrame(fitMastery);
+  }
+  function fitMastery() {
+    const box = $('#mastery'), more = $('#mMore'); if (!box || !more) return;
+    box.classList.remove('clamp');
+    const first = box.firstElementChild;
+    const fits = !first || !first.offsetHeight || box.scrollHeight <= first.offsetHeight * 2 + 4 + 2;
+    more.hidden = fits;
+    box.classList.toggle('clamp', !fits && !mOpen);
+    more.setAttribute('aria-expanded', String(!fits && mOpen)); more.classList.toggle('open', mOpen);
+  }
+  if (mode !== 'words') $('#mMore').onclick = () => { mOpen = !mOpen; store.set('mOpen', mOpen); renderMastery(); };
+  function nextItem() {
+    if (auto()) return autoPick(pre, state.set, state.last && state.last.key);
+    const it = items();
+    let pool = it.filter((x) => !state.last || x.key !== state.last.key);
+    if (!pool.length) pool = it;
+    const w = pool.map((x) => 6 - score(x.key));
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
+    return pool[0];
+  }
+  function result(ok, item) {
+    if (state.firstTry) {
+      logDay();
+      state.total++;
+      if (ok) { state.right++; state.streak++; } else state.streak = 0;
+      if (item.key) bump(item.key, ok ? 1 : -1);
+      if (item.key && auto()) autoResult(pre, item.key, ok);
+    }
+    state.firstTry = false;
+    if (mode === 'words') { wScore(); return; }
+    renderMastery();
+  }
+  // Feedback is a coloured glow on the card (plus a shake when wrong).
+  // A check or cross badge rides on the glow (CSS), so colour is never the only cue; screen readers hear it too.
+  const glow = (ok) => {
+    stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth;
+    stage.classList.add(ok ? 'glow-good' : 'glow-bad');
+    announce(ok ? 'Correct' : 'Not quite');
+  };
+
+  // Auto: a new sign is shown with its answer before it is asked.
+  function renderIntro(item) {
+    state.last = item;
+    stage.classList.remove('glow-good', 'glow-bad');
+    const ctx = mode === 'read' ? pickCtx(item, [...universe().filter((u) => u.key !== item.key), item]) : 'alone';
+    stage.innerHTML = `<div class="intro">
+      <span class="intro-tag">New sign</span>
+      <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
+      <div class="intro-ans">${esc(item.answer)}</div>
+      ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
+      ${ctx !== 'alone' ? `<p class="intro-note">Shown ${CTX_NAME[ctx]}: pale cells stand for the rest of the word.</p>` : ''}
+      <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
+    const go = () => { autoMeet(pre, item.key); state.forced = item; state.ctx = [item.key, ctx]; next(); };
+    $('#gotIt').onclick = go;
+    state.key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  }
+
+  function renderRead() {
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
+    stage.classList.remove('glow-good', 'glow-bad');
+    const uni = [...universe().filter((u) => u.key !== item.key), item];
+    const ctx = state.ctx && state.ctx[0] === item.key ? state.ctx[1] : pickCtx(item, uni);
+    state.ctx = null;
+    let pool = items().filter((x) => x.key !== item.key);
+    // Early in Auto, top up from the sign's own group so there are always three wrong answers.
+    if (auto() && pool.length < 6) pool = [...pool, ...autoList('all').filter((x) => x.src === item.src && x.key !== item.key && !pool.some((o) => o.key === x.key))];
+    const opts = shuffle([item, ...guessOptions(item, ctx, pool, uni)]);
+    const long = opts.some((o) => o.answer.length > 2);
+    stage.innerHTML = `
+      <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
+      <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
+    let misses = 0;
+    const choose = (btn) => {
+      if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong') || $('.choice.right', stage)) return;
+      const ok = btn.dataset.k === item.key;
+      result(ok, item); glow(ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      if (ok) setTimeout(next, 650);
+      // After a second miss, outline the right answer; it still has to be tapped to move on.
+      else if (++misses >= 2) { const r = $$('.choice', stage).find((b) => b.dataset.k === item.key); if (r) r.classList.add('reveal'); }
+    };
+    stage.onclick = (e) => choose(e.target.closest('.choice'));
+    state.key = (e) => {
+      const btns = $$('.choice', stage);
+      if (/^[1-4]$/.test(e.key) && !opts.some((o) => /^[0-9]$/.test(o.answer))) return choose(btns[Number(e.key) - 1]);
+      const o = opts.find((x) => x.answer === e.key.toLowerCase());
+      if (o) choose(btns.find((b) => b.dataset.k === o.key));
+    };
+  }
+
+  function renderWrite() {
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
+    stage.classList.remove('glow-good', 'glow-bad');
+    const targets = [...item.cells];
+    let done = false, shown = false;
+    const on = targets.map(() => new Set()), ok = targets.map(() => false);
+    // Several cells sit side by side at full size; each one turns faintly green when it's right.
+    stage.innerHTML = `
+      <div class="target">${esc(item.answer)}</div>
+      <div class="pads" style="--n:${targets.length}">${targets.map((_, ci) => `<div class="dotpad" data-c="${ci}">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="${targets.length > 1 ? `Cell ${ci + 1}, ` : ''}dot ${d}">${d}</button>`).join('')}</div>`).join('')}</div>
+      <button class="link-btn corner" id="skip">Show me</button>`;
+    const pads = $$('.dotpad', stage);
+    const paint = (ci) => { [1, 2, 3, 4, 5, 6].forEach((d) => $(`[data-d="${d}"]`, pads[ci]).classList.toggle('on', on[ci].has(d))); pads[ci].classList.toggle('ok', ok[ci]); };
+    const evaluate = (ci, added) => {
+      if (done) return;
+      const w = new Set(toDots(targets[ci]));
+      if (added && !w.has(added)) { result(false, item); glow(false); pads[ci].classList.remove('bad'); void pads[ci].offsetWidth; pads[ci].classList.add('bad'); }
+      ok[ci] = on[ci].size === w.size && [...w].every((d) => on[ci].has(d)); paint(ci);
+      // After "Show me", stay three times as long so the answer can sink in.
+      if (ok.every(Boolean)) { done = true; result(true, item); glow(true); setTimeout(next, shown ? 2250 : 750); }
+    };
+    const tog = (ci, d) => {
+      if (done) return;
+      if (on[ci].has(d)) { on[ci].delete(d); paint(ci); evaluate(ci, 0); } else { on[ci].add(d); paint(ci); evaluate(ci, d); }
+    };
+    stage.querySelector('.pads').onclick = (e) => { const b = e.target.closest('button[data-d]'); if (b) tog(Number(b.closest('.dotpad').dataset.c), Number(b.dataset.d)); };
+    $('#skip').onclick = () => {
+      if (done) return;
+      if (state.firstTry) result(false, item);
+      shown = true;
+      targets.forEach((t, ci) => { on[ci] = new Set(toDots(t)); });
+      targets.forEach((t, ci) => evaluate(ci, 0));
+    };
+    const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
+    state.key = (e) => { const d = KEYS[e.key.toLowerCase()]; if (!d) return; const ci = Math.max(0, ok.indexOf(false)); tog(ci, d); };
+  }
+
+  function renderWords() {
+    const word = wordDeck();
+    state.last = word; state.firstTry = true;
+    stage.classList.remove('glow-good', 'glow-bad');
+    const cells = toCells(translate(word, 'en', state.wgrade));
+    let done = false, hinting = false;
+    // Contractions are colour coded like everywhere else; cells stay one size so nothing jumps around.
+    const cellsHTML = cells.map((c, i) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1)}</span>`).join('');
+    stage.innerHTML = `
+      <div class="w-top"><button class="link-btn pillish" id="hint">Hint</button><button class="link-btn pillish" id="skip">Skip</button></div>
+      <div class="prompt-cells words many" id="wcells">${cellsHTML}</div>`;
+    const lbls = $$('#wcells .lbl');
+    const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const check = () => {
+      if (done) return;
+      if (wpad.value === target) { done = true; result(true, {}); glow(true); paintTyped(lbls, cells, '', true); setTimeout(next, 900); }
+      else paintTyped(lbls, cells, wpad.value);
+    };
+    wOnInput = () => { if (!hinting) check(); };
+    wOnEnter = () => { if (!done && wpad.value) { result(false, {}); glow(false); } };
+    wpad.value = ''; check();
+    $('#hint').onclick = () => {
+      if (done || hinting) return;
+      state.firstTry = false; hinting = true;
+      typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paintTyped(lbls, cells, wpad.value); }, () => done || state.last !== word);
+    };
+    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paintTyped(lbls, cells, '', true); setTimeout(next, 1300); };
+    state.key = null;
+  }
+  // Type mode score: words right first time this session, the current streak and the best streak ever (per grade).
+  function wScore() {
+    const el = $('#wScore'); if (!el) return;
+    const bk = 'pwbest' + state.wgrade, b = Math.max(store.get(bk, 0), state.streak); store.set(bk, b);
+    el.innerHTML = `<span>Right: <b>${state.right}</b> of ${state.total}</span><span>Streak: <b>${state.streak}</b></span><span>Best: <b>${b}</b></span>`;
+  }
+  // Type mode: one on-screen keyboard for the whole session; each word plugs in its own handlers.
+  let wOnInput = () => {}, wOnEnter = () => {};
+  const wpad = mode === 'words' ? letterPad({ mount: $('#wkb'), onInput: () => wOnInput(), onEnter: () => wOnEnter() }) : null;
+  // The next item to ask; in Auto a brand-new sign gets its intro card first.
+  function takeItem() {
+    if (state.forced) { const f = state.forced; state.forced = null; return f; }
+    const it = nextItem();
+    if (it && it.isNew) { renderIntro(it); return null; }
+    return it;
+  }
+  let dead = false;
+  function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
+  // Six-key input in Guess: a chord spelling one of the answers picks it (Draw already uses F D S J K L for its dots).
+  const six = mode === 'read' && sixKeyOn() ? chord((ds, cell, letter) => { if (letter && state.key) state.key({ key: letter, preventDefault() {} }); }) : null;
+  const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; if (six && six.down(e)) return; state.key && state.key(e); };
+  const onKeyUp = (e) => { if (six && sheet.hidden) six.up(e); };
+  document.addEventListener('keyup', onKeyUp);
+  const onSet = (e) => {
+    if (e.detail === 'mastery') { Object.keys(m).forEach((k) => delete m[k]); renderMastery(); }
+  };
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('settings', onSet);
+  window.addEventListener('resize', fitMastery);
+  renderPicker(); renderMastery(); wScore(); next();
+  return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); window.removeEventListener('settings', onSet); window.removeEventListener('resize', fitMastery); };
+}
+// ---------- sweep ----------
+export function sweepMode(q) {
+  let src = q.get('src') || store.get('swSrc', 'words');
+  if (src === 'sentences') src = 'phrases';
+  if (!SWEEP_SRC[src]) src = 'words';
+  $('#picker').innerHTML = `<div class="sw-row">${radios('src', Object.entries(SWEEP_SRC), src)}</div>
+    <div class="sw-row">${radios('swGrade', [[1, 'Grade 1'], [2, 'Grade 2']], S.swGrade)}${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>`;
+  $('#modeBody').innerHTML = `
+    <div class="sweep-box" id="box" tabindex="0" aria-label="Braille line. Arrow keys move cell by cell.">
+      <div class="edge left"></div><div class="edge right"></div>
+      <div class="sweep-track" id="track"></div>
+      <div class="reader" id="reader"></div>
+      <div class="finger" id="finger"></div>
+      <div class="sweep-top"><button class="link-btn pillish" id="restart">${icon('restart', 16)} Restart</button>
+        <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
+      <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
+    </div>
+    <p class="sw-info" id="swInfo" aria-live="polite"></p>
+`;
+  bindRadios($('#picker'), (k, v) => {
+    if (k === 'src') { src = v; store.set('swSrc', v); text = textFor(); build(); return; }
+    setS(k, k === 'swGrade' ? Number(v) : v);
+  });
+  const box = $('#box'), track = $('#track'), finger = $('#finger'), reader = $('#reader');
+  let cells = [], lefts = [], widths = [], totalW = 0, offset = 0, headX = 0, W = 0;
+  let curIdx = -1, raf = 0, edgeRaf = 0, active = false;
+
+  const nextWord = deck(COMMON_WORDS.slice(0, 3000)), nextPhrase = deck(PHRASES);
+  const textFor = () => {
+    if (src === 'words') return Array.from({ length: 7 }, nextWord).join(' ');
+    if (src === 'phrases') return nextPhrase();
+    if (src === 'numbers') return numberLine();
+    if (src === 'passages') return PASSAGES[passIdx][1];
+    return [signLine(), signLine(), signLine()].join(', ');
+  };
+  // Passages go in order, easiest first; Next moves on and the place is remembered.
+  let passIdx = Math.min(PASSAGES.length - 1, store.get('swPass', 0));
+  // Reading speed: timed from the first touch to passing the last cell, in words a minute (best kept per grade).
+  let t0 = 0, tDone = 0;
+  const words = () => text.split(/\s+/).filter(Boolean).length;
+  const info = (extra = '') => {
+    const el = $('#swInfo'); if (!el) return;
+    const pass = src === 'passages' ? `Passage ${passIdx + 1} of ${PASSAGES.length} · level ${PASSAGES[passIdx][0]}` : '';
+    const b = store.get('swBest' + S.swGrade, 0);
+    el.innerHTML = [pass, extra || `${words()} words${b ? ` · best ${b} words a minute` : ''}`].filter(Boolean).join(' · ');
+  };
+  function timing(pos) {
+    if (!t0 && active) t0 = performance.now();
+    const last = cells.length - 1;
+    if (t0 && !tDone && last >= 0 && pos > lefts[last] + widths[last]) {
+      tDone = performance.now();
+      const secs = (tDone - t0) / 1000, wpm = Math.round(words() / (secs / 60));
+      const bk = 'swBest' + S.swGrade, b = Math.max(store.get(bk, 0), wpm);
+      if (secs > 2) store.set(bk, b);
+      info(`${words()} words in ${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')} · <b>${wpm} words a minute</b>${b > wpm ? ` (best ${b})` : wpm >= b && secs > 2 ? ' · new best' : ''}`);
+    }
+  }
+  let text = textFor();
+  function build() {
+    const grade = S.swGrade;
+    cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
+    t0 = 0; tDone = 0; info();
+    track.innerHTML = cells.map((c, i) => c.kind === 'space'
+      ? `<div class="sc space" data-i="${i}"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`
+      : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1, esc(c.idx === 0 ? (c.print || '·') : ''))}</div>`).join('');
+    requestAnimationFrame(() => { measure(); reset(); });
+  }
+  function measure() {
+    const els = $$('.sc', track);
+    lefts = els.map((e) => e.offsetLeft); widths = els.map((e) => e.offsetWidth);
+    totalW = track.scrollWidth; W = box.clientWidth;
+  }
+  // The line starts just right of the middle, so the reader rests in the middle with the upcoming cells in view.
+  const homeX = () => Math.round(W * 0.5);
+  const startOffset = () => homeX() + 24;
+  function reset() { offset = startOffset(); headX = homeX(); curIdx = -1; update(false); }
+  const clampV = (o) => Math.max(Math.min(startOffset(), W * 0.5 - totalW), Math.min(startOffset(), o));
+  const clamp = () => { offset = clampV(offset); };
+  // When the finger lifts, ease the reader back to the middle and slide the line with it,
+  // so the same cell stays under the reader (at either end of the line the line can't move, so the reader stays put).
+  let settleRaf = 0;
+  function settle() {
+    cancelAnimationFrame(settleRaf);
+    let prev = performance.now();
+    const step = (t) => {
+      const dt = Math.min(50, t - prev) / 1000; prev = t;
+      if (active) { settleRaf = requestAnimationFrame(step); return; }
+      const gap = homeX() - headX;
+      const want = Math.abs(gap) < 0.5 ? gap : gap * Math.min(1, dt * 2.4);
+      const d = clampV(offset + want) - offset;
+      if (!d) { settleRaf = requestAnimationFrame(step); return; }
+      offset += d; headX += d; update(false);
+      settleRaf = requestAnimationFrame(step);
+    };
+    settleRaf = requestAnimationFrame(step);
+  }
+
+  function update(feedback = true) {
+    clamp();
+    track.style.transform = `translateX(${offset}px)`;
+    reader.style.left = headX + 'px'; finger.style.left = headX + 'px';
+    box.classList.toggle('active', active);
+    const pos = headX - offset;
+    timing(pos);
+    $('#swProg').style.width = (totalW ? Math.max(0, Math.min(1, (pos - (lefts[0] || 0)) / (totalW - (lefts[0] || 0)))) * 100 : 0) + '%';
+    let idx = -1;
+    for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
+    $$('.sc', track).forEach((el, i) => el.classList.toggle('passed', lefts[i] + widths[i] < pos));
+    // The current cell's letter fades in with a strong ease-in: barely visible at first, mostly appearing near the cell's right edge.
+    if (idx !== curIdx && curIdx >= 0 && track.children[curIdx]) { const l = $('.lbl', track.children[curIdx]); if (l) l.style.cssText = ''; }
+    if (idx >= 0 && cells[idx].kind !== 'space') {
+      const l = $('.lbl', track.children[idx]), f = (pos - lefts[idx]) / widths[idx];
+      if (l) l.style.opacity = Math.pow(Math.max(0, Math.min(1, f)), 4).toFixed(3);
+    }
+    if (idx !== curIdx) {
+      $$('.sc.cur', track).forEach((e) => e.classList.remove('cur'));
+      if (idx >= 0 && cells[idx].kind !== 'space') track.children[idx].classList.add('cur');
+      curIdx = idx;
+    }
+  }
+  function edgeLoop() {
+    cancelAnimationFrame(edgeRaf);
+    let prev = performance.now();
+    const step = (t) => {
+      const dt = Math.min(50, t - prev) / 1000; prev = t;
+      if (!active) return;
+      // The further the reader is from the middle, the faster the line moves (and backwards left of the middle).
+      const v = -(headX - homeX()) / (W / 2);
+      if (Math.abs(v) > 0.04) { offset += v * 300 * dt; update(); }
+      edgeRaf = requestAnimationFrame(step);
+    };
+    edgeRaf = requestAnimationFrame(step);
+  }
+  const boxX = (e) => e.clientX - box.getBoundingClientRect().left;
+  box.addEventListener('pointerdown', (e) => { active = true; box.setPointerCapture(e.pointerId); headX = boxX(e); $('#hint').style.opacity = 0; update(); edgeLoop(); });
+  box.addEventListener('pointermove', (e) => {
+    const touchLike = e.pointerType !== 'mouse';
+    if (touchLike && !box.hasPointerCapture(e.pointerId)) return;
+    if (!active && !touchLike) { active = true; edgeLoop(); $('#hint').style.opacity = 0; }
+    headX = Math.max(0, Math.min(W, boxX(e))); update();
+  });
+  const end = (e) => { if (e.pointerType !== 'mouse' || e.type === 'pointerleave') { active = false; update(false); } };
+  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end); box.addEventListener('pointerleave', end);
+  box.addEventListener('wheel', (e) => { e.preventDefault(); offset -= (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * 0.6; update(false); }, { passive: false });
+  box.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    let i = Math.max(0, curIdx) + dir;
+    while (cells[i] && cells[i].kind === 'space') i += dir;
+    if (cells[i]) animateTo(headX - (lefts[i] + widths[i] * 0.3));
+  });
+  function animateTo(target) {
+    const start = offset, t0 = performance.now();
+    const step = (t) => { const k = Math.min(1, (t - t0) / 420); offset = start + (target - start) * (1 - Math.pow(1 - k, 3)); update(); if (k < 1) raf = requestAnimationFrame(step); };
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
+  }
+  $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); t0 = 0; tDone = 0; info(); };
+  $('#shuffleBtn').onclick = () => { if (src === 'passages') { passIdx = (passIdx + 1) % PASSAGES.length; store.set('swPass', passIdx); } text = textFor(); build(); };
+  $('.sweep-top', box).addEventListener('pointerdown', (e) => e.stopPropagation());
+  const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
+  const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); };
+  window.addEventListener('resize', onResize); window.addEventListener('settings', onSet);
+  build(); settle();
+  return () => { active = false; cancelAnimationFrame(raf); cancelAnimationFrame(edgeRaf); cancelAnimationFrame(settleRaf); window.removeEventListener('resize', onResize); window.removeEventListener('settings', onSet); };
+}

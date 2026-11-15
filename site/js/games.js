@@ -7,6 +7,7 @@ import { WORDS } from './data.js';
 import { SNOWMAN_WORDS } from './snowman.js';
 import { AGENT_CASES } from './agentcases.js';
 import { chord, sixKeyOn } from './sixkey.js';
+import { gameStore } from './storage.js';
 import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
 
@@ -15,10 +16,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
-const store = {
-  get(k, d) { try { const v = localStorage.getItem('dots.g.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('dots.g.' + k, JSON.stringify(v)); } catch {} },
-};
+const store = gameStore;
 const AZ = 'abcdefghijklmnopqrstuvwxyz';
 const AJ = 'abcdefghij';
 const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -863,7 +861,7 @@ export const GAMES = {
   riddles: { name: 'Riddles', icon: 'bulb', range: 'Easy–Hard', desc: 'Over 100 riddles; pick the answer written in braille', levels: LV3, run: riddles,
     help: ['Read the riddle, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Easy has three choices and shows letters under the cells. Medium has four, and Hard uses Grade 2 contractions.'] },
 };
-export const gameStore = store;
+export { gameStore };
 // One short line for a game's card on the Games page: the best score at any level, cases solved, or "Played".
 export function gameStatus(k) {
   const lv = ['easy', 'medium', 'hard'];
