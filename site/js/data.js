@@ -1,22 +1,9 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=43';
-
-export const SIGN_WORDS = [
-  'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',
-  'Alarm', 'Main', 'Entrance', 'Information', 'Office', 'Kitchen', 'Accessible', 'Emergency', 'Library', 'Lobby',
-];
+import { cellsOf } from './braille.js';
 
 export const WORDS = [
   'cab', 'bed', 'dig', 'fig', 'hide', 'jade', 'milk', 'lamp', 'snow', 'quiz', 'yes', 'zero', 'wave', 'jump',
   'park', 'tree', 'blue', 'fox', 'cozy', 'map', 'rain', 'lake', 'home', 'warm', 'maple', 'canoe', 'north',
-];
-export const SENTENCES = [
-  'the quick brown fox jumps over the lazy dog',
-  'braille is read with the fingertips',
-  'exit is to the left',
-  'washrooms are on the second floor',
-  'press the button to open the door',
-  'six dots make every letter',
 ];
 
 // Hand-checked technical examples (Grade 1 context). Groups: "cells:label", "_" = space.

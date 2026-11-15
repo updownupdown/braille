@@ -1,15 +1,15 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=43';
+} from './braille.js';
 import {
-  SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=43';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=43';
-import { COMMON_WORDS } from './wordlist.js?v=43';
-import { LANG_CONTRACTIONS } from './langcontractions.js?v=43';
-import { G2_EXAMPLES } from './g2examples.js?v=43';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=43';
+  SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
+} from './data.js';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js';
+import { COMMON_WORDS } from './wordlist.js';
+import { LANG_CONTRACTIONS } from './langcontractions.js';
+import { G2_EXAMPLES } from './g2examples.js';
+import { PHRASES, signLine, numberLine } from './phrases.js';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -1840,5 +1840,21 @@ $$('[data-icon]').forEach((el) => { el.insertAdjacentHTML('afterbegin', icon(el.
 $('#settingsBtn').onclick = openSettings;
 window.addEventListener('resize', syncHeadH);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+// "Updated" bar: each deploy stamps version.json; when it changes while the app is open, offer a reload.
+let loadedVersion = null;
+async function checkVersion() {
+  try {
+    const r = await fetch('version.json', { cache: 'no-store' }); if (!r.ok) return;
+    const { v } = await r.json();
+    if (loadedVersion == null) { loadedVersion = v; return; }
+    if (v !== loadedVersion && !$('#updBar')) {
+      document.body.insertAdjacentHTML('beforeend', `<div class="upd-bar" id="updBar" role="status"><span>Updated</span><button class="btn" type="button">Reload</button></div>`);
+      $('#updBar button').onclick = () => location.reload();
+    }
+  } catch {}
+}
+checkVersion();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
+setInterval(checkVersion, 30 * 60 * 1000);
 applySettings();
 route();

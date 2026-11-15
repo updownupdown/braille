@@ -1,8 +1,9 @@
-name: Deploy site to GitHub Pages
+name: Test and deploy site to GitHub Pages
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -11,17 +12,35 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Translator checks
+        run: node --test tests/translator.test.mjs
+      - name: Install Playwright
+        run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - name: Every route loads without errors
+        run: node tests/smoke.mjs
+
   deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Stamp the version (the app shows "Updated" when this changes)
+        run: echo "{\"v\":\"${GITHUB_SHA::7}\"}" > site/version.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
