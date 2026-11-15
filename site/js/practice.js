@@ -116,45 +116,12 @@ export function autoResult(pre, key, ok) {
   st.s[key] = [box, st.turn + (ok ? AUTO_GAP[box] : 2)];
   autoSave(pre, st);
 }
-// ---------- Guess: context and confusable answers ----------
-// A sign is shown in a context: on its own (bare), or beside pale placeholder cells that stand for the rest of a word.
-// Pale cells after it = start of a word, on both sides = inside a word, before it = end of a word.
-// The context is picked so only one answer is right; the wrong answers favour the signs most easily confused with it.
-export const CTX_ALL = ['alone', 'start', 'mid', 'end'];
-export const CTX_NAME = { alone: 'on its own', start: 'at the start of a word', mid: 'inside a word', end: 'at the end of a word' };
-export const LOWER_MID = ['ea', 'bb', 'cc', 'ff', 'gg'], LOWER_START = ['be', 'con', 'dis'];
-export function ctxOf(x, uni) {
-  if (x.kind === 'digit' || x.kind === 'math') return ['alone'];
-  if (x.kind === 'indicator') return ['start'];
-  if (x.kind === 'punct') return [x.answer === '(' ? 'start' : 'end'];
-  if (x.kind === 'letter') {
-    // A lone letter reads as its wordsign once that wordsign is in play (b alone is "but").
-    const ws = uni.some((u) => u.key !== x.key && u.cells === x.cells && u.kind === 'contraction' && ctxOf(u, uni).includes('alone'));
-    return ws ? ['start', 'mid', 'end'] : CTX_ALL;
-  }
-  switch (x.grp) {
-    case 'Alphabetic wordsigns': case 'Strong wordsigns': case 'Lower wordsigns': case 'Shortforms': return ['alone'];
-    case 'Strong groupsigns': return x.answer === 'ing' ? ['mid', 'end'] : ['start', 'mid', 'end'];
-    case 'Lower groupsigns': return LOWER_MID.includes(x.answer) ? ['mid'] : LOWER_START.includes(x.answer) ? ['start'] : ['start', 'mid', 'end'];
-    case 'Final-letter groupsigns': return ['mid', 'end'];
-    default: return CTX_ALL;
-  }
-}
-// Other readings of the same cells that would also be right in this context.
-export const rivals = (x, ctx, uni) => uni.filter((u) => u.cells === x.cells && u.answer !== x.answer && ctxOf(u, uni).includes(ctx));
-export function pickCtx(x, uni) {
-  const ok = ctxOf(x, uni).filter((c) => !rivals(x, c, uni).length);
-  const list = ok.length ? ok : ctxOf(x, uni);
-  // Plain letters, digits and maths signs sit on their own whenever that's unambiguous.
-  if (list.includes('alone') && ['letter', 'digit', 'math'].includes(x.kind)) return 'alone';
-  return list[Math.floor(Math.random() * list.length)];
-}
-export const GHOST = () => cellHTML('⠿', 'ghost');
-export const ctxCellsHTML = (cells, ctx) => `${ctx === 'mid' || ctx === 'end' ? GHOST() : ''}${[...cells].map((c) => cellHTML(c)).join('')}${ctx === 'mid' || ctx === 'start' ? GHOST() : ''}`;
-// How alike two signs look: same cells (another context), mirror image, moved up or down a row, one dot apart.
+// ---------- Guess: confusable answers ----------
+// A sign is shown on its own. No other reading of the same cells is ever offered (bb is never beside be or ;),
+// so the choices alone settle what it means; the wrong answers favour the signs most easily confused with it.
+// How alike two signs look: mirror image, moved up or down a row, one dot apart, same prefix, same group.
 export const dotSet = (cells) => [...cells].map((c) => new Set(toDots(c)));
 export function likeness(a, b) {
-  if (a.cells === b.cells) return 100;
   const A = dotSet(a.cells), B = dotSet(b.cells);
   if (A.length !== B.length) return a.src && a.src === b.src ? 10 : 0;
   const same = (f) => A.every((s, i) => { const t = new Set([...s].map(f)); return t.size === B[i].size && [...t].every((d) => B[i].has(d)); });
@@ -166,11 +133,13 @@ export function likeness(a, b) {
   const firstSame = A.length > 1 && [...A[0]].length === B[0].size && [...A[0]].every((d) => B[0].has(d));
   return (diff === 1 ? 40 : diff === 2 ? 15 : 0) + (firstSame ? 20 : 0) + (a.src && a.src === b.src ? 10 : 0);
 }
-export function guessOptions(item, ctx, pool, uni) {
-  const bad = new Set([item.answer, ...rivals(item, ctx, uni).map((u) => u.answer)]);
+// Every reading of these cells anywhere in the course (b is also "but", bb also "be" and ";").
+export const readingsOf = (cells) => autoCourse().filter((u) => u.cells === cells).map((u) => u.answer);
+export function guessOptions(item, pool) {
+  const bad = new Set([item.answer, ...readingsOf(item.cells)]);
   const seen = new Set(), cands = [];
-  for (const x of [...pool, ...uni.filter((u) => u.cells === item.cells)]) {
-    if (bad.has(x.answer) || seen.has(x.answer)) continue;
+  for (const x of pool) {
+    if (x.cells === item.cells || bad.has(x.answer) || seen.has(x.answer)) continue;
     seen.add(x.answer); cands.push([likeness(item, x) + Math.random() * 9, x]);
   }
   return cands.sort((p, q) => q[0] - p[0]).slice(0, 3).map(([, x]) => x);
@@ -227,7 +196,7 @@ export function deck(list) {
 }
 export const WORD_LEN = { short: ['Short', (w) => w.length >= 2 && w.length <= 4], medium: ['Medium', (w) => w.length >= 5 && w.length <= 7], long: ['Long', (w) => w.length >= 8] };
 export const HELP = {
-  read: ['A braille cell appears. Pick what it says.', 'Pale cells stand for the rest of a word: a sign between them is inside a word, before them starts a word, after them ends one. A sign with nothing around it stands alone, as a word of its own. Only one answer fits.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
+  read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
   sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
@@ -272,8 +241,6 @@ export function quizMode(mode, q) {
     const it = CATS[state.cat].sets[state.set][1](pre);
     return it;
   };
-  // Every sign that could be meant (for picking a context with one right answer), by category.
-  const universe = () => auto() ? autoItems(pre, state.set) : state.cat === 'contractions' ? autoCourse() : autoList('g1');
   const score = (k) => m[pre + k] || 0;
   const bump = (k, d) => {
     m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m);
@@ -344,7 +311,7 @@ export function quizMode(mode, q) {
     renderMastery();
   }
   // Feedback is a coloured glow on the card (plus a shake when wrong).
-  // A check or cross badge rides on the glow (CSS), so colour is never the only cue; screen readers hear it too.
+  // Screen readers hear the result too.
   const glow = (ok) => {
     stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth;
     stage.classList.add(ok ? 'glow-good' : 'glow-bad');
@@ -355,15 +322,13 @@ export function quizMode(mode, q) {
   function renderIntro(item) {
     state.last = item;
     stage.classList.remove('glow-good', 'glow-bad');
-    const ctx = mode === 'read' ? pickCtx(item, [...universe().filter((u) => u.key !== item.key), item]) : 'alone';
     stage.innerHTML = `<div class="intro">
       <span class="intro-tag">New sign</span>
-      <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
+      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
       <div class="intro-ans">${esc(item.answer)}</div>
       ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
-      ${ctx !== 'alone' ? `<p class="intro-note">Shown ${CTX_NAME[ctx]}: pale cells stand for the rest of the word.</p>` : ''}
       <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
-    const go = () => { autoMeet(pre, item.key); state.forced = item; state.ctx = [item.key, ctx]; next(); };
+    const go = () => { autoMeet(pre, item.key); state.forced = item; next(); };
     $('#gotIt').onclick = go;
     state.key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   }
@@ -371,16 +336,13 @@ export function quizMode(mode, q) {
   function renderRead() {
     const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
     stage.classList.remove('glow-good', 'glow-bad');
-    const uni = [...universe().filter((u) => u.key !== item.key), item];
-    const ctx = state.ctx && state.ctx[0] === item.key ? state.ctx[1] : pickCtx(item, uni);
-    state.ctx = null;
     let pool = items().filter((x) => x.key !== item.key);
     // Early in Auto, top up from the sign's own group so there are always three wrong answers.
     if (auto() && pool.length < 6) pool = [...pool, ...autoList('all').filter((x) => x.src === item.src && x.key !== item.key && !pool.some((o) => o.key === x.key))];
-    const opts = shuffle([item, ...guessOptions(item, ctx, pool, uni)]);
+    const opts = shuffle([item, ...guessOptions(item, pool)]);
     const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
-      <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
+      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
       <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
     let misses = 0;
     const choose = (btn) => {

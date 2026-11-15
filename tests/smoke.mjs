@@ -46,6 +46,28 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   }
   await ctx.close();
 }
+// Guess: the choices alone must settle the answer. No wrong choice may share the sign's cells
+// (b is also "but", bb is also "be" and ";"), for every set and for Auto's whole course.
+{
+  const page = await browser.newPage();
+  await page.goto(base + '#/practice/read');
+  await page.waitForTimeout(400);
+  const bad = await page.evaluate(async () => {
+    const P = await import('./js/practice.js');
+    const out = [];
+    const pools = Object.entries(P.CATS).filter(([k]) => k !== 'auto').flatMap(([c, cat]) => Object.entries(cat.sets).map(([s, [, f]]) => [`${c}.${s}`, f('r:')]));
+    pools.push(['auto', P.autoCourse()]);
+    for (const [name, pool] of pools) for (const item of pool) for (let i = 0; i < 8; i++) {
+      const opts = P.guessOptions(item, pool.filter((x) => x.key !== item.key));
+      const readings = new Set(P.readingsOf(item.cells));
+      for (const o of opts) if (o.cells === item.cells || readings.has(o.answer)) out.push(`${name}: ${item.answer} offered with ${o.answer}`);
+      if (new Set(opts.map((o) => o.answer)).size !== opts.length) out.push(`${name}: ${item.answer} has a repeated choice`);
+    }
+    return [...new Set(out)];
+  });
+  if (bad.length) failures.push('Guess choices with two right answers:\n  ' + bad.slice(0, 20).join('\n  '));
+  await page.close();
+}
 await browser.close();
 server.close();
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
