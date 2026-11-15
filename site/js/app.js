@@ -1,15 +1,15 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=41';
+} from './braille.js?v=42';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=41';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=41';
-import { COMMON_WORDS } from './wordlist.js?v=41';
-import { LANG_CONTRACTIONS } from './langcontractions.js?v=41';
-import { G2_EXAMPLES } from './g2examples.js?v=41';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=41';
+} from './data.js?v=42';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=42';
+import { COMMON_WORDS } from './wordlist.js?v=42';
+import { LANG_CONTRACTIONS } from './langcontractions.js?v=42';
+import { G2_EXAMPLES } from './g2examples.js?v=42';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=42';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -451,7 +451,7 @@ views[''] = () => {
 // ---------- practice data ----------
 const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
 // The note is only shown in the help sheet's list, never in the quiz.
-const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d, n]) => ({ key: 'c' + w, cells: cellsOf(d), answer: w, kind: 'contraction', grp: cat,
+const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d, n]) => ({ key: (cat === 'Lower wordsigns' && (w === 'be' || w === 'in') ? 'cw' : 'c') + w, cells: cellsOf(d), answer: w, kind: 'contraction', grp: cat,
   note: n || (cat === 'Shortforms' ? SHORT_SPELL[w] || '' : G2_EXAMPLE[w] ? 'e.g. ' + G2_EXAMPLE[w] : '') }));
 const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
 const CATS = {
@@ -503,11 +503,7 @@ function autoState(pre) {
   if (!all[k]) {
     // First visit: signs already known from other practice start further along, so they're only reviewed.
     const m = mastery(), st = { turn: 0, s: {} };
-    autoCourse().forEach((x, i) => {
-      const sc = m[pre + x.key] || 0;
-      if (sc >= 4) st.s[x.key] = [3, 4 + (i % 20)];
-      else if (sc > 0) st.s[x.key] = [1, 0];
-    });
+    autoCourse().forEach((x, i) => { if ((m[pre + x.key] || 0) >= 4) st.s[x.key] = [3, 4 + (i % 20)]; });
     all[k] = st; store.set('auto', all);
   }
   return all[k];
@@ -518,8 +514,24 @@ function autoPick(pre, scope, lastKey) {
   const st = autoState(pre), list = autoList(scope);
   const met = list.filter((x) => st.s[x.key]);
   const learning = met.filter((x) => st.s[x.key][0] < 2).length;
-  const fresh = list.find((x) => !st.s[x.key]);
-  if (fresh && learning < AUTO_NEW_AT_ONCE) return { ...fresh, isNew: true };
+  let fresh = list.find((x) => !st.s[x.key]);
+  // Before showing a sign as new, check what you already know of it from other practice and lessons.
+  if (fresh && learning < AUTO_NEW_AT_ONCE) {
+    const m = mastery(), other = pre === 'w:' ? 'r:' : 'w:', done = store.get('learnDone', []);
+    const lesson = (x) => (done.includes('alphabet') && x.kind === 'letter') || (done.includes('numbers') && ['digit', 'punct', 'indicator'].includes(x.kind)) || (done.includes('grade2') && x.src === 'start');
+    let n = learning, changed = false;
+    while (fresh && n < AUTO_NEW_AT_ONCE) {
+      const a = m[pre + fresh.key] || 0, b = m[other + fresh.key] || 0;
+      if (a >= 4) st.s[fresh.key] = [3, st.turn + 4 + Math.floor(Math.random() * 12)];
+      else if (b >= 4) st.s[fresh.key] = [2, st.turn + 2 + Math.floor(Math.random() * 6)];
+      else if (a > 0 || b > 0 || lesson(fresh)) { st.s[fresh.key] = [1, st.turn]; n++; }
+      else break;
+      changed = true;
+      fresh = list.find((x) => !st.s[x.key]);
+    }
+    if (changed) { autoSave(pre, st); return autoPick(pre, scope, lastKey); }
+    if (fresh) return { ...fresh, isNew: true };
+  }
   const pool = met.filter((x) => x.key !== lastKey);
   if (!pool.length) return met[0] || (fresh && { ...fresh, isNew: true });
   // Most overdue first; among signs due on the same turn, a random one.
@@ -535,6 +547,66 @@ function autoResult(pre, key, ok) {
   const box = ok ? Math.min(AUTO_GAP.length - 1, ((st.s[key] || [0])[0]) + 1) : 0;
   st.s[key] = [box, st.turn + (ok ? AUTO_GAP[box] : 2)];
   autoSave(pre, st);
+}
+
+// ---------- Guess: context and confusable answers ----------
+// A sign is shown in a context: on its own (bare), or beside pale placeholder cells that stand for the rest of a word.
+// Pale cells after it = start of a word, on both sides = inside a word, before it = end of a word.
+// The context is picked so only one answer is right; the wrong answers favour the signs most easily confused with it.
+const CTX_ALL = ['alone', 'start', 'mid', 'end'];
+const CTX_NAME = { alone: 'on its own', start: 'at the start of a word', mid: 'inside a word', end: 'at the end of a word' };
+const LOWER_MID = ['ea', 'bb', 'cc', 'ff', 'gg'], LOWER_START = ['be', 'con', 'dis'];
+function ctxOf(x, uni) {
+  if (x.kind === 'digit' || x.kind === 'math') return ['alone'];
+  if (x.kind === 'indicator') return ['start'];
+  if (x.kind === 'punct') return [x.answer === '(' ? 'start' : 'end'];
+  if (x.kind === 'letter') {
+    // A lone letter reads as its wordsign once that wordsign is in play (b alone is "but").
+    const ws = uni.some((u) => u.key !== x.key && u.cells === x.cells && u.kind === 'contraction' && ctxOf(u, uni).includes('alone'));
+    return ws ? ['start', 'mid', 'end'] : CTX_ALL;
+  }
+  switch (x.grp) {
+    case 'Alphabetic wordsigns': case 'Strong wordsigns': case 'Lower wordsigns': case 'Shortforms': return ['alone'];
+    case 'Strong groupsigns': return x.answer === 'ing' ? ['mid', 'end'] : ['start', 'mid', 'end'];
+    case 'Lower groupsigns': return LOWER_MID.includes(x.answer) ? ['mid'] : LOWER_START.includes(x.answer) ? ['start'] : ['start', 'mid', 'end'];
+    case 'Final-letter groupsigns': return ['mid', 'end'];
+    default: return CTX_ALL;
+  }
+}
+// Other readings of the same cells that would also be right in this context.
+const rivals = (x, ctx, uni) => uni.filter((u) => u.cells === x.cells && u.answer !== x.answer && ctxOf(u, uni).includes(ctx));
+function pickCtx(x, uni) {
+  const ok = ctxOf(x, uni).filter((c) => !rivals(x, c, uni).length);
+  const list = ok.length ? ok : ctxOf(x, uni);
+  // Plain letters, digits and maths signs sit on their own whenever that's unambiguous.
+  if (list.includes('alone') && ['letter', 'digit', 'math'].includes(x.kind)) return 'alone';
+  return list[Math.floor(Math.random() * list.length)];
+}
+const GHOST = () => cellHTML('⠿', 'ghost');
+const ctxCellsHTML = (cells, ctx) => `${ctx === 'mid' || ctx === 'end' ? GHOST() : ''}${[...cells].map((c) => cellHTML(c)).join('')}${ctx === 'mid' || ctx === 'start' ? GHOST() : ''}`;
+// How alike two signs look: same cells (another context), mirror image, moved up or down a row, one dot apart.
+const dotSet = (cells) => [...cells].map((c) => new Set(toDots(c)));
+function likeness(a, b) {
+  if (a.cells === b.cells) return 100;
+  const A = dotSet(a.cells), B = dotSet(b.cells);
+  if (A.length !== B.length) return a.src && a.src === b.src ? 10 : 0;
+  const same = (f) => A.every((s, i) => { const t = new Set([...s].map(f)); return t.size === B[i].size && [...t].every((d) => B[i].has(d)); });
+  if (same((d) => (d <= 3 ? d + 3 : d - 3))) return 60;
+  const down = (d) => (d === 3 || d === 6 ? 0 : d + 1), up = (d) => (d === 1 || d === 4 ? 0 : d - 1);
+  if (A.every((s) => ![...s].includes(3) && ![...s].includes(6)) && same(down)) return 50;
+  if (A.every((s) => ![...s].includes(1) && ![...s].includes(4)) && same(up)) return 50;
+  const diff = A.reduce((n, s, i) => n + [...s].filter((d) => !B[i].has(d)).length + [...B[i]].filter((d) => !s.has(d)).length, 0);
+  const firstSame = A.length > 1 && [...A[0]].length === B[0].size && [...A[0]].every((d) => B[0].has(d));
+  return (diff === 1 ? 40 : diff === 2 ? 15 : 0) + (firstSame ? 20 : 0) + (a.src && a.src === b.src ? 10 : 0);
+}
+function guessOptions(item, ctx, pool, uni) {
+  const bad = new Set([item.answer, ...rivals(item, ctx, uni).map((u) => u.answer)]);
+  const seen = new Set(), cands = [];
+  for (const x of [...pool, ...uni.filter((u) => u.cells === item.cells)]) {
+    if (bad.has(x.answer) || seen.has(x.answer)) continue;
+    seen.add(x.answer); cands.push([likeness(item, x) + Math.random() * 9, x]);
+  }
+  return cands.sort((p, q) => q[0] - p[0]).slice(0, 3).map(([, x]) => x);
 }
 
 // ---------- practice help: what the chosen set is ----------
@@ -578,15 +650,6 @@ function practiceHelp(mode, cat, set) {
     ${rows ? `<div class="ctable help-list">${rows}</div>` : '<p class="muted">Your first sign is on its way.</p>'}
   </div>`;
 }
-// Merge items that share the same cells (e.g. "bb" and "be") so a reading quiz is never ambiguous.
-function mergeByCells(items) {
-  const map = new Map();
-  for (const it of items) {
-    const m = map.get(it.cells);
-    if (m) { if (!m.answer.split(' / ').includes(it.answer)) m.answer += ' / ' + it.answer; } else map.set(it.cells, { ...it });
-  }
-  return [...map.values()];
-}
 const SWEEP_SRC = { words: 'Words', phrases: 'Phrases', numbers: 'Numbers', signs: 'Signs' };
 // Mode keys stay as they were (URLs, saved progress); only the names changed.
 const MODES = { read: 'Guess', write: 'Draw', words: 'Type', sweep: 'Read' };
@@ -597,7 +660,7 @@ function deck(list) {
 }
 const WORD_LEN = { short: ['Short', (w) => w.length >= 2 && w.length <= 4], medium: ['Medium', (w) => w.length >= 5 && w.length <= 7], long: ['Long', (w) => w.length >= 8] };
 const HELP = {
-  read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
+  read: ['A braille cell appears. Pick what it says.', 'Pale cells stand for the rest of a word: a sign between them is inside a word, before them starts a word, after them ends one. A sign with nothing around it stands alone, as a word of its own. Only one answer fits.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
   sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
@@ -641,8 +704,10 @@ function quizMode(mode, q) {
   // Auto never merges: its options already skip anything with the same cells as the answer.
   const items = () => {
     const it = CATS[state.cat].sets[state.set][1](pre);
-    return mode === 'read' && !auto() ? mergeByCells(it) : it;
+    return it;
   };
+  // Every sign that could be meant (for picking a context with one right answer), by category.
+  const universe = () => auto() ? autoItems(pre, state.set) : state.cat === 'contractions' ? autoCourse() : autoList('g1');
   const score = (k) => m[pre + k] || 0;
   const bump = (k, d) => {
     m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m);
@@ -718,13 +783,15 @@ function quizMode(mode, q) {
   function renderIntro(item) {
     state.last = item;
     stage.classList.remove('glow-good', 'glow-bad');
+    const ctx = mode === 'read' ? pickCtx(item, [...universe().filter((u) => u.key !== item.key), item]) : 'alone';
     stage.innerHTML = `<div class="intro">
       <span class="intro-tag">New sign</span>
-      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
+      <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
       <div class="intro-ans">${esc(item.answer)}</div>
       ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
+      ${ctx !== 'alone' ? `<p class="intro-note">Shown ${CTX_NAME[ctx]}: pale cells stand for the rest of the word.</p>` : ''}
       <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
-    const go = () => { autoMeet(pre, item.key); state.forced = item; next(); };
+    const go = () => { autoMeet(pre, item.key); state.forced = item; state.ctx = [item.key, ctx]; next(); };
     $('#gotIt').onclick = go;
     state.key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   }
@@ -732,12 +799,16 @@ function quizMode(mode, q) {
   function renderRead() {
     const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
     stage.classList.remove('glow-good', 'glow-bad');
-    let others = shuffle(items().filter((x) => x.cells !== item.cells));
-    if (auto() && others.length < 3) others = [...others, ...shuffle(autoList('all').filter((x) => x.src === item.src && x.cells !== item.cells && !others.some((o) => o.key === x.key)))];
-    const opts = shuffle([item, ...others.slice(0, 3)]);
+    const uni = [...universe().filter((u) => u.key !== item.key), item];
+    const ctx = state.ctx && state.ctx[0] === item.key ? state.ctx[1] : pickCtx(item, uni);
+    state.ctx = null;
+    let pool = items().filter((x) => x.key !== item.key);
+    // Early in Auto, top up from the sign's own group so there are always three wrong answers.
+    if (auto() && pool.length < 6) pool = [...pool, ...autoList('all').filter((x) => x.src === item.src && x.key !== item.key && !pool.some((o) => o.key === x.key))];
+    const opts = shuffle([item, ...guessOptions(item, ctx, pool, uni)]);
     const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
-      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
+      <div class="prompt-cells ctx-${ctx}">${ctxCellsHTML(item.cells, ctx)}</div>
       <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
     const choose = (btn) => {
       if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong')) return;
