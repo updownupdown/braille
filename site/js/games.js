@@ -1,12 +1,12 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=38';
-import { TRIVIA as TRIVIA_1, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=38';
-import { TRIVIA_MORE } from './trivia2.js?v=38';
+import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=39';
+import { TRIVIA as TRIVIA_1, RIDDLES, RIDDLE_CLASH, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=39';
+import { TRIVIA_MORE } from './trivia2.js?v=39';
 const TRIVIA = Object.fromEntries(Object.entries(TRIVIA_1).map(([k, v]) => [k, [...v, ...(TRIVIA_MORE[k] || [])]]));
-import { WORDS } from './data.js?v=38';
-import { SNOWMAN_WORDS } from './snowman.js?v=38';
-import { AGENT_CASES } from './agentcases.js?v=38';
-import { COMMON_WORDS } from './wordlist.js?v=38';
+import { WORDS } from './data.js?v=39';
+import { SNOWMAN_WORDS } from './snowman.js?v=39';
+import { AGENT_CASES } from './agentcases.js?v=39';
+import { COMMON_WORDS } from './wordlist.js?v=39';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -296,7 +296,8 @@ function riddles(el, level, ctx) {
       if (!list.length) list = items.filter((x) => !seen.has(x[0]));
       if (!list.length) { seen.clear(); list = items; }
       const [q, a] = pick(list); seen.add(q);
-      const w = shuffle(items.filter((x) => x[1] !== a).map((x) => x[1])).slice(0, 3);
+      const clash = new Set(RIDDLE_CLASH.filter((g) => g.includes(a)).flat());
+      const w = shuffle(items.filter((x) => x[1] !== a && !clash.has(x[1])).map((x) => x[1])).slice(0, 3);
       return { q, a, w };
     },
   });

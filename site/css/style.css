@@ -519,7 +519,7 @@ body[data-page="home"] .top { min-height: 56px; }
 .stage .prompt-cells .cell { --s: clamp(11px, 3.7vw, 21px); }
 .stage .prompt-cells.many .cell { --s: clamp(7px, 2.1vw, 11px); }
 .stage .prompt-cells.words .lbl { font-size: .9rem; color: var(--ink-2); min-height: 1.2em; }
-.stage .target { font-size: 3.2rem; }
+.stage .target { font-size: 2.5rem; overflow-wrap: anywhere; }
 .dotpad { grid-template-columns: repeat(2, 53px); grid-template-rows: repeat(3, 53px); gap: 10px; padding: 14px; border-radius: 20px; }
 .dotpad button { font-size: 0; }
 .dotpad.nums button { font-size: .82rem; }
@@ -1770,7 +1770,7 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .m-more .ic { transition: transform .2s; }
 .m-more.open .ic { transform: rotate(180deg); }
 .mastery { position: relative; }
-.mastery.clamp { max-height: calc(28px * 4 + 4px * 3); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); mask-image: linear-gradient(to bottom, #000 62%, transparent); }
+.mastery.clamp { max-height: calc(28px * 2 + 4px); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); mask-image: linear-gradient(to bottom, #000 62%, transparent); }
 /* Practice: Draw, one pad per cell */
 .pads { display: flex; gap: 12px; justify-content: center; flex-wrap: nowrap; }
 .pads .dotpad { transition: border-color .2s, background .2s; }
@@ -1788,3 +1788,10 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* v38: Cheat Sheet Print on the right */
 .cs-head .row { flex: 1 1 100%; }
 .cs-head #csPrint { margin-left: auto; }
+/* v39: Trivia and Riddles answers wrap inside their box when a word is too long for one row */
+.quiz-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 520px) { .quiz-opts { grid-template-columns: minmax(0, 1fr); } }
+.quiz-opt { min-width: 0; }
+.quiz-opt .braille-line { max-width: 100%; }
+.quiz-opt .bword { flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.quiz-opt .quiz-print { overflow-wrap: anywhere; }
