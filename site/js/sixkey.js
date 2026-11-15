@@ -2,11 +2,12 @@
 // Hold the keys of one cell together and let go; the cell is sent when the last key comes up.
 // Turned on in Settings ("Physical keyboard: Six-key"); off, those keys type their own letters.
 import { LETTERS, fromDots } from './braille.js';
+import { store } from './storage.js';
 
 const DOT = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
 const LETTER_OF = Object.fromEntries(Object.entries(LETTERS).map(([l, c]) => [c, l]));
 
-export const sixKeyOn = () => { try { return !!JSON.parse(localStorage.getItem('dots.settings') || '{}').sixKey; } catch { return false; } };
+export const sixKeyOn = () => !!(store.get('settings', {}) || {}).sixKey;
 
 // Returns { down(e), up(e) }: each returns true when it consumed the event.
 // onCell(dots[], cell, letter) gets the chord once every key is released.
