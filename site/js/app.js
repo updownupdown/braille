@@ -11,6 +11,7 @@ import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
 import { PHRASES, signLine, numberLine } from './phrases.js';
 import { chord, sixKeyOn } from './sixkey.js';
+import { PASSAGES } from './passages.js';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -709,7 +710,7 @@ function practiceHelp(mode, cat, set) {
     ${rows ? `<div class="ctable help-list">${rows}</div>` : '<p class="muted">Your first sign is on its way.</p>'}
   </div>`;
 }
-const SWEEP_SRC = { words: 'Words', phrases: 'Phrases', numbers: 'Numbers', signs: 'Signs' };
+const SWEEP_SRC = { words: 'Words', phrases: 'Phrases', numbers: 'Numbers', signs: 'Signs', passages: 'Passages' };
 // Mode keys stay as they were (URLs, saved progress); only the names changed.
 const MODES = { read: 'Guess', write: 'Draw', words: 'Type', sweep: 'Read' };
 // A shuffled deck: every item comes up once before any repeats.
@@ -1011,6 +1012,7 @@ function sweepMode(q) {
         <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
       <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
     </div>
+    <p class="sw-info" id="swInfo" aria-live="polite"></p>
 `;
   bindRadios($('#picker'), (k, v) => {
     if (k === 'src') { src = v; store.set('swSrc', v); text = textFor(); build(); return; }
@@ -1025,12 +1027,36 @@ function sweepMode(q) {
     if (src === 'words') return Array.from({ length: 7 }, nextWord).join(' ');
     if (src === 'phrases') return nextPhrase();
     if (src === 'numbers') return numberLine();
+    if (src === 'passages') return PASSAGES[passIdx][1];
     return [signLine(), signLine(), signLine()].join(', ');
   };
+  // Passages go in order, easiest first; Next moves on and the place is remembered.
+  let passIdx = Math.min(PASSAGES.length - 1, store.get('swPass', 0));
+  // Reading speed: timed from the first touch to passing the last cell, in words a minute (best kept per grade).
+  let t0 = 0, tDone = 0;
+  const words = () => text.split(/\s+/).filter(Boolean).length;
+  const info = (extra = '') => {
+    const el = $('#swInfo'); if (!el) return;
+    const pass = src === 'passages' ? `Passage ${passIdx + 1} of ${PASSAGES.length} · level ${PASSAGES[passIdx][0]}` : '';
+    const b = store.get('swBest' + S.swGrade, 0);
+    el.innerHTML = [pass, extra || `${words()} words${b ? ` · best ${b} words a minute` : ''}`].filter(Boolean).join(' · ');
+  };
+  function timing(pos) {
+    if (!t0 && active) t0 = performance.now();
+    const last = cells.length - 1;
+    if (t0 && !tDone && last >= 0 && pos > lefts[last] + widths[last]) {
+      tDone = performance.now();
+      const secs = (tDone - t0) / 1000, wpm = Math.round(words() / (secs / 60));
+      const bk = 'swBest' + S.swGrade, b = Math.max(store.get(bk, 0), wpm);
+      if (secs > 2) store.set(bk, b);
+      info(`${words()} words in ${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')} · <b>${wpm} words a minute</b>${b > wpm ? ` (best ${b})` : wpm >= b && secs > 2 ? ' · new best' : ''}`);
+    }
+  }
   let text = textFor();
   function build() {
     const grade = S.swGrade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
+    t0 = 0; tDone = 0; info();
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
       ? `<div class="sc space" data-i="${i}"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`
       : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1, esc(c.idx === 0 ? (c.print || '·') : ''))}</div>`).join('');
@@ -1072,6 +1098,7 @@ function sweepMode(q) {
     reader.style.left = headX + 'px'; finger.style.left = headX + 'px';
     box.classList.toggle('active', active);
     const pos = headX - offset;
+    timing(pos);
     $('#swProg').style.width = (totalW ? Math.max(0, Math.min(1, (pos - (lefts[0] || 0)) / (totalW - (lefts[0] || 0)))) * 100 : 0) + '%';
     let idx = -1;
     for (let i = 0; i < cells.length; i++) if (pos >= lefts[i] && pos < lefts[i] + widths[i]) { idx = i; break; }
@@ -1125,8 +1152,8 @@ function sweepMode(q) {
     const step = (t) => { const k = Math.min(1, (t - t0) / 420); offset = start + (target - start) * (1 - Math.pow(1 - k, 3)); update(); if (k < 1) raf = requestAnimationFrame(step); };
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
   }
-  $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); };
-  $('#shuffleBtn').onclick = () => { text = textFor(); build(); };
+  $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); t0 = 0; tDone = 0; info(); };
+  $('#shuffleBtn').onclick = () => { if (src === 'passages') { passIdx = (passIdx + 1) % PASSAGES.length; store.set('swPass', passIdx); } text = textFor(); build(); };
   $('.sweep-top', box).addEventListener('pointerdown', (e) => e.stopPropagation());
   const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };
   const onSet = (e) => { if (['swGrade', 'swSize'].includes(e.detail)) build(); };

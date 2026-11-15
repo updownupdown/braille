@@ -1915,3 +1915,4 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .hunt-line.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 22%, transparent); }
 .hunt-line .cell { --on: #f4f0e8; --off: rgba(255, 255, 255, .1); }
 .hunt-plate .btn { align-self: center; }
+.sw-info { text-align: center; color: var(--muted); font-size: .88rem; margin: 12px 0 0; min-height: 1.3em; } .sw-info b { color: var(--ink); }
