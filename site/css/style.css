@@ -1485,10 +1485,8 @@ body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; b
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hl-ic[class*="gc-"] { color: color-mix(in srgb, var(--gc) 55%, #fff); } }
 .hsec { margin-top: 34px; }
 .home-head { margin-bottom: 4px; }
-
-/* ---------- v18: Secret Agent message scrolls sideways ---------- */
-.ag-msg { position: relative; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
-.ag-msg::-webkit-scrollbar { display: none; }
+/* Secret Agent message wraps onto lines (scrolls only if one word is wider than the box) */
+.ag-msg { position: relative; flex-wrap: wrap; justify-content: center; overflow-x: auto; }
 .ag-w { flex: none; }
 
 /* ---------- v18: Translate, braille to text ---------- */
@@ -1846,3 +1844,17 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* Type mode score line, between the card and the keyboard */
 .w-score { display: flex; justify-content: center; gap: 18px; font-size: .88rem; color: var(--muted); margin: 12px 0 2px; }
 .w-score b { color: var(--ink); font-weight: 600; }
+/* Home: one overall progress line under the logo */
+.h-overall { margin: 6px 0 0; color: var(--muted); font-size: .92rem; }
+.h-overall b { color: var(--ink); font-weight: 600; }
+/* Long Learn pages fold by section (Numbers, Signs) */
+.fold .g2-body { padding: 0 0 22px; }
+.fold .g2-body > .group-title:first-child h3 { display: none; }
+.fold .g2-body > .group-title:first-child { margin-top: 0; }
+/* Translate: Line / As a sign */
+.tr-view { display: flex; margin: 0 0 10px; }
+.tr-out.as-sign { padding: 16px; }
+.tr-sign { grid-template-columns: minmax(0, 1fr); }
+.tr-sign .plate { width: 100%; }
+.tr-tools { display: flex; gap: 10px; flex-wrap: wrap; }
+.tr-sign .plate .braille-line { width: 100%; align-self: stretch; }

@@ -475,7 +475,7 @@ function agent(el, level, ctx) {
       onEnter: () => { if (inp.value.trim() && wi < words.length) glow(card, false); } });
     const mark = () => {
       $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
-      // The message is one scrolling line, so keep the current word centred in it.
+      // The message wraps onto lines; if it ever scrolls (a very long word), keep the current word in view.
       const msg = $('#msg', el), cur = $('.ag-w.cur', el);
       if (msg && cur) glide(msg, cur.offsetLeft - (msg.clientWidth - cur.offsetWidth) / 2, first ? 0 : 1000);
       first = false;
