@@ -191,16 +191,17 @@ const BLOCK = {
 // be-, con- and dis- go only at the start of a word, and only when they make the first syllable.
 const PREFIX = [['dis', fromDots('256')], ['con', fromDots('25')], ['be', fromDots('23')]];
 const VOWEL = /[aeiouy]/;
-const BE_YES = new Set(['being', 'been']);
+const BE_YES = /^(being|bestow|bespoke|bespectacled)/;
+const BE_NOT_RE = /^(benef|benedict|bever|bedouin)/;
 const BE_NOT = new Set(['bedroom', 'bedrooms', 'bedrock', 'beneficial', 'beneficiary', 'benefited', 'benefit', 'benefits', 'beverage', 'beverages', 'bevel', 'beret', 'beryl', 'beta', 'bevy', 'beluga', 'begonia']);
 function prefixOf(s) {
   for (const [p, cell] of PREFIX) {
     if (!s.startsWith(p) || s.length <= p.length) continue;
     const rest = s.slice(p.length);
     if (!VOWEL.test(rest)) continue; // "disk", "best": no second syllable
-    if (p === 'be' && !BE_YES.has(s) && (BE_NOT.has(s) || !/^([^aeiou][aeiouy]|[bcdfgpt][rl])/.test(rest) || rest[0] === rest[1])) continue; // be-gin, be-tray; not best, bell
+    if (p === 'be' && !BE_YES.test(s) && (BE_NOT.has(s) || BE_NOT_RE.test(s) || !/^([^aeiou][aeiouy]|[bcdfgpt][rl])/.test(rest) || rest[0] === rest[1])) continue; // be-gin, be-tray; not best, bell
     if (p === 'con' && /^[aeiouy]/.test(rest)) continue; // cone, conic
-    if (p === 'dis' && rest[0] === 'h') continue; // dish
+    if (p === 'dis' && rest[0] === 'h' && !/^h(on|ear|arm|evel)/.test(rest)) continue; // dish, but dis-honest
     return [p, cell];
   }
   return null;
@@ -215,22 +216,105 @@ for (const [cat, { items }] of Object.entries(CONTRACTIONS)) for (const [w, d] o
 // A "part" is {cells, print, kind, note}
 const P = (cells, print, kind, note = '') => ({ cells, print, kind, note });
 
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k); // "constructor" is a word too
+// Patterns for whole families of words: re-act (prefix), south-east and Shang-hai (compounds).
+const BLOCK_RE = [
+  [/^(over)?re(act|affirm|appear|assur|assign|assess|align|agent|adjust|awaken|arrang)|^preamble|^deactiv|eaway|pineapple/, ['ea']],
+  [/^(south|north)east/, ['the']], [/t(house|hood|hill|hold|hole|hand|heart|head)/, ['th', 'the']],
+  [/ssh|^mishandl/, ['sh']], [/^shanghai/, ['gh']], [/^(micr|kil)owa/, ['ow']], [/^(bi|micr|retr|styr|tw|ins)of/, ['of']],
+  [/^(takedown|daredevil)/, ['ed']], [/^painstak/, ['st']], [/^(toenail|bottleneck)/, ['en']],
+  [/^(centime|multime|sentiment)/, ['time']], [/^ornament/, ['name']], [/^isome/, ['some']], [/^here(s|tic|dit)/, ['here']],
+];
+// Signs that would cut across syllables in these spots: st-o-n-ed, pris-o-n-er, be-l-i-e-v-er, r-e-v-er-se.
+const AVOID = {
+  one: (pre, post) => pre.endsWith('o') || /^(d|r|e|o|n[cdt]|l[aiou]?s?$|ts?$)/.test(post),
+  st: (pre, post) => post.startsWith('h'), // a-s-th-m-a, e-s-th-er
+  there: (pre, post) => pre && /^[dr]/.test(post), // ga-the-r-ed
+  here: (pre) => /(ad|co|in)$/.test(pre), // ad-h-er-ed, co-h-er-en-t, in-h-er-en-t
+  under: (pre) => pre.endsWith('a'), // l-a-u-n-d-er
+  some: (pre, post) => post === 'd', // bl-o-s-s-o-m-ed
+  ever: (pre, post) => /[ie]$/.test(pre) || /(^|ir|un|non|pre)r$/.test(pre) && !post.startsWith('en') || /pers$/.test(pre),
+};
+const blockFor = (s) => [...(has(BLOCK, s) ? BLOCK[s] : []), ...BLOCK_RE.filter(([re]) => re.test(s)).flatMap(([, b]) => b)];
+
+// Shortforms keep their sign inside longer words that keep their meaning: friendly, greatest, received, unnecessary.
+const SHORTFORM = CONTRACTIONS.Shortforms.items.map(([w]) => w).sort((a, b) => b.length - a.length);
+const SF_CELLS = {}; // cells -> shortform, to spot letter groups that would read as one (al = also)
+for (const [w, d] of CONTRACTIONS.Shortforms.items) SF_CELLS[cellsOf(d)] = w;
+
 function contractRun(s, whole) {
-  if (whole && EXCEPTIONS[s]) return [P(cellsOf(EXCEPTIONS[s]), s, 'contraction', 'whole word')];
-  if (whole && WORDSIGN[s]) return [P(WORDSIGN[s], s, 'contraction', LABELS[s] || 'wordsign')];
+  if (whole && has(EXCEPTIONS, s)) return [P(cellsOf(EXCEPTIONS[s]), s, 'contraction', 'whole word')];
+  if (whole && has(WORDSIGN, s)) return [P(WORDSIGN[s], s, 'contraction', LABELS[s] || 'wordsign')];
   if (whole) {
     for (const suf of SUFFIXES) {
       const base = s.slice(0, -suf.length);
-      if (s.endsWith(suf) && base.length > 1 && SUFFIX_OK.has(base) && WORDSIGN[base]) return [P(WORDSIGN[base], base, 'contraction', LABELS[base] || 'wordsign'), ...contractRun('x' + suf, false).slice(1)];
+      if (s.endsWith(suf) && base.length > 1 && SUFFIX_OK.has(base) && has(WORDSIGN, base)) return [P(WORDSIGN[base], base, 'contraction', LABELS[base] || 'wordsign'), ...contractRun('x' + suf, false).slice(1)];
+    }
+    const sf = shortformIn(s);
+    if (sf) return sf;
+  }
+  const out = contractLetters(s, whole);
+  // A word whose cells spell a shortform (al, ab, pd) needs the grade 1 indicator.
+  if (whole && out.every((p) => p.kind === 'letter') && has(SF_CELLS, out.map((p) => p.cells).join(''))) {
+    out.unshift(P(IND.grade1, '', 'indicator', 'grade 1 indicator (reads as a shortform)'));
+  }
+  return out;
+}
+
+// Endings that keep a shortform's sign: friends, greatest, received (rcv-d), receivers.
+const SF_END = {
+  '': ['s'], great: ['s', 'er', 'est', 'ly', 'ness'], quick: ['s', 'er', 'est', 'ly', 'ness', 'en', 'ie', 'ies'],
+  friend: ['s', 'ly', 'lier', 'liest', 'lies', 'liness', 'ship', 'ships', 'less'], good: ['s', 'ness', 'ly', 'y', 'ie', 'ies'],
+  blind: ['s', 'ly', 'ness'], little: ['r', 'st'], letter: ['s', 'ed', 'ing'], afternoon: ['s'], afterward: ['s'],
+  first: ['ly', 's'], braille: ['d', 's'], paid: [], said: [], must: ['s'], should: [], could: [], would: [], children: [],
+};
+const SF_END_E = ['d', 'r', 'rs', 's']; // receive, declare, rejoice and the rest
+// Words that can come before a shortform in a compound, and shortforms that start compounds: girlfriend, goodbye.
+const SF_START = {
+  un: ['necessary', 'said', 'paid', 'friendly'], girl: ['friend'], boy: ['friend'], best: ['friend'], school: ['friend', 'children'],
+  grand: ['children'], step: ['children'], god: ['children'], news: ['letter'], under: ['paid'], over: ['paid'], pre: ['paid'],
+  re: ['paid'], be: ['friend', 'little'], here: ['about', 'after'], there: ['about', 'after'], where: ['about'],
+  herein: ['after'], round: ['about'],
+};
+const SF_COMPOUND = new Set(['after', 'good', 'first', 'blind', 'quick']);
+function shortformIn(s) {
+  for (const pre of ['', ...Object.keys(SF_START)]) {
+    if (!s.startsWith(pre)) continue;
+    for (const base of SHORTFORM) {
+      if (!s.startsWith(base, pre.length) || (pre && !SF_START[pre].includes(base))) continue;
+      const end = s.slice(pre.length + base.length);
+      if (!pre && !end) continue;
+      const ends = base.endsWith('e') && !has(SF_END, base) ? SF_END_E : has(SF_END, base) ? SF_END[base] : SF_END[''];
+      // A compound: after-life, good-bye, first-hand, blind-fold (blind is spelled out before a vowel).
+      const compound = !pre && SF_COMPOUND.has(base) && end.length > 2 && /^[^aeiouy]/.test(end);
+      if (end && !ends.includes(end) && !compound) continue;
+      const out = [];
+      if (pre) out.push(...(pre === 'be' ? [P(fromDots('23'), 'be', 'contraction', 'groupsign')] : contractLetters(pre, false)));
+      out.push(P(WORDSIGN[base], base, 'contraction', LABELS[base]));
+      if (end) out.push(...(compound ? contractLetters(end, false) : contractLetters('x' + end, false).slice(1)));
+      return out;
     }
   }
-  const block = BLOCK[s] || [];
+  return null;
+}
+
+// Spell a letter run with groupsigns, choosing the spelling with the fewest cells (busi-ness, sugges-tion).
+// On a tie the earlier, longer sign wins.
+function contractLetters(s, whole, noPrefix = false) {
+  const block = blockFor(s);
   const out = [];
-  let i = 0;
-  const pre = prefixOf(s);
-  if (pre) { out.push(P(pre[1], pre[0], 'contraction', 'groupsign')); i = pre[0].length; }
-  while (i < s.length) {
-    let hit = null;
+  let start = 0;
+  const pre = !noPrefix && prefixOf(s);
+  if (pre) { out.push(P(pre[1], pre[0], 'contraction', 'groupsign')); start = pre[0].length; }
+  const n = s.length;
+  const best = new Array(n + 1);
+  best[n] = { cost: 0 };
+  for (let i = n - 1; i >= start; i--) {
+    let pick = null;
+    const consider = (p, cells, kind) => {
+      const cost = [...cells].length + best[i + p.length].cost;
+      if (!pick || cost < pick.cost) pick = { cost, p, cells, kind };
+    };
     for (const [p, cells, rule] of GROUPS) {
       if (!s.startsWith(p, i)) continue;
       if (block.includes(p)) continue;
@@ -238,38 +322,113 @@ function contractRun(s, whole) {
       if (rule === 'middle' && (i === 0 || i + p.length >= s.length)) continue;
       // A lower sign (ea, bb…) gives way to an upper one that starts on its second letter: n-e-ar, not n-ea-r.
       if (rule === 'middle' && GROUPS.some(([q, , r]) => r !== 'middle' && q.length > 1 && s.startsWith(q, i + 1) && !block.includes(q))) continue;
-      if (whole && p === s) continue; // whole-word forms handled above
-      hit = [p, cells];
-      break;
+      if (has(AVOID, p) && AVOID[p](s.slice(0, i), s.slice(i + p.length))) continue;
+      if (whole && p === s) continue; // whole-word forms handled above (st alone is s-t, not still)
+      consider(p, cells, 'contraction');
     }
-    if (hit) { out.push(P(hit[1], hit[0], 'contraction', 'groupsign')); i += hit[0].length; }
-    else { out.push(P(LETTERS[s[i]], s[i], 'letter')); i++; }
+    consider(s[i], LETTERS[s[i]], 'letter');
+    best[i] = pick;
+  }
+  for (let i = start; i < n;) {
+    const b = best[i];
+    out.push(b.kind === 'letter' ? P(b.cells, b.p, 'letter') : P(b.cells, b.p, 'contraction', 'groupsign'));
+    i += b.p.length;
   }
   return out;
 }
 
 const HYPHENS = ['-', '–', '—'];
-const isLetter = (c) => /[a-z]/i.test(c);
+// Accented letters: a modifier (dots 4-5 plus a mark) before the plain letter: café = c-a-f-⠘⠌-e.
+const ACCENT = { '́': ['45 34', 'acute accent'], '̀': ['45 16', 'grave accent'], '̂': ['45 146', 'circumflex'], '̈': ['45 25', 'diaeresis'], '̧': ['45 12346', 'cedilla'], '̃': ['45 12456', 'tilde'], '̊': ['45 1246', 'ring'] };
+const accentOf = (c) => { const d = c.normalize('NFD'); return d.length === 2 && /[a-z]/i.test(d[0]) && ACCENT[d[1]] ? [d[0], ACCENT[d[1]]] : null; };
+const baseOf = (c) => (accentOf(c) ? accentOf(c)[0] : c);
+const isLetter = (c) => /[a-z]/i.test(c) || !!accentOf(c);
 const isDigit = (c) => /[0-9]/.test(c);
+const isUpper = (c) => /[A-Z]/.test(baseOf(c));
+// Symbols beyond the punctuation lessons, so they are not left blank.
+const UEB_MORE = {
+  '[': ['46 126', 'open square bracket'], ']': ['46 345', 'close square bracket'], '{': ['456 126', 'open curly bracket'], '}': ['456 345', 'close curly bracket'],
+  '<': ['4 126', 'less than'], '>': ['4 345', 'greater than'], '~': ['4 35', 'tilde'], _: ['46 36', 'underscore'], '\\': ['456 16', 'backslash'], '|': ['456 1256', 'vertical bar'],
+  '€': ['4 15', 'euro'], '£': ['4 123', 'pound'], '¢': ['4 14', 'cent'], '¥': ['4 13456', 'yen'], '§': ['45 234', 'section'], '¶': ['45 1234', 'paragraph'],
+  '©': ['45 14', 'copyright'], '®': ['45 1235', 'registered'], '™': ['45 2345', 'trademark'], '…': ['256 256 256', 'ellipsis'], '•': ['456 256', 'bullet'],
+  '‘': ['6 236', 'open single quote'], '−': ['5 36', 'minus'], '^': ['4 26', 'caret'], '→': ['56 1256 135', 'right arrow'], '←': ['56 1256 246', 'left arrow'],
+  '«': ['45 236', 'open angle quote'], '»': ['45 356', 'close angle quote'],
+};
+// Lower cells that would read as a word when they stand alone (? is also "his"), so they take the grade 1 symbol.
+const LOWER_WORDS = new Set(['23', '26', '2356', '236', '35', '356'].map(fromDots));
+
+// Three or more words in capitals make a capitals passage: ⠠⠠⠠ before, ⠠⠄ after the last.
+function capsPassages(words) {
+  const caps = words.map((w) => /^\s*$/.test(w) ? null : /[a-z]/i.test(w.normalize('NFD')) && ![...w].some((c) => isLetter(c) && !isUpper(c)));
+  const start = new Set(); const end = new Set();
+  for (let i = 0; i < words.length;) {
+    if (caps[i] !== true) { i++; continue; }
+    let j = i, n = 0, last = i;
+    while (j < words.length && caps[j] !== false) { if (caps[j]) { n++; last = j; } j++; }
+    if (n >= 3) { start.add(i); end.add(last); }
+    i = last + 1;
+  }
+  return { start, end, inside: (k) => [...start].some((a) => a <= k && [...end].some((b) => b >= k && b >= a && ![...end].some((c) => c >= a && c < b))) };
+}
+
+// Mixed case (McDonald, CDs, iPhone) or accented letters: capitals marked inside the word, each piece contracted.
+function mixedRun(run, grade, atStart) {
+  const out = [];
+  const pieces = run.match(/[A-ZÀ-ÖØ-Þ]+[^A-ZÀ-ÖØ-Þ]*|[^A-ZÀ-ÖØ-Þ]+/g) || [];
+  pieces.forEach((pc, n) => {
+    const capLen = [...pc].findIndex((c) => !isUpper(c));
+    const nCap = capLen < 0 ? pc.length : capLen;
+    if (nCap >= 2) out.push(P(IND.capital + IND.capital, '', 'indicator', 'capitals word'));
+    else if (nCap === 1) out.push(P(IND.capital, '', 'indicator', 'capital'));
+    const spell = (str, first) => {
+      // split on accented letters, contract the plain stretches
+      let buf = '';
+      const flush = () => {
+        if (!buf) return;
+        if (grade === 2) {
+          let k = 0; // carry original case for display
+          for (const p of contractLetters(buf.toLowerCase(), false, !first)) { p.print = buf.slice(k, k + p.print.length); k += p.print.length; out.push(p); }
+        } else for (const ch of buf) out.push(P(LETTERS[ch.toLowerCase()], ch, 'letter'));
+        buf = ''; first = false;
+      };
+      for (const ch of str) {
+        const acc = accentOf(ch);
+        if (acc) { flush(); out.push(P(cellsOf(acc[1][0]), '', 'indicator', acc[1][1]), P(LETTERS[acc[0].toLowerCase()], ch, 'letter')); first = false; } else buf += ch;
+      }
+      flush();
+    };
+    if (nCap >= 2 && nCap < pc.length) {
+      spell(pc.slice(0, nCap), atStart && n === 0);
+      out.push(P(IND.capital + fromDots('3'), '', 'indicator', 'capitals terminator'));
+      spell(pc.slice(nCap), false);
+    } else spell(pc, atStart && n === 0);
+  });
+  return out;
+}
 
 // English UEB translator. grade: 1 or 2. Returns array of parts.
 export function translateEnglish(text, grade = 1) {
   const parts = [];
-  const words = text.replace(/\r/g, '').split(/(\s+)/);
+  const words = text.replace(/\r/g, '').normalize('NFC').split(/(\s+)/);
+  const passage = capsPassages(words);
+  let inPassage = false;
   let quoteOpen = false;
-  for (const w of words) {
-    if (!w) continue;
+  words.forEach((w, wi) => {
+    if (!w) return;
     if (/^\s+$/.test(w)) {
       if (w.includes('\n')) parts.push(P('\n', '↵', 'newline'));
       else parts.push(P('⠀', ' ', 'space'));
-      continue;
+      return;
     }
+    const wordStart = parts.length;
     // core letters for whole-word detection
-    const lettersOnly = w.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '');
-    const allCaps = lettersOnly.length >= 2 && /^[A-Z]+$/.test(lettersOnly);
+    const lettersOnly = w.replace(/^[^a-z0-9À-ɏ]+|[^a-z0-9À-ɏ]+$/gi, '');
+    const allCaps = lettersOnly.length >= 2 && [...lettersOnly].every((c) => isLetter(c) && isUpper(c));
     let capsWordDone = false;
     let i = 0;
     let numMode = false;
+    if (passage.start.has(wi)) inPassage = true;
+    let passageOpen = passage.start.has(wi);
     while (i < w.length) {
       const c = w[i];
       if (isDigit(c)) {
@@ -288,8 +447,9 @@ export function translateEnglish(text, grade = 1) {
         while (j < w.length && isLetter(w[j])) j++;
         const run = w.slice(i, j);
         // Only lowercase a–j can be mistaken for digits; a capital sign already ends number mode.
-        if (numMode && /^[a-j]/.test(run)) parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (letter after number)'));
+        if (numMode && /^[a-j]/.test(baseOf(run[0]))) parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (letter after number)'));
         numMode = false;
+        if (passageOpen) { parts.push(P(IND.capital + IND.capital + IND.capital, '', 'indicator', 'capitals passage')); passageOpen = false; }
         const lower = run.toLowerCase();
         // A hyphen or dash also bounds a word: so-called, x-ray, mother-in-law.
         const segStart = Math.max(...HYPHENS.map((h) => (i ? w.lastIndexOf(h, i - 1) : -1))) + 1;
@@ -301,19 +461,24 @@ export function translateEnglish(text, grade = 1) {
         let whole = run === segLetters || (apos && run === apos[1] && i === segStart + seg.indexOf(apos[1]));
         // be, were, his and was are spelled out (other contractions still apply: w-er-e) when punctuation touches them.
         if (whole && ['be', 'were', 'his', 'was'].includes(lower) && lettersOnly !== w) whole = false;
+        const plain = /^[a-z]+$/i.test(run);
+        const simple = plain && (inPassage || allCaps || /^[A-Z]?[a-z]*$/.test(run) || /^[A-Z]+$/.test(run));
+        if (!simple) {
+          parts.push(...mixedRun(run, grade, i === segStart));
+          i = j;
+          continue;
+        }
         // capitals
-        if (allCaps) {
+        if (inPassage) {
+          // the passage indicator covers every letter
+        } else if (allCaps) {
           if (!capsWordDone) { parts.push(P(IND.capital + IND.capital, '', 'indicator', 'capitals word')); capsWordDone = true; }
-        } else if (/^[A-Z][a-z]*$/.test(run)) {
+        } else if (/^[A-Z]+$/.test(run) && run.length > 1) {
+          parts.push(P(IND.capital + IND.capital, '', 'indicator', 'capitals word')); // ADA-style: the hyphen ends it
+        } else if (/^[A-Z]/.test(run)) {
           parts.push(P(IND.capital, '', 'indicator', 'capital'));
         }
-        const mixed = !allCaps && !/^[A-Z]?[a-z]*$/.test(run);
-        if (mixed) {
-          for (const ch of run) {
-            if (/[A-Z]/.test(ch)) parts.push(P(IND.capital, '', 'indicator', 'capital'));
-            parts.push(P(LETTERS[ch.toLowerCase()], ch, 'letter'));
-          }
-        } else if (grade === 2) {
+        if (grade === 2) {
           if (whole && lower.length === 1 && !'aio'.includes(lower)) {
             parts.push(P(IND.grade1, '', 'indicator', 'grade 1 indicator (lone letter)'));
             parts.push(P(LETTERS[lower], run, 'letter'));
@@ -335,17 +500,26 @@ export function translateEnglish(text, grade = 1) {
         numMode = true; i++; continue;
       }
       numMode = false;
+      const code = c.charCodeAt(0);
       if (c === '"') {
         parts.push(quoteOpen ? P(fromDots('356'), '”', 'punct', 'close quote') : P(fromDots('236'), '“', 'punct', 'open quote'));
         quoteOpen = !quoteOpen;
+      } else if (code >= 0x2800 && code <= 0x28ff) {
+        parts.push(P(c, c, 'punct', 'braille cell')); // braille typed or pasted in stays as it is
       } else if (UEB_PUNCT[c]) {
         parts.push(P(UEB_PUNCT[c][0], c, 'punct', UEB_PUNCT[c][1]));
+      } else if (has(UEB_MORE, c)) {
+        parts.push(P(cellsOf(UEB_MORE[c][0]), c, 'punct', UEB_MORE[c][1]));
       } else {
         parts.push(P(fromDots(''), c, 'unknown', 'not in this table'));
       }
       i++;
     }
-  }
+    // A lone lower sign such as ? would read as a word (his), so it takes the grade 1 symbol.
+    const mine = parts.slice(wordStart);
+    if (grade === 2 && mine.length === 1 && mine[0].kind === 'punct' && LOWER_WORDS.has(mine[0].cells)) parts.splice(wordStart, 0, P(IND.grade1, '', 'indicator', 'grade 1 symbol'));
+    if (passage.end.has(wi)) { parts.push(P(IND.capital + fromDots('3'), '', 'indicator', 'capitals terminator')); inPassage = false; }
+  });
   return parts;
 }
 
@@ -364,7 +538,7 @@ const LANG = {
     },
     punct: {
       ',': '2', ';': '23', ':': '25', '.': '256', '?': '26', '!': '235', "'": '3', '’': '3', '-': '36', '/': '34',
-      '«': '2356', '»': '2356', '"': '2356', '“': '2356', '”': '2356', '(': '236', ')': '356',
+      '«': '2356', '»': '2356', '"': '2356', '“': '2356', '”': '2356', '(': '236', ')': '356', '€': '45 15',
     },
   },
   es: {
@@ -441,6 +615,8 @@ export function translateOther(text, code) {
       numMode = true;
       continue;
     }
+    // A decimal comma or point between digits keeps the number going: 3,5.
+    if (numMode && (ch === ',' || ch === '.') && isDigit(chars[i + 1] || '') && L.punct[ch]) { parts.push(P(cellsOf(L.punct[ch]), ch, 'punct', 'decimal')); continue; }
     numMode = false;
     if (L.accent && !L.map[low]) {
       const a = split(low);
@@ -470,7 +646,7 @@ export function translateOther(text, code) {
       parts.push(P(fromDots(dots), ch, 'letter'));
       continue;
     }
-    if (L.punct[ch]) { parts.push(P(fromDots(L.punct[ch]), ch, 'punct')); continue; }
+    if (L.punct[ch]) { parts.push(P(cellsOf(L.punct[ch]), ch, 'punct')); continue; }
     parts.push(P(fromDots(''), ch, 'unknown', 'not in this table'));
   }
   return parts;

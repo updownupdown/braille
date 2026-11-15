@@ -1,15 +1,15 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=40';
+} from './braille.js?v=41';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=40';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=40';
-import { COMMON_WORDS } from './wordlist.js?v=40';
-import { LANG_CONTRACTIONS } from './langcontractions.js?v=40';
-import { G2_EXAMPLES } from './g2examples.js?v=40';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=40';
+} from './data.js?v=41';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=41';
+import { COMMON_WORDS } from './wordlist.js?v=41';
+import { LANG_CONTRACTIONS } from './langcontractions.js?v=41';
+import { G2_EXAMPLES } from './g2examples.js?v=41';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=41';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -1169,7 +1169,7 @@ function overviewSection() {
       <p>See <a href="#/reference/grade2">Grade 2</a> for every contraction.</p>`],
     ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Practice › Read</a>.</p>
       <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. You can build cells dot by dot in <a href="#/practice/write">Practice › Draw</a>.</p>`],
-    ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), Canadian bank notes, ATMs, transit handrails and many product labels. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
+    ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), ATMs, transit handrails and many product labels. Canadian bank notes have braille-sized dots too, though they are a counting code rather than braille. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
     ['ov-learn', 'Learning it as a sighted person', `<p>Most sighted learners start by reading braille <b>by sight</b>, which is what this site teaches. It’s a great way to understand signs, help a blind friend or family member, or begin training as a teacher or transcriber. Reading by touch takes much longer, because your fingertips need months of practice to tell the dots apart.</p>
       <p>A good order is: the letters a–j, then the rest of the <a href="#/reference/alphabet">alphabet</a>, then <a href="#/reference/numbers">numbers and capitals</a>, then the most common <a href="#/reference/grade2">Grade 2</a> contractions. Practise a little each day in <a href="#/practice/read">Guess</a> and <a href="#/practice/write">Draw</a>, then try real <a href="#/reference/signs">signs</a>.</p>`],
     ['ov-history', 'History', `<p>Louis Braille was born in 1809 in Coupvray, France, and lost his sight after an accident in his father’s workshop at age three. At the Royal Institute for Blind Youth in Paris he met Charles Barbier’s 12-dot “night writing”, a military code for reading in the dark. In 1824, at 15, he simplified it into the six-dot cell that fits under one fingertip. Braille died in 1852; France made his system official two years later.</p>
