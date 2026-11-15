@@ -46,8 +46,8 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   }
   await ctx.close();
 }
-// Guess: the choices alone must settle the answer. No wrong choice may share the sign's cells
-// (b is also "but", bb is also "be" and ";"), for every set and for Auto's whole course.
+// Guess: exactly one choice may be right. Shown alone, no wrong choice may share the sign's cells
+// (b is also "but", bb is also "be" and ";"); shown inside a word, only readings that can't sit there may.
 {
   const page = await browser.newPage();
   await page.goto(base + '#/practice/read');
@@ -63,6 +63,15 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
       for (const o of opts) if (o.cells === item.cells || readings.has(o.answer)) out.push(`${name}: ${item.answer} offered with ${o.answer}`);
       if (new Set(opts.map((o) => o.answer)).size !== opts.length) out.push(`${name}: ${item.answer} has a repeated choice`);
     }
+    // Inside a real word, a choice with the same cells is fine only if it can't sit at that place in a word.
+    for (const item of P.autoCourse()) for (const wc of P.wordsFor(item)) {
+      const word = wc.parts.map((x) => x.cells).join('');
+      if ([...word].slice(wc.at, wc.at + wc.len).join('') !== item.cells) out.push(`word ${wc.word}: ${item.answer} is not at the faded gap`);
+      const opts = P.guessOptions(item, P.autoCourse().filter((x) => x.key !== item.key), wc.pos);
+      for (const o of opts) if (o.cells === item.cells && P.allowedPos(o).includes(wc.pos)) out.push(`word ${wc.word}: ${item.answer} offered with ${o.answer}`);
+      if (opts.some((o) => o.answer === item.answer)) out.push(`word ${wc.word}: ${item.answer} offered twice`);
+    }
+    if (!P.wordsFor(P.autoCourse().find((x) => x.key === 'cbb')).length) out.push('no words found for bb');
     return [...new Set(out)];
   });
   if (bad.length) failures.push('Guess choices with two right answers:\n  ' + bad.slice(0, 20).join('\n  '));

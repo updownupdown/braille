@@ -1817,3 +1817,8 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .sheet .st-page .st-top b { font-size: 1.5rem; }
 /* Translate: the language picker sits on the right of the header */
 .subbar #langDD { margin-left: auto; }
+
+/* Guess: a sign inside a real word; the other cells of the word are faded */
+.prompt-cells .cell.dim { opacity: .4; }
+.stage .prompt-cells.in-word { flex-wrap: nowrap; }
+.stage .prompt-cells.in-word .cell { --s: clamp(9px, 2.9vw, 18px); }
