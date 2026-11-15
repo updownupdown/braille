@@ -22,9 +22,9 @@ const base = `http://localhost:${server.address().port}/`;
 export const ROUTES = ['', 'reference', 'reference/overview', 'reference/alphabet', 'reference/numbers', 'reference/grade2',
   'reference/g2words', 'reference/g2strong', 'reference/g2lower', 'reference/g2affix', 'reference/g2short',
   'reference/signs', 'reference/science', 'reference/languages', 'reference/systems', 'reference/cheatsheet',
-  'practice', 'practice/read', 'practice/write', 'practice/words', 'practice/sweep', 'practice/read?cat=auto',
+  'practice', 'practice/read', 'practice/write', 'practice/words', 'practice/sweep', 'practice/read?cat=auto', 'practice/stats',
   'games', 'games/wordle', 'games/snowman', 'games/anagrams', 'games/agent', 'games/rain', 'games/time', 'games/mirror',
-  'games/memory', 'games/maze', 'games/trivia', 'games/riddles', 'translate', 'translate?text=Exit%20floor%202'];
+  'games/memory', 'games/maze', 'games/signhunt', 'games/trivia', 'games/riddles', 'translate', 'translate?text=Exit%20floor%202'];
 
 const browser = await chromium.launch();
 const failures = [];

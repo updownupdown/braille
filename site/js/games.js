@@ -6,6 +6,8 @@ const TRIVIA = Object.fromEntries(Object.entries(TRIVIA_1).map(([k, v]) => [k, [
 import { WORDS } from './data.js';
 import { SNOWMAN_WORDS } from './snowman.js';
 import { AGENT_CASES } from './agentcases.js';
+import { chord, sixKeyOn } from './sixkey.js';
+import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -52,10 +54,14 @@ const glow = (el, ok) => { el.classList.remove('glow-good', 'glow-bad'); void el
 const best = (k, v) => { const b = store.get('best.' + k, null); if (v != null && (b == null || v > b)) { store.set('best.' + k, v); return v; } return b; };
 const bestLow = (k, v) => { const b = store.get('best.' + k, null); if (v != null && (b == null || v < b)) { store.set('best.' + k, v); return v; } return b; };
 // Keyboard listener that ignores typing in inputs and open dialogs.
+// With six-key input on (Settings), F D S J K L chords arrive as the letter they spell, so every game takes braille typing.
 function keys(fn) {
-  const h = (e) => { if (e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT' || !document.getElementById('sheet').hidden) return; fn(e); };
-  document.addEventListener('keydown', h);
-  return () => document.removeEventListener('keydown', h);
+  const skip = (e) => e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT' || !document.getElementById('sheet').hidden;
+  const six = sixKeyOn() ? chord((dots, cell, letter) => { if (letter) fn({ key: letter, preventDefault() {}, target: document.body }); }) : null;
+  const h = (e) => { if (skip(e)) return; if (six && six.down(e)) return; fn(e); };
+  const u = (e) => { if (!skip(e) && six) six.up(e); };
+  document.addEventListener('keydown', h); document.addEventListener('keyup', u);
+  return () => { document.removeEventListener('keydown', h); document.removeEventListener('keyup', u); };
 }
 const LV3 = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
 // On-screen print keyboard for games, in place of a text box (no phone keyboard popping up and taking half the screen).
@@ -134,6 +140,54 @@ const scoreBest = (k, extra = '') => `<span class="g-score">Score: <b id="sc">0<
 const livesHTML = (n, of = 3) => Array.from({ length: of }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
 // Start screen for timed games: what to do, which symbols are in play at this level, then Start.
 const startScreen = (how, incl) => `<p class="g-how">${how}</p><button class="btn primary" id="go">Start</button><p class="g-incl"><b>Includes</b> ${incl}</p>`;
+
+// ---------- Sign Hunt ----------
+// A building directory in braille only: find the line that says the target. Practises scanning a real sign, not just decoding.
+const HUNT_ROOMS = ['office', 'library', 'cafeteria', 'gym', 'reception', 'kitchen', 'lounge', 'pharmacy', 'clinic', 'lobby', 'parking', 'stairs', 'elevator', 'washroom', 'information', 'auditorium', 'classroom', 'laboratory', 'storage', 'mailroom'];
+function signhunt(el, level) {
+  const cfg = { easy: { n: 3, grade: 1 }, medium: { n: 4, grade: 2 }, hard: { n: 5, grade: 2 } }[level];
+  const pool = [...new Set([...HUNT_ROOMS, ...SIGNS.filter((x) => /^[a-z ]{3,16}$/.test(x) && x.split(' ').length <= 2)])];
+  el.innerHTML = `${statBar('', '<span class="lives" id="lives"></span>', scoreBest('hunt.' + level))}
+    <div class="card g-card hunt" id="card"><p class="hunt-q" id="q"></p><div class="plate hunt-plate" id="plate"></div></div>`;
+  const card = $('#card', el);
+  let sc = 0, lives = 3, target = null, busy = false;
+  const cap = (t) => t.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+  // Hard: lines that start alike (same first letter or a shared word) so the first cell is not enough.
+  function lines() {
+    const t = pick(pool);
+    let others = shuffle(pool.filter((x) => x !== t));
+    if (level === 'hard') others.sort((a, b) => (b[0] === t[0]) - (a[0] === t[0]));
+    // A line that merely contains the target's words ("exit" / "no exit") would make two right answers: leave it out.
+    others = others.filter((x) => !x.split(' ').includes(t) && !t.split(' ').includes(x));
+    const ls = shuffle([t, ...others.slice(0, cfg.n - 1)]).map((x) => ({ name: x, text: x }));
+    if (level === 'hard') ls.forEach((x, i) => { if (i % 2) x.text = `${x.name} ${100 + Math.floor(Math.random() * 400)}`; });
+    return [t, ls];
+  }
+  function round() {
+    busy = false; card.classList.remove('glow-good', 'glow-bad');
+    const [t, ls] = lines(); target = t;
+    $('#q', el).innerHTML = `Which line says <b>${esc(cap(t))}</b>?`;
+    $('#plate', el).innerHTML = ls.map((x) => `<button class="hunt-line" data-t="${esc(x.name)}">${line(cap(x.text), { grade: cfg.grade })}</button>`).join('');
+  }
+  $('#plate', el).onclick = (e) => {
+    const b = e.target.closest('.hunt-line'); if (!b || busy) return;
+    const ok = b.dataset.t === target;
+    glow(card, ok); b.classList.add(ok ? 'right' : 'wrong');
+    if (ok) { busy = true; sc++; $('#sc', el).textContent = sc; best('hunt.' + level, sc); $('#best', el).textContent = best('hunt.' + level); setTimeout(round, 700); return; }
+    lives--; $('#lives', el).innerHTML = livesHTML(lives);
+    if (!lives) {
+      busy = true; $$('.hunt-line', el).forEach((x) => { if (x.dataset.t === target) x.classList.add('right'); });
+      setTimeout(() => {
+        $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`;
+        $('#plate', el).innerHTML = '<button class="btn primary" id="again">Play again</button>';
+        $('#again', el).onclick = () => { sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
+      }, 1200);
+    }
+  };
+  $('#lives', el).innerHTML = livesHTML(lives);
+  round();
+  return () => {};
+}
 
 // ---------- Wordle ----------
 function wordle(el) {
@@ -781,7 +835,7 @@ function maze(el, level) {
 export const GAME_GROUPS = [
   ['Word Games', ['wordle', 'snowman', 'anagrams', 'agent']],
   ['Quick Fire', ['rain', 'time', 'mirror']],
-  ['Puzzles and Quizzes', ['memory', 'maze', 'trivia', 'riddles']],
+  ['Puzzles and Quizzes', ['memory', 'maze', 'signhunt', 'trivia', 'riddles']],
 ];
 export const GAMES = {
   wordle: { name: 'Braidle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
@@ -802,6 +856,8 @@ export const GAMES = {
     help: ['Flip two cards at a time. Match each braille cell with its print letter.', 'Easy uses 6 pairs from a–j, Medium 8 pairs, Hard 15 pairs with lots of look-alikes.', 'Try to finish in as few moves as you can.'] },
   maze: { name: 'Braille Maze', icon: 'maze', range: 'Easy–Hard', desc: 'Step only on the cells that spell the word, in order', levels: LV3, run: maze,
     help: ['Start at the flag. Step up, down, left or right onto the next letter of the word.', 'Cells that don’t spell the word are traps. Three traps and the route is revealed.', 'Bigger grids and longer words on harder levels. Hard uses Grade 2, so some steps are contractions.'] },
+  signhunt: { name: 'Sign Hunt', icon: 'sign', range: 'Easy–Hard', desc: 'Find the right line on a building directory, in braille only', levels: LV3, run: signhunt,
+    help: ['A directory sign lists several places, in braille only. Tap the line that says the place you are looking for.', 'Easy has three lines in Grade 1. Medium has four in Grade 2, the way Canadian signs are made. Hard has five, with look-alike lines and room numbers.', 'Three wrong taps and the round ends. Your best score is saved for each level.'] },
   trivia: { name: 'Trivia', icon: 'help', range: 'Easy–Hard', desc: '1,000 questions on ten topics, with answers in braille', levels: LV3, run: trivia,
     help: ['Read the question, then pick the answer. The answers are written in braille.', 'Easy shows print under the cells, Medium is braille only, Hard uses Grade 2 contractions.', 'Rounds are ten questions. Choose a topic or play them all.'] },
   riddles: { name: 'Riddles', icon: 'bulb', range: 'Easy–Hard', desc: 'Over 100 riddles; pick the answer written in braille', levels: LV3, run: riddles,
@@ -812,7 +868,7 @@ export const gameStore = store;
 export function gameStatus(k) {
   const lv = ['easy', 'medium', 'hard'];
   const top = (pre, low = false) => { const v = lv.map((l) => store.get('best.' + pre + l, null)).filter((x) => x != null); return v.length ? (low ? Math.min(...v) : Math.max(...v)) : null; };
-  const n = { rain: top('rain.'), time: top('time.'), mirror: top('mirror.'), trivia: top('quiz.trivia') }[k];
+  const n = { rain: top('rain.'), time: top('time.'), mirror: top('mirror.'), trivia: top('quiz.trivia'), signhunt: top('hunt.') }[k];
   if (n != null) return `Best ${n}`;
   if (k === 'memory') { const m = top('mem.', true); if (m != null) return `Best ${m} moves`; }
   if (k === 'riddles') { const s = lv.reduce((a, l) => a + store.get('riddles.solved.' + l, []).length, 0); if (s) return `${s} solved`; }
