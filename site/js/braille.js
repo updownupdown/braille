@@ -182,7 +182,7 @@ GROUPS.sort((a, b) => b[0].length - a[0].length);
 
 // Words where a sign would cut across syllables or change the sound, so it is not used there.
 const BLOCK = {
-  fever: ['ever'], fevers: ['ever'], feverish: ['ever'], severe: ['ever'], severely: ['ever'], severity: ['ever'],
+  severe: ['ever'], severely: ['ever'], severity: ['ever'],
   bothered: ['there'], bothering: ['there'], sentiment: ['time'], sentiments: ['time'], sentimental: ['time'],
   tournament: ['name'], tournaments: ['name'], ornament: ['name'], ornaments: ['name'], ornamental: ['name'],
   nowhere: ['ow'], wherever: ['where'],
@@ -193,7 +193,7 @@ const PREFIX = [['dis', fromDots('256')], ['con', fromDots('25')], ['be', fromDo
 const VOWEL = /[aeiouy]/;
 const BE_YES = /^(being|bestow|bespoke|bespectacled)/;
 const BE_NOT_RE = /^(benef|benedict|bever|bedouin)/;
-const BE_NOT = new Set(['bedroom', 'bedrooms', 'bedrock', 'beneficial', 'beneficiary', 'benefited', 'benefit', 'benefits', 'beverage', 'beverages', 'bevel', 'beret', 'beryl', 'beta', 'bevy', 'beluga', 'begonia']);
+const BE_NOT = new Set(['bedroom', 'bedrooms', 'bedrock', 'beneficial', 'beneficiary', 'benefited', 'benefit', 'benefits', 'beverage', 'beverages', 'bevel', 'beret', 'beryl', 'bevy', 'beluga', 'begonia']);
 function prefixOf(s) {
   for (const [p, cell] of PREFIX) {
     if (!s.startsWith(p) || s.length <= p.length) continue;
@@ -323,7 +323,7 @@ function contractLetters(s, whole, noPrefix = false) {
       // A lower sign (ea, bb…) gives way to an upper one that starts on its second letter: n-e-ar, not n-ea-r.
       if (rule === 'middle' && GROUPS.some(([q, , r]) => r !== 'middle' && q.length > 1 && s.startsWith(q, i + 1) && !block.includes(q))) continue;
       if (has(AVOID, p) && AVOID[p](s.slice(0, i), s.slice(i + p.length))) continue;
-      if (whole && p === s) continue; // whole-word forms handled above (st alone is s-t, not still)
+      if (whole && p === s && !['er', 'ed', 'ow'].includes(p)) continue; // st alone is s-t, not still; er, ed, ow keep their sign
       consider(p, cells, 'contraction');
     }
     consider(s[i], LETTERS[s[i]], 'letter');
@@ -517,7 +517,7 @@ export function translateEnglish(text, grade = 1) {
     }
     // A lone lower sign such as ? would read as a word (his), so it takes the grade 1 symbol.
     const mine = parts.slice(wordStart);
-    if (grade === 2 && mine.length === 1 && mine[0].kind === 'punct' && LOWER_WORDS.has(mine[0].cells)) parts.splice(wordStart, 0, P(IND.grade1, '', 'indicator', 'grade 1 symbol'));
+    if (mine.length === 1 && mine[0].kind === 'punct' && LOWER_WORDS.has(mine[0].cells)) parts.splice(wordStart, 0, P(IND.grade1, '', 'indicator', 'grade 1 symbol'));
     if (passage.end.has(wi)) { parts.push(P(IND.capital + fromDots('3'), '', 'indicator', 'capitals terminator')); inPassage = false; }
   });
   return parts;

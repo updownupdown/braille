@@ -1,6 +1,6 @@
 // Learn Braille service worker: app shell cached for offline use, refreshed in the background.
-const CACHE = 'learn-braille-v42';
-const SHELL = ['./', './index.html', './css/style.css?v=42', './js/app.js?v=42', './js/braille.js?v=42', './js/data.js?v=42', './js/games.js?v=42', './js/gamedata.js?v=42', './js/wordlist.js?v=42', './js/phrases.js?v=42', './js/snowman.js?v=42', './js/agentcases.js?v=42', './js/g2examples.js?v=42', './js/trivia2.js?v=42', './js/langcontractions.js?v=42',
+const CACHE = 'learn-braille-v43';
+const SHELL = ['./', './index.html', './css/style.css?v=43', './js/app.js?v=43', './js/braille.js?v=43', './js/data.js?v=43', './js/games.js?v=43', './js/gamedata.js?v=43', './js/wordlist.js?v=43', './js/phrases.js?v=43', './js/snowman.js?v=43', './js/agentcases.js?v=43', './js/g2examples.js?v=43', './js/trivia2.js?v=43', './js/langcontractions.js?v=43',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
