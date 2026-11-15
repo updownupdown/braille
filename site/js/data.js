@@ -1,5 +1,5 @@
 // Reference content: languages, world systems, signage, science, history.
-import { cellsOf } from './braille.js?v=40';
+import { cellsOf } from './braille.js?v=41';
 
 export const SIGN_WORDS = [
   'Exit', 'Men', 'Women', 'Washroom', 'Stairs', 'Elevator', 'Push', 'Pull', 'Room', 'Floor', 'Open', 'Close',
@@ -109,7 +109,7 @@ export const SYSTEMS = [
   { group: 'Other Latin-script languages', items: [
     ['French (Code braille français uniformisé)', 'France, Quebec, French Canada, Belgium, Switzerland, Africa', 'Intégral (uncontracted) and abrégé (contracted). Accented letters have their own cells and numbers use “Antoine” digits after a one-dot number sign.', 'fr'],
     ['Spanish', 'Spain, Latin America', 'Mostly uncontracted. Accented vowels and ñ have their own cells; ⠨ marks capitals; the period is a single dot.', 'es'],
-    ['German (Deutsche Blindenschrift)', 'Germany, Austria, Switzerland', 'Basisschrift (uncontracted, formerly Vollschrift) and Kurzschrift (contracted). Umlauts and ß have their own cells; capitals are traditionally not marked.', 'de'],
+    ['German (Deutsche Blindenschrift)', 'Germany, Austria, Switzerland', 'Basisschrift (letter by letter), Vollschrift (adds one-cell signs for au, ei, sch and a few more) and Kurzschrift (contracted). Umlauts and ß have their own cells; capitals are traditionally not marked.', 'de'],
     ['Italian, Portuguese, Dutch, Nordic and others', 'Europe & beyond', 'Each adapts the same a–z base from French braille, adding its own accented letters and punctuation.'],
   ]},
   { group: 'Other scripts', items: [
@@ -194,7 +194,7 @@ export const SIGN_REGIONS = {
     facts: [
       ['Code', 'UEB Grade 2 since 2016; EBAE on older signs. Signs are very similar to Canada’s.'],
       ['Rules', 'The 2010 ADA Standards (§703) require Grade 2 braille directly below the raised text, with domed dots.'],
-      ['Height', 'Braille baseline at least 48 in (1220 mm) and raised text no higher than 60 in (1525 mm) above the floor, on the latch side of the door.'],
+      ['Height', 'Raised characters sit between 48 in (1220 mm) and 60 in (1525 mm) above the floor, measured to the baseline of the lowest and highest lines, on the latch side of the door.'],
       ['Capitals', 'ADA only asks for capital signs before proper nouns, the first word of a sentence, initials and acronyms — so many signs look all lowercase in braille.'],
       ['Elevators', 'Braille left of each button. ADA-style labels use contractions: “open” is ⠕⠏⠢ (o-p-en), “alarm” is ⠁⠇⠜⠍ (a-l-ar-m), “phone” is ⠏⠓⠐⠕ (p-h-one).'],
     ],
