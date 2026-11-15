@@ -26,6 +26,15 @@ site/            static site (deployed as-is)
 
 Run locally with any static server, e.g. `python3 -m http.server -d site`.
 
+## Tests and deploys
+
+Every pull request and every push to main runs `.github/workflows/pages.yml`:
+
+- `node --test tests/translator.test.mjs` checks every Grade 2 example in `js/g2examples.js` against the translator.
+- `node tests/smoke.mjs` (needs `npm install --no-save playwright`) opens every route at phone and laptop sizes and fails on any page error or sideways scroll. Add new routes to its `ROUTES` list.
+
+Pushes to main deploy only when both pass. There are no cache version numbers to bump: the service worker fetches the app's files network-first (cached copy offline), and the deploy stamps `site/version.json` so an open app can show an "Updated · Reload" bar.
+
 The Grade 2 translator follows the main UEB contraction rules but is simplified; treat it as a learning aid, not a transcription tool.
 
 ## Install as an app

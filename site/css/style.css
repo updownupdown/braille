@@ -1816,3 +1816,8 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* v42: Guess context cells */
 .prompt-cells .cell.ghost { opacity: .22; }
 .prompt-cells .cell.ghost i { background: var(--muted); border-color: var(--muted); }
+
+/* Update-ready bar (shown when a new deploy lands while the app is open) */
+.upd-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 18px; border-radius: 99px; background: var(--ink, #1c1917); color: var(--bg); box-shadow: 0 6px 24px rgb(0 0 0 / .18); font-weight: 500; }
+.upd-bar .btn { min-height: 34px; padding: 0 16px; background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (min-width: 900px) { .upd-bar { bottom: 24px; } }
