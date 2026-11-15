@@ -1,6 +1,6 @@
 // Games: each game renders into a container and returns a cleanup function.
 import { LETTERS, IND, translate, toCells, toDots } from './braille.js?v=40';
-import { TRIVIA as TRIVIA_1, RIDDLES, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=40';
+import { TRIVIA as TRIVIA_1, RIDDLES, RIDDLE_CLASH, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js?v=40';
 import { TRIVIA_MORE } from './trivia2.js?v=40';
 const TRIVIA = Object.fromEntries(Object.entries(TRIVIA_1).map(([k, v]) => [k, [...v, ...(TRIVIA_MORE[k] || [])]]));
 import { WORDS } from './data.js?v=40';
@@ -296,7 +296,8 @@ function riddles(el, level, ctx) {
       if (!list.length) list = items.filter((x) => !seen.has(x[0]));
       if (!list.length) { seen.clear(); list = items; }
       const [q, a] = pick(list); seen.add(q);
-      const w = shuffle(items.filter((x) => x[1] !== a).map((x) => x[1])).slice(0, 3);
+      const clash = new Set(RIDDLE_CLASH.filter((g) => g.includes(a)).flat());
+      const w = shuffle(items.filter((x) => x[1] !== a && !clash.has(x[1])).map((x) => x[1])).slice(0, 3);
       return { q, a, w };
     },
   });

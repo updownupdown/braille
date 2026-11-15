@@ -462,11 +462,11 @@ const CATS = {
   symbols: { name: '!?#', sets: {
     num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d, kind: 'digit' }))],
     punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1], kind: 'punct' }))],
-    signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1], kind: 'math' }))],
+    signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: p === '-' ? 'pminus' : 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1], kind: 'math' }))],
     ind: ['Indicators', () => INDICATORS.map(([p, d, n]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p, kind: 'indicator', note: n }))],
   } },
   contractions: { name: 'Grade 2', sets: {
-    start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean), 'the 18 most common'],
+    start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean)],
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
     all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
   } },
@@ -681,7 +681,7 @@ function quizMode(mode, q) {
     const box = $('#mastery'), more = $('#mMore'); if (!box || !more) return;
     box.classList.remove('clamp');
     const first = box.firstElementChild;
-    const fits = !first || !first.offsetHeight || box.scrollHeight <= first.offsetHeight * 4 + 4 * 3 + 2;
+    const fits = !first || !first.offsetHeight || box.scrollHeight <= first.offsetHeight * 2 + 4 + 2;
     more.hidden = fits;
     box.classList.toggle('clamp', !fits && !mOpen);
     more.setAttribute('aria-expanded', String(!fits && mOpen)); more.classList.toggle('open', mOpen);
@@ -1246,7 +1246,7 @@ const EXTRA_CHARTS = {
     blurb: 'Nemeth writes digits in the lower part of the cell, so a number never looks like a letter. The numeric indicator comes before a number that starts a line or follows a space.',
     examples: NEMETH.map((s) => [s.print, s.g]),
     groups: [['Digits', [['2', '1'], ['23', '2'], ['25', '3'], ['256', '4'], ['26', '5'], ['235', '6'], ['2356', '7'], ['236', '8'], ['35', '9'], ['356', '0']]],
-      ['Signs', [['3456', 'numeric indicator'], ['346', 'plus'], ['36', 'minus'], ['16', 'times'], ['46 34', 'divided by'], ['46 13', 'equals'], ['46', 'decimal point']]]] },
+      ['Signs', [['3456', 'numeric indicator'], ['346', 'plus'], ['36', 'minus'], ['4 16', 'times'], ['46 34', 'divided by'], ['46 13', 'equals'], ['46', 'decimal point']]]] },
   ar: { name: 'Arabic braille', kind: 'letter',
     blurb: 'Read left to right, even though print Arabic runs right to left. A letter has one cell whatever its position in the word, and many share cells with Latin sound-alikes (ب = b, د = d, ف = f).',
     examples: [['سلام · peace', grp([['234', 'س'], ['123', 'ل'], ['1', 'ا'], ['134', 'م']])], ['كتاب · book', grp([['13', 'ك'], ['2345', 'ت'], ['1', 'ا'], ['12', 'ب']])]],
