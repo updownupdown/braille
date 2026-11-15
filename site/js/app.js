@@ -5,7 +5,7 @@ import {
 import {
   SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
 } from './data.js';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js';
+import { GAMES, GAME_GROUPS, gameStore, gameStatus, letterPad, paintTyped, typeHint } from './games.js';
 import { COMMON_WORDS } from './wordlist.js';
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
@@ -694,7 +694,7 @@ function quizMode(mode, q) {
   const picker = $('#picker'), body = $('#modeBody');
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
-    ${mode === 'words' ? '<div id="wkb"></div>' : `<div class="below-stage">
+    ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
       <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery"></div>
     </div>`}`;
@@ -727,7 +727,7 @@ function quizMode(mode, q) {
   }
   const saveSel = () => store.set('psel', { cat: state.cat, set: state.set });
   bindRadios(picker, (k, v) => {
-    if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); next(); return; }
+    if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); wScore(); next(); return; }
     if (k === 'wlen') { state.wlen = v; store.set('pwlen', v); wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[v][1])); next(); return; }
     state.cat = v; state.set = Object.keys(CATS[v].sets)[0]; saveSel(); renderPicker(); restart();
   });
@@ -770,7 +770,7 @@ function quizMode(mode, q) {
       if (item.key && auto()) autoResult(pre, item.key, ok);
     }
     state.firstTry = false;
-    if (mode === 'words') return;
+    if (mode === 'words') { wScore(); return; }
     renderMastery();
   }
   // Feedback is a coloured glow on the card (plus a shake when wrong).
@@ -889,8 +889,14 @@ function quizMode(mode, q) {
       state.firstTry = false; hinting = true;
       typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paintTyped(lbls, cells, wpad.value); }, () => done || state.last !== word);
     };
-    $('#skip').onclick = () => { if (done) return; done = true; paintTyped(lbls, cells, '', true); setTimeout(next, 1300); };
+    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paintTyped(lbls, cells, '', true); setTimeout(next, 1300); };
     state.key = null;
+  }
+  // Type mode score: words right first time this session, the current streak and the best streak ever (per grade).
+  function wScore() {
+    const el = $('#wScore'); if (!el) return;
+    const bk = 'pwbest' + state.wgrade, b = Math.max(store.get(bk, 0), state.streak); store.set(bk, b);
+    el.innerHTML = `<span>Right: <b>${state.right}</b> of ${state.total}</span><span>Streak: <b>${state.streak}</b></span><span>Best: <b>${b}</b></span>`;
   }
   // Type mode: one on-screen keyboard for the whole session; each word plugs in its own handlers.
   let wOnInput = () => {}, wOnEnter = () => {};
@@ -911,7 +917,7 @@ function quizMode(mode, q) {
   document.addEventListener('keydown', onKey);
   window.addEventListener('settings', onSet);
   window.addEventListener('resize', fitMastery);
-  renderPicker(); renderMastery(); next();
+  renderPicker(); renderMastery(); wScore(); next();
   return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); window.removeEventListener('settings', onSet); window.removeEventListener('resize', fitMastery); };
 }
 
@@ -1191,6 +1197,9 @@ function grade2Section() {
       <div class="g2-body"><div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div>${practiseBtn(`#/practice/read?cat=contractions&set=k${ci}`)}</div></details>`).join('')}</div>
     ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
   const bind = () => {
+    // The comparison strip scrolls sideways on narrow screens: fade the right edge while there is more to see.
+    const sc = $('.g2c-scroll');
+    if (sc) { const f = () => sc.classList.toggle('more', sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 4); sc.addEventListener('scroll', f, { passive: true }); f(); }
     const all = () => $$('.g2-group'), btn = $('#g2Toggle');
     const sync = () => { btn.textContent = all().every((d) => d.open) ? 'Close all' : 'Open all'; };
     btn.onclick = () => { const open = !all().every((d) => d.open); all().forEach((d) => { d.open = open; }); sync(); };
@@ -1518,7 +1527,8 @@ views.games = (q, sub) => {
   const g = GAMES[sub];
   if (!g) {
     setTitle('Games'); setSub('');
-    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div><span class="hrow-ic gc-${k}">${icon(x.icon, 31)}</span></a>`; };
+    // Same card as the Learn index: icon, name and line, then the best score (or Played) and a chevron.
+    const row = (k) => { const x = GAMES[k], st = gameStatus(k); return `<a class="hrow g-tile" href="#/games/${k}"><span class="hrow-ic gc-${k}">${icon(x.icon, 24)}</span><div class="hrow-text"><b>${x.name}</b><span>${x.desc}</span></div>${st ? `<span class="g-status">${esc(st)}</span>` : ''}${icon('right', 20)}</a>`; };
     view.innerHTML = `<p class="lead-p g-intro">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
       ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${t}</h2><div class="hrows g-tiles">${ks.map(row).join('')}</div>`).join('')}`;
     return;
@@ -1603,7 +1613,7 @@ function openSearch() {
   searchBar.hidden = false; syncHeadH();
   const q = $('#gq'); q.focus(); if (q.value) renderSearch();
 }
-function closeSearch() { searchBar.hidden = true; searchPanel.hidden = true; $('#gq').value = ''; syncHeadH(); }
+function closeSearch() { searchBar.hidden = true; searchPanel.hidden = true; $('#gq').value = ''; syncHeadH(); $('#searchBtn').blur(); }
 let RESULTS = [];
 function renderSearch() {
   const raw = $('#gq').value;
@@ -1611,7 +1621,7 @@ function renderSearch() {
   RESULTS = searchResults(raw);
   const secName = Object.fromEntries([...REF_SECTIONS, ['practice', 'Practice'], ['games', 'Games']]);
   const tr = /[a-z]/i.test(raw) && !/^[1-6\s-]+$/.test(raw) ? `<a class="sr tr" href="#/translate?lang=en&text=${encodeURIComponent(raw)}"><span class="sr-cells">${lineHTML(translate(raw, 'en', 2), { labels: false, cls: 'sm' })}</span><span class="sr-text"><b>Translate “${esc(raw)}”</b><small>English Grade 2</small></span></a>` : '';
-  searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr" data-r="${i}"><span class="sr-cells">${e.cells ? cellsK(e.cells, e.kind || '', 'sm') : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word or a symbol.</p>'}${tr}</div>`;
+  searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr${e.cells && [...e.cells].length > 3 ? ' long' : ''}" data-r="${i}"><span class="sr-cells">${e.cells ? ([...e.cells].length > 3 ? cellsHTML(e.cells, 'sm') : cellsK(e.cells, e.kind || '', 'sm')) : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word or a symbol.</p>'}${tr}</div>`;
   searchPanel.hidden = false;
 }
 $('#gq').addEventListener('input', renderSearch);

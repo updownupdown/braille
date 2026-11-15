@@ -59,18 +59,20 @@ const LV3 = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
 // On-screen print keyboard for games, in place of a text box (no phone keyboard popping up and taking half the screen).
 // The physical keyboard works too. Returns an input-like object: value, disabled, off().
 const KB_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-export function letterPad({ display = null, mount, digits = false, onInput, onEnter }) {
+export function letterPad({ display = null, mount, digits = false, onInput, onEnter, only = null }) {
   let value = '', disabled = false;
   const show = () => { if (display) { display.textContent = value; display.classList.toggle('empty', !value); } };
   const rows = (digits ? ['1234567890'] : []).concat(KB_ROWS);
   mount.innerHTML = `<div class="g-kb">${rows.map((r, i) => `<div class="g-kr">${[...r].map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('')}${i === rows.length - 1 ? '<button type="button" class="wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`).join('')}</div>`;
   const press = (k) => {
-    if (disabled) return;
+    if (disabled || (only && k.length === 1 && !only.includes(k))) return;
     if (k === 'enter') { if (onEnter) onEnter(); return; }
     value = k === 'back' ? value.slice(0, -1) : value + k;
     show(); if (onInput) onInput();
   };
   const kb = mount.firstElementChild;
+  // only: the keys this level can need; the rest are dimmed (and ignored) so the keyboard doesn't suggest letters that never come up.
+  if (only) kb.querySelectorAll('[data-k]').forEach((b) => { if (b.dataset.k.length === 1 && !only.includes(b.dataset.k)) { b.classList.add('dim'); b.disabled = true; } });
   // Act on touch-down for speed; keep the click for keyboard activation (Enter or Space on a focused key).
   kb.addEventListener('pointerdown', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; e.preventDefault(); press(b.dataset.k); });
   kb.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b && e.detail === 0) press(b.dataset.k); });
@@ -377,10 +379,10 @@ function timeAttack(el, level) {
   const cellsOf = (x) => (/\d/.test(x) ? IND.number + LETTERS['jabcdefghi'[Number(x)]] : LETTERS[x]);
   const incl = { easy: 'the letters a to j.', medium: 'all 26 letters.', hard: 'all 26 letters and the digits 0 to 9, each with the number sign.' }[level];
   el.innerHTML = `${statBar('', timerBar(60), scoreBest('time.' + level))}
-    <div class="card g-card ta" id="card"><button class="btn g-corner" id="skip">Skip</button><div class="g-overlay" id="ov">${startScreen('Type what each braille cell says, as fast as you can. You have 60 seconds.', incl)}</div><div class="prompt-cells" id="cells"></div></div>
+    <div class="card g-card ta" id="card"><button class="btn g-corner" id="skip" hidden>Skip</button><div class="g-overlay" id="ov">${startScreen('Type what each braille cell says, as fast as you can. You have 60 seconds.', incl)}</div><div class="prompt-cells" id="cells"></div></div>
     <div id="kb"></div>`;
   const card = $('#card', el);
-  const inp = letterPad({ mount: $('#kb', el), digits: level === 'hard', onInput: () => check() });
+  const inp = letterPad({ mount: $('#kb', el), digits: level === 'hard', only: level === 'easy' ? AJ : null, onInput: () => check() });
   let cur, sc = 0, end = 0, raf = 0, running = false;
   const nextItem = () => { let x; do { x = pick(pool); } while (x === cur && pool.length > 1); cur = x; $('#cells', el).innerHTML = [...cellsOf(x)].map((c) => cell(c)).join(''); };
   function tick() {
@@ -390,13 +392,13 @@ function timeAttack(el, level) {
     raf = requestAnimationFrame(tick);
   }
   function over() {
-    running = false; cancelAnimationFrame(raf); $('#cells', el).innerHTML = '';
+    running = false; cancelAnimationFrame(raf); $('#cells', el).innerHTML = ''; $('#skip', el).hidden = true;
     const b = best('time.' + level, sc); $('#best', el).textContent = b;
     const ov = $('#ov', el); ov.hidden = false;
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
-  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; running = true; end = performance.now() + 60000; inp.value = ''; nextItem(); raf = requestAnimationFrame(tick); }
+  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; $('#skip', el).hidden = false; running = true; end = performance.now() + 60000; inp.value = ''; nextItem(); raf = requestAnimationFrame(tick); }
   const check = () => {
     if (!running) return;
     const v = inp.value.trim().toLowerCase(); if (!v) return;
@@ -804,3 +806,14 @@ export const GAMES = {
     help: ['Read the riddle, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Easy has three choices and shows letters under the cells. Medium has four, and Hard uses Grade 2 contractions.'] },
 };
 export const gameStore = store;
+// One short line for a game's card on the Games page: the best score at any level, cases solved, or "Played".
+export function gameStatus(k) {
+  const lv = ['easy', 'medium', 'hard'];
+  const top = (pre, low = false) => { const v = lv.map((l) => store.get('best.' + pre + l, null)).filter((x) => x != null); return v.length ? (low ? Math.min(...v) : Math.max(...v)) : null; };
+  const n = { rain: top('rain.'), time: top('time.'), mirror: top('mirror.'), trivia: top('quiz.trivia') }[k];
+  if (n != null) return `Best ${n}`;
+  if (k === 'memory') { const m = top('mem.', true); if (m != null) return `Best ${m} moves`; }
+  if (k === 'riddles') { const s = lv.reduce((a, l) => a + store.get('riddles.solved.' + l, []).length, 0); if (s) return `${s} solved`; }
+  if (k === 'agent') { const s = CASES.filter((c, i) => store.get('agent.p.' + i, 0) >= c.missions.length).length; if (s) return `${s} of ${CASES.length} cases`; }
+  return store.get('played', []).includes(k) ? 'Played' : '';
+}

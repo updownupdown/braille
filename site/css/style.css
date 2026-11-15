@@ -628,7 +628,7 @@ body.s-sw-real.s-dotnums .sweep-track .cell i::after { display: none; }
 .top .nav { margin-left: 0; }
 #settingsBtn, .nav + #settingsBtn { margin-left: 0; }
 .icon-btn.plain { border: 0; background: none; color: var(--ink-2); }
-.icon-btn.plain:hover { background: var(--surface-2); color: var(--ink); }
+@media (hover: hover) { .icon-btn.plain:hover { background: var(--surface-2); color: var(--ink); } }
 .top .icon-btn.plain { width: 42px; height: 42px; }
 .top .icon-btn.plain .ic { width: 24px; height: 24px; }
 .top.scrolled, .top:has(.subbar:not([hidden])) { border-bottom-color: var(--line); }
@@ -1821,3 +1821,28 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .upd-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 18px; border-radius: 99px; background: var(--ink, #1c1917); color: var(--bg); box-shadow: 0 6px 24px rgb(0 0 0 / .18); font-weight: 500; }
 .upd-bar .btn { min-height: 34px; padding: 0 16px; background: var(--accent); border-color: var(--accent); color: #fff; }
 @media (min-width: 900px) { .upd-bar { bottom: 24px; } }
+
+/* Search: a long result (a sign or phrase) puts its braille on its own line under the title */
+.sr.long { grid-template-columns: minmax(0, 1fr) auto; }
+.sr.long .sr-cells { grid-column: 1 / -1; order: 2; }
+@media (max-width: 480px) { .sr.long { grid-template-columns: minmax(0, 1fr); } }
+.g2c-scroll.more { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+/* Game keyboards: keys a level never needs are dimmed */
+.g-kr button.dim { opacity: .3; box-shadow: none; cursor: default; }
+/* Laptop: the practice mode bar sits in the same centred column as the picker and card, and the card uses the room */
+@media (min-width: 760px) {
+  body[data-page="practice"] .subbar { justify-content: center; }
+  body[data-page="practice"] .subbar .modes { flex: 0 1 720px; max-width: 720px; }
+  body[data-page="practice"] .subbar #helpBtn { margin-left: 0; }
+}
+@media (min-width: 900px) and (min-height: 700px) {
+  .stage { min-height: 380px; padding: 40px 28px; }
+  .stage .prompt-cells .cell { --s: 30px; }
+  .stage .prompt-cells.many .cell { --s: 16px; }
+}
+/* Games list: best score or Played, beside the chevron */
+.g-status { flex: none; font-size: .8rem; font-weight: 500; color: var(--ink-2); background: var(--surface-2); border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
+@media (max-width: 400px) { .g-status { display: none; } }
+/* Type mode score line, between the card and the keyboard */
+.w-score { display: flex; justify-content: center; gap: 18px; font-size: .88rem; color: var(--muted); margin: 12px 0 2px; }
+.w-score b { color: var(--ink); font-weight: 600; }
