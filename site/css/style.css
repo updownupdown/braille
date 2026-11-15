@@ -1877,3 +1877,4 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 :is(.choice, .quiz-opt).wrong::after { content: "✕"; color: var(--bad); }
 .choice.reveal { border: 2px dashed var(--good); }
 .m-sep { color: var(--muted); margin: 0 4px; }
+.backup-row .row { display: flex; gap: 8px; flex: none; }

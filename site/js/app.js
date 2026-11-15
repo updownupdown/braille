@@ -231,8 +231,10 @@ function openSettings() {
       <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
     <div class="set-group"><h3>Your data</h3>
-      <p class="set-note">Everything is saved on this device only. Each reset asks you to tap again to confirm.</p>
+      <p class="set-note">Everything is saved on this device only. Save a backup file to keep it safe or move it to another device. Each reset asks you to tap again to confirm.</p>
       <div class="reset-list">
+        <div class="reset-row backup-row"><span><b>Backup</b><small>Progress, scores and settings in one small file</small></span><span class="row"><button class="btn" type="button" id="bkSave">Save</button><button class="btn" type="button" id="bkLoad">Restore</button></span></div>
+        <input type="file" id="bkFile" accept=".json,application/json" hidden>
         <div class="reset-row" data-r="games"><span><b>Game progress</b><small>Scores, bests, levels, solved riddles and Secret Agent cases</small></span><button class="btn" type="button">Reset</button></div>
         <div class="reset-row" data-r="learn"><span><b>Learning progress</b><small>Practice, Auto and finished lessons</small></span><button class="btn" type="button">Reset</button></div>
         <div class="reset-row" data-r="all"><span><b>Everything</b><small>All of the above, plus these settings</small></span><button class="btn" type="button">Reset</button></div>
@@ -251,7 +253,28 @@ function openSettings() {
     learn: (k) => k.startsWith('dots.') && !k.startsWith('dots.g.') && k !== 'dots.settings',
     all: (k) => k.startsWith('dots.'),
   };
-  $$('.reset-row', sheet).forEach((row) => {
+  // Backup: every dots.* key in one JSON file; restoring replaces what is on this device and reloads.
+  $('#bkSave', sheet).onclick = () => {
+    const data = {};
+    try { Object.keys(localStorage).filter((k) => k.startsWith('dots.')).forEach((k) => { data[k] = localStorage.getItem(k); }); } catch {}
+    const blob = new Blob([JSON.stringify({ app: 'learn-braille', saved: new Date().toISOString(), data }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `learn-braille-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    $('#bkSave', sheet).textContent = 'Saved ✓';
+  };
+  $('#bkLoad', sheet).onclick = () => $('#bkFile', sheet).click();
+  $('#bkFile', sheet).onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const btn = $('#bkLoad', sheet);
+    try {
+      const j = JSON.parse(await f.text());
+      if (j.app !== 'learn-braille' || !j.data) throw new Error('not a backup');
+      Object.keys(localStorage).filter((k) => k.startsWith('dots.')).forEach((k) => localStorage.removeItem(k));
+      Object.entries(j.data).forEach(([k, v]) => { if (k.startsWith('dots.') && typeof v === 'string') localStorage.setItem(k, v); });
+      btn.textContent = 'Restored ✓'; setTimeout(() => location.reload(), 700);
+    } catch { btn.textContent = 'Not a backup file'; btn.classList.add('danger'); setTimeout(() => { btn.textContent = 'Restore'; btn.classList.remove('danger'); }, 2500); }
+  };
+  $$('.reset-row[data-r]', sheet).forEach((row) => {
     const btn = $('button', row); let armed = 0;
     btn.onclick = () => {
       if (!armed) { btn.textContent = 'Tap to confirm'; btn.classList.add('danger'); armed = setTimeout(() => { armed = 0; btn.textContent = 'Reset'; btn.classList.remove('danger'); }, 4000); return; }
@@ -373,8 +396,8 @@ function progressHTML() {
     </div></details>`;
 }
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
-const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
-const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'The 180 contractions', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
+const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
+const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
 const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
@@ -1167,8 +1190,18 @@ const G2_EXAMPLE = {
 };
 const G2_USE = { 'Alphabetic wordsigns': 'whole word', 'Strong contractions': 'word or part of one', 'Strong groupsigns': 'part of a word' };
 const G2_START = ['and', 'for', 'of', 'the', 'with', 'but', 'can', 'do', 'it', 'that', 'you', 'ing', 'st', 'sh', 'th', 'ch', 'er', 'ed'];
-function grade2Section() {
-  const cats = Object.entries(CONTRACTIONS);
+// Grade 2 is taught as a short basics lesson and then five lessons, each a few contraction groups with its own check.
+const G2_LESSONS = {
+  g2words: ['Wordsigns', ['Alphabetic wordsigns', 'Strong wordsigns'], 'One cell for a whole word: a letter or a strong sign standing alone.'],
+  g2strong: ['Strong Signs', ['Strong contractions', 'Strong groupsigns'], 'Signs that work anywhere: and, for, of, the, with, and letter groups like ch, sh and ing.'],
+  g2lower: ['Lower Signs', ['Lower groupsigns', 'Lower wordsigns'], 'Cells that use only the lower four dots. Where they sit in a word decides what they mean.'],
+  g2affix: ['Initial & Final Letters', ['Initial-letter contractions', 'Final-letter groupsigns'], 'Two-cell signs: a prefix cell plus a letter, at the start or end of a word.'],
+  g2short: ['Shortforms', ['Shortforms'], 'Abbreviated spellings of 75 common words, such as ab for about and brl for braille.'],
+};
+function grade2Section(key = 'grade2') {
+  const lesson = G2_LESSONS[key];
+  const cats = Object.entries(CONTRACTIONS).filter(([cat]) => !lesson || lesson[1].includes(cat));
+  const catIndex = (cat) => Object.keys(CONTRACTIONS).indexOf(cat);
   // Examples for a sign: two right uses (green tick) and, where it helps, one place it doesn't apply (orange warning).
   const exOf = (e) => G2_EXAMPLES[e.print + '|' + e.cat] || G2_EXAMPLES[e.print];
   // be-, con- and dis- aren't produced by the translator, so those examples carry their braille; label the first cell with the prefix.
@@ -1191,7 +1224,9 @@ function grade2Section() {
   const g2 = unicodeOf(translate(sample, 'en', 2)).replace(/ /g, '').length;
   // Word by word, so each Grade 2 word sits under its Grade 1 version and the saving shows as a gap.
   const sWords = sample.split(' ');
-  const html = `
+  const groupHTML = ([cat, { blurb }]) => `<div class="sg g2-sec" id="g2-${catIndex(cat)}"><div class="group-title"><h3>${esc(cat)}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><span>${esc(blurb)}</span></div>
+      <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div>${practiseBtn(`#/practice/read?cat=contractions&set=k${catIndex(cat)}`)}</div>`;
+  const html = lesson ? `<p class="lead-p">${esc(lesson[2])}</p>${cats.map(groupHTML).join('')}` : `
     <p class="lead-p">Grade 2 uses about 180 contractions to make braille shorter. Most books and public signs in Canada use it. Many cells mean different things alone versus inside a word, so each table notes where a sign may go.</p>
     <div class="g2-compare"><div class="g2c-scroll"><div class="g2c-grid">
       <small class="g2c-k">Grade 1<span>${g1} cells</span></small><small class="g2c-k">Grade 2<span>${g2} cells</span></small>
@@ -1199,18 +1234,13 @@ function grade2Section() {
     </div></div></div>
     <div class="group-title"><h3>Start with these</h3><span>The most frequent signs. Learn a few at a time.</span></div>
     <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: G2_USE[DICT[i].cat] || DICT[i].cat }); }).join('')}</div>${practiseBtn('#/practice/read?cat=contractions&set=start')}
-    <div class="group-title g2-all"><h3>All contractions</h3><span>Tap a group to open it.</span><button class="gt-link" id="g2Toggle" type="button">Open all</button></div>
-    <div class="g2-groups">${cats.map(([cat, { blurb }], ci) => `<details class="g2-group" id="g2-${ci}"><summary><span class="g2-t"><h3>${esc(cat)}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><small>${esc(blurb)}</small></span>${icon('chevron', 20)}</summary>
-      <div class="g2-body"><div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div>${practiseBtn(`#/practice/read?cat=contractions&set=k${ci}`)}</div></details>`).join('')}</div>
+    <div class="group-title"><h3>Five lessons</h3><span>Each covers a few groups and ends with its own check.</span></div>
+    <div class="hrows g-tiles g2-lessons">${Object.entries(G2_LESSONS).map(([k, [t, cs]]) => `<a class="hrow g-tile ${lessonsDone().includes(k) ? 'li-done' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(lessonsDone().includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${t}</b><span>${cs.reduce((n, c) => n + CONTRACTIONS[c].items.length, 0)} signs · ${cs.join(', ')}</span></div>${icon('right', 20)}</a>`).join('')}</div>
     ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
   const bind = () => {
     // The comparison strip scrolls sideways on narrow screens: fade the right edge while there is more to see.
     const sc = $('.g2c-scroll');
     if (sc) { const f = () => sc.classList.toggle('more', sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 4); sc.addEventListener('scroll', f, { passive: true }); f(); }
-    const all = () => $$('.g2-group'), btn = $('#g2Toggle');
-    const sync = () => { btn.textContent = all().every((d) => d.open) ? 'Close all' : 'Open all'; };
-    btn.onclick = () => { const open = !all().every((d) => d.open); all().forEach((d) => { d.open = open; }); sync(); };
-    all().forEach((d) => d.addEventListener('toggle', sync));
     if (!view.dataset.exBound) view.addEventListener('click', (e) => {
       const t = e.target.closest('.ex-tog'); if (!t) return;
       const p = $('.crow-ex', t.closest('.crow')); const open = p.hidden;
@@ -1218,12 +1248,12 @@ function grade2Section() {
     });
     view.dataset.exBound = '1';
   };
-  return { html, bind, jumps: cats.map(([cat, { items }], ci) => ({ value: 'g2-' + ci, label: cat, hint: items.length + ' signs' })) };
+  return { html, bind, jumps: lesson ? cats.map(([cat, { items }]) => ({ value: 'g2-' + catIndex(cat), label: cat, hint: items.length + ' signs' })) : null };
 }
 
 // ---------- reference ----------
 const REF_SECTIONS = [
-  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & Symbols'], ['grade2', 'Grade 2'], ['signs', 'Signs'],
+  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & Symbols'], ['grade2', 'Grade 2 Basics'], ...Object.entries(G2_LESSONS).map(([k, [t]]) => [k, t]), ['signs', 'Signs'],
   ['science', 'Maths & Science'], ['languages', 'Languages'], ['systems', 'World Systems'], ['cheatsheet', 'Cheat Sheet'],
 ];
 function alphabetSection() {
@@ -1253,7 +1283,7 @@ function overviewSection() {
     ['ov-context', 'One cell, several meanings', `<p>There are far more symbols than patterns, so context matters. ${cellHTML(LETTERS.b, 'sm')} is <b>b</b> on its own in a word, the word <b>“but”</b> when it stands alone in Grade 2, and the digit <b>2</b> after the number sign ${cellHTML(IND.number, 'sm')}. A capital sign ${cellHTML(IND.capital, 'sm')} makes the next letter uppercase.</p>
       <p>See <a href="#/reference/numbers">Numbers &amp; symbols</a> for these signs.</p>`],
     ['ov-grades', 'Grade 1 and Grade 2', `<p><b>Grade 1</b> spells every letter. <b>Grade 2</b> adds about 180 contractions, like ${cellHTML('⠮', 'sm')} for “the”, so text takes far less space. Most books and public signs in Canada use Grade 2. Learners usually start with Grade 1, then add contractions a few at a time.</p>
-      <p>See <a href="#/reference/grade2">Grade 2</a> for every contraction.</p>`],
+      <p>See <a href="#/reference/grade2">Grade 2 Basics</a> and its five lessons for every contraction.</p>`],
     ['ov-read', 'Reading and writing it', `<p>Readers glide the pads of their fingers lightly left to right along a line, often using both hands, rather than pressing on each cell. Experienced readers can reach speeds similar to reading print aloud. You can try the motion in <a href="#/practice/sweep">Practice › Read</a>.</p>
       <p>Braille is written on a <b>Perkins brailler</b> (a six-key machine from 1951), by hand with a <b>slate and stylus</b> (pressing dots from the back, so you write right to left), or electronically with a <b>refreshable braille display</b> that raises pins under each cell. You can build cells dot by dot in <a href="#/practice/write">Practice › Draw</a>.</p>`],
     ['ov-where', 'Where you’ll see it', `<p>Room and washroom signs, elevator buttons, medicine boxes (required in the EU), ATMs, transit handrails and many product labels. Canadian bank notes have braille-sized dots too, though they are a counting code rather than braille. See <a href="#/reference/signs">Signs</a> for examples by country, and <a href="#/reference/languages">Languages</a> and <a href="#/reference/systems">World systems</a> for braille beyond English.</p>`],
@@ -1418,6 +1448,7 @@ function refSection(key, sub) {
     case 'alphabet': return { html: alphabetSection() };
     case 'numbers': return numbersSection();
     case 'grade2': return grade2Section();
+    case 'g2words': case 'g2strong': case 'g2lower': case 'g2affix': case 'g2short': return grade2Section(key);
     case 'signs': return signsSection(sub);
     case 'science': return scienceSection();
     case 'languages': return languagesSection();
@@ -1431,7 +1462,7 @@ function refSection(key, sub) {
 
 // ---------- Learn: lessons, reference and the end-of-lesson check ----------
 // The first four sections are lessons (read in order, each ends with a short check); the rest is look-up material.
-const LESSONS = ['overview', 'alphabet', 'numbers', 'grade2'];
+const LESSONS = ['overview', 'alphabet', 'numbers', 'grade2', ...Object.keys(G2_LESSONS)];
 const isLesson = (k) => LESSONS.includes(k);
 const lessonsDone = () => store.get('learnDone', []).filter(isLesson);
 const QUIZ_LEN = 5, QUIZ_PASS = 4;
@@ -1453,6 +1484,7 @@ function quizQuestions(key) {
   if (key === 'overview') return pick(OVERVIEW_QUIZ, QUIZ_LEN).map((o) => ({ q: o.q, cells: o.cells, answer: o.a, choices: shuffle([o.a, ...o.x]).map((t) => ({ t })) }));
   if (key === 'alphabet') return fromItems(CATS.letters.sets.az[1](), QUIZ_LEN);
   if (key === 'numbers') return shuffle([...fromItems(CATS.symbols.sets.num[1](), 2), ...fromItems(CATS.symbols.sets.punct[1](), 2), ...fromItems(CATS.symbols.sets.ind[1](), 1)]);
+  if (G2_LESSONS[key]) return fromItems(G2_LESSONS[key][1].flatMap((c) => C(c)()), QUIZ_LEN);
   return fromItems(CATS.contractions.sets.start[1](), QUIZ_LEN);
 }
 const quizHTML = (key) => `<div class="sg lq-wrap" id="check"><div class="group-title"><h3>Test Yourself${lessonsDone().includes(key) ? '<span class="count lq-done">Done</span>' : ''}</h3><span>${QUIZ_LEN} quick questions. Get ${QUIZ_PASS} right to complete this lesson.</span></div><div class="card lq" id="lq"></div></div>`;
@@ -1501,7 +1533,7 @@ function learnIndex() {
   const row = (k, t, n) => `<a class="hrow g-tile ${done.includes(k) ? 'li-done' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(done.includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${n ? `${n}. ` : ''}${t}</b><span>${done.includes(k) ? 'Done · ' : ''}${SEC_DESC[k]}</span></div>${icon('right', 18)}</a>`;
   const les = REF_SECTIONS.filter(([k]) => isLesson(k)), ref = REF_SECTIONS.filter(([k]) => !isLesson(k));
   view.innerHTML = `<h2 class="sec-h li-h">Lessons</h2>
-    <p class="lead-p li-p">Four short lessons, from the six-dot cell to contractions. Each one ends with a quick check.</p>
+    <p class="lead-p li-p">${les.length} short lessons, from the six-dot cell to every contraction. Each one ends with a quick check.</p>
     <div class="hprog li-prog"><span class="bar"><i style="width:${Math.round(done.length / les.length * 100)}%"></i></span><span>${done.length} of ${les.length} done</span></div>
     <div class="hrows g-tiles">${les.map(([k, t], i) => row(k, t, i + 1)).join('')}</div>
     <h2 class="sec-h">Reference</h2>
@@ -1581,7 +1613,7 @@ function buildIndex() {
   const nav = (h) => () => { closeSearch(); location.hash = h; };
   DICT.forEach((e, i) => out.push({
     title: e.print, sub: e.group === 'Letters' ? 'Letter' : e.cat + (e.note && e.note.length < 40 ? ' · ' + e.note : ''), cells: e.cells, kind: e.kind,
-    sec: SEC_OF_GROUP[e.group] || 'grade2', dict: e,
+    sec: SEC_OF_GROUP[e.group] || (Object.entries(G2_LESSONS).find(([, [, cs]]) => cs.includes(e.group)) || ['grade2'])[0], dict: e,
     act: () => openSheet(e.group === 'Letters' ? letterDetail(e.print) : symbolDetail(e), { title: e.group === 'Letters' ? 'Letter ' + e.print : 'Symbol' }),
   }));
   REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Learn section', sec: k, page: true, act: nav('#/reference/' + k) }));
