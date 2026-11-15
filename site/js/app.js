@@ -10,6 +10,7 @@ import { COMMON_WORDS } from './wordlist.js';
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
 import { PHRASES, signLine, numberLine } from './phrases.js';
+import { chord, sixKeyOn } from './sixkey.js';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -78,7 +79,7 @@ const P = {
 const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
 // ---------- settings ----------
-const DEFAULTS = { theme: 'auto', color: true, dotFill: 'outline', swGrade: 1, swSize: 'large' };
+const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large' };
 const S = { ...DEFAULTS, ...store.get('settings', {}) };
 function applySettings() {
   const r = document.documentElement;
@@ -228,6 +229,8 @@ function openSettings() {
       <div class="set-row stack"><span>Appearance</span>${radios('theme', [['auto', `${icon('auto', 18)}Auto`], ['light', `${icon('sun', 18)}Light`], ['dark', `${icon('moon', 18)}Dark`]], S.theme)}</div>
       <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
+      <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key (F D S J K L)']], S.sixKey ? '1' : '0')}</div>
+      <p class="set-note six-note">Six-key types braille like a Perkins brailler: hold the keys for one cell together, then let go. Works in Guess, Type, the games and Braille to text, from the next screen you open.</p>
       <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
     </div>
     <div class="set-group"><h3>Your data</h3>
@@ -245,6 +248,7 @@ function openSettings() {
   </div>`, { title: 'Settings' });
   bindRadios($('.settings', sheet), (k, v) => {
     if (k === 'color') { setS('color', v === '1'); $('.color-key', sheet).classList.toggle('off', v !== '1'); return; }
+    if (k === 'sixKey') { setS('sixKey', v === '1'); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
   // Each reset needs a second tap; it goes back to normal after a few seconds if left alone.
@@ -375,30 +379,58 @@ const PROG_GROUPS = () => [
   ['Punctuation', CATS.symbols.sets.punct[1](), 'symbols', 'punct'], ['Maths & money', CATS.symbols.sets.signs[1](), 'symbols', 'signs'],
   ['Indicators', CATS.symbols.sets.ind[1](), 'symbols', 'ind'], ['Contractions', CATS.contractions.sets.all[1](), 'contractions', 'all'],
 ];
-function progressHTML() {
-  const m = mastery();
+// Answers per day (first tries only), kept for the stats page's calendar and streak.
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function logDay() { const d = store.get('days', {}), k = dayKey(); d[k] = (d[k] || 0) + 1; store.set('days', d); }
+function dayStreak(days) {
+  let n = 0; const d = new Date();
+  if (!days[dayKey(d)]) d.setDate(d.getDate() - 1); // today not practised yet: the streak still counts up to yesterday
+  while (days[dayKey(d)]) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+// Stats: what is known per group in Guess and Draw, the last 12 weeks of practice, Auto's boxes and the most-missed signs.
+function statsView() {
+  setTitle('Practice');
+  setSub(`<a class="back-link" href="#/practice">${icon('right', 18)} Practice</a>`);
+  const m = mastery(), misses = store.get('misses', {}), days = store.get('days', {});
   const groups = PROG_GROUPS();
-  const known = (pre, items) => items.filter((x) => (m[pre + x.key] || 0) >= 4).length;
-  let got = 0, all = 0;
-  const tally = (mode, pre, items, cat, set) => {
-    const k = known(pre, items); got += k; all += items.length;
-    return `<a class="tally" href="#/practice/${mode}?cat=${cat}&set=${set}"><span class="t-num"><b>${k}</b> / ${items.length}</span><span class="t-bar"><i style="width:${(k / items.length) * 100}%"></i></span></a>`;
-  };
-  const rows = groups.map(([n, items, cat, set]) => `<tr><th scope="row">${n}</th><td>${tally('read', 'r:', items, cat, set)}</td><td>${tally('write', 'w:', items, cat, set)}</td></tr>`).join('');
-  return `<details class="progress-card"><summary>
-      <span class="pc-title">Your progress</span>
-      <span class="pc-bar" aria-hidden="true"><i style="width:${(got / all) * 100}%"></i></span>
-      <span class="pc-sum"><b>${got}</b> / ${all}</span>${icon('chevron', 20)}</summary>
-    <div class="pc-body">
-      <table class="ptable"><thead><tr><th></th><th>Read</th><th>Write</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="muted small">Something counts as learned after a few correct answers in a row. Tap a tally to practise it.</p>
-      <div class="row"><a class="btn primary" href="#/practice">Practice</a><a class="btn" href="#/practice/read?cat=auto&set=all">Auto</a></div>
-    </div></details>`;
+  const count = (pre, items) => { let k = 0, l = 0; items.forEach((x) => { const v = level(m[pre + x.key] || 0); if (v >= 4) k++; else if (v > 0) l++; }); return [k, l]; };
+  const bar = (pre, items, cat, set, mode) => { const [k, l] = count(pre, items), n = items.length; return `<a class="st-bar" href="#/practice/${mode}?cat=${cat}&set=${set}" aria-label="${k} known, ${l} learning of ${n}"><span class="st-track"><i class="k" style="width:${(k / n) * 100}%"></i><i class="l" style="width:${(l / n) * 100}%"></i></span><span class="st-n"><b>${k}</b>/${n}</span></a>`; };
+  const rows = groups.map(([n, items, cat, set]) => `<tr><th scope="row">${n}</th><td>${bar('r:', items, cat, set, 'read')}</td><td>${bar('w:', items, cat, set, 'write')}</td></tr>`).join('');
+  // 12 weeks, Monday first, today last.
+  const today = new Date(); const start = new Date(today); start.setDate(start.getDate() - 83 - ((today.getDay() + 6) % 7));
+  const cellsCal = []; const max = Math.max(1, ...Object.values(days));
+  for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) { const v = days[dayKey(d)] || 0; cellsCal.push(`<i class="${v ? 'on' : ''}" style="${v ? `--a:${(0.35 + 0.65 * v / max).toFixed(2)}` : ''}" title="${dayKey(d)}: ${v} answers"></i>`); }
+  const daysPractised = Object.keys(days).length, streak = dayStreak(days);
+  const all = Object.values(store.get('auto', {})).reduce((acc, st) => { Object.values(st.s || {}).forEach(([b]) => { acc[b] = (acc[b] || 0) + 1; }); return acc; }, {});
+  const autoBoxes = AUTO_GAP.map((_, b) => all[b] || 0);
+  const BOX = ['New', 'Box 2', 'Box 3', 'Box 4', 'Box 5', 'Box 6', 'Long term'];
+  const DICT_BY_KEY = Object.fromEntries(Object.entries(CATS).filter(([k]) => k !== 'auto').flatMap(([, c]) => Object.values(c.sets)).flatMap(([, f]) => { try { return f('r:'); } catch { return []; } }).map((x) => [x.key, x]));
+  const missed = Object.entries(misses).map(([k, n]) => [k.slice(2), k[0], n]).filter(([k]) => DICT_BY_KEY[k]).sort((a, b) => b[2] - a[2]).slice(0, 12);
+  view.innerHTML = `<div class="st-page">
+    <div class="st-top">
+      <div><b>${streak}</b><span>day streak</span></div>
+      <div><b>${daysPractised}</b><span>days practised</span></div>
+      <div><b>${Object.values(days).reduce((a, b) => a + b, 0)}</b><span>answers</span></div>
+    </div>
+    <h2 class="sec-h">Last 12 Weeks</h2>
+    <div class="st-cal" aria-label="Practice calendar, darker means more answers">${cellsCal.join('')}</div>
+    <h2 class="sec-h">Known Signs</h2>
+    <p class="muted small st-key"><span class="k"></span> known <span class="l"></span> learning. Tap a bar to practise that group.</p>
+    <table class="st-table"><thead><tr><th></th><th>Guess</th><th>Draw</th></tr></thead><tbody>${rows}</tbody></table>
+    <h2 class="sec-h">Auto</h2>
+    <p class="muted small">Signs move up a box each time you get them right and wait longer before coming back; a miss sends one back to the start.</p>
+    <div class="st-boxes">${autoBoxes.map((n, b) => `<div><b>${n}</b><span>${BOX[b]}</span></div>`).join('')}</div>
+    <h2 class="sec-h">Most Missed</h2>
+    ${missed.length ? `<div class="ctable narrow">${missed.map(([k, pre, n]) => crowHTML(DICT_BY_KEY[k].cells, DICT_BY_KEY[k].answer, { note: `${n} miss${n > 1 ? 'es' : ''} in ${pre === 'w' ? 'Draw' : 'Guess'}` })).join('')}</div>
+      <div class="row st-row"><a class="btn primary" href="#/practice/read?cat=auto&set=all">Practise with Auto</a></div>` : '<p class="muted">Nothing missed yet.</p>'}
+  </div>`;
+  markMulti(view);
 }
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
 const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
 const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
-const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'agent', 'trivia', 'riddles'];
+const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
   const m = mastery(), misses = store.get('misses', {});
@@ -461,7 +493,7 @@ views[''] = () => {
     <div class="home-head">
       <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
-    ${isNew ? '' : `<p class="h-overall">${[`<b>${knownL}</b> of 26 letters known`, `<b>${doneL.length}</b> of ${LESSONS.length} lessons`, `<b>${played.length}</b> of ${GAME_ORDER.length} games played`].join('<span aria-hidden="true"> · </span>')}</p>`}
+    ${isNew ? '' : `<p class="h-overall">${[`<b>${knownL}</b> of 26 letters known`, `<b>${doneL.length}</b> of ${LESSONS.length} lessons`, `<b>${played.length}</b> of ${GAME_ORDER.length} games played`].join('<span aria-hidden="true"> · </span>')} <a class="st-link" href="#/practice/stats">Stats</a></p>`}
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>
@@ -473,11 +505,15 @@ const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETT
 // The note is only shown in the help sheet's list, never in the quiz.
 const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d, n]) => ({ key: (cat === 'Lower wordsigns' && (w === 'be' || w === 'in') ? 'cw' : 'c') + w, cells: cellsOf(d), answer: w, kind: 'contraction', grp: cat,
   note: n || (cat === 'Shortforms' ? SHORT_SPELL[w] || '' : G2_EXAMPLE[w] ? 'e.g. ' + G2_EXAMPLE[w] : '') }));
+// Short everyday words spelled letter by letter (Grade 1), for drawing whole words cell by cell. 40 per session.
+let SHORT_POOL = null;
+const SHORT_WORDS = () => { SHORT_POOL = SHORT_POOL || shuffle(COMMON_WORDS.filter((w) => /^[a-z]{3,4}$/.test(w))).slice(0, 40); return SHORT_POOL; };
 const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
 const CATS = {
   letters: { name: 'ABC', sets: {
     aj: ['a–j', L('abcdefghij')], kt: ['k–t', L('klmnopqrst')], uz: ['u–z', L('uvwxyz')],
     az: ['All letters', L('abcdefghijklmnopqrstuvwxyz')], mirror: ['Mirror pairs', L('dfeihjrw'), 'd/f, e/i, h/j, r/w'],
+    words: ['Words', () => SHORT_WORDS().map((w) => ({ key: 'sw' + w, cells: [...w].map((l) => LETTERS[l]).join(''), answer: w, kind: 'letter' })), 'Three and four letters, Grade 1'],
   } },
   symbols: { name: '!?#', sets: {
     num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d, kind: 'digit' }))],
@@ -639,6 +675,7 @@ const SET_HELP = {
   'letters.uz': ['Letters u–z', ['u, v, x, y and z are a to e with both bottom dots added.', 'w is the odd one out. French had no w when Louis Braille made the system, so it was added later and doesn’t follow the pattern: it is j plus the lower-right dot.']],
   'letters.az': ['All letters', ['The alphabet comes in three rows of ten. a–j use only the top four dots. k–t add the lower-left dot. u, v, x, y, z add both bottom dots to a–e, and w is j plus the lower-right dot.']],
   'letters.mirror': ['Mirror pairs', ['These letters are left-to-right mirror images of each other, so they are the easiest to mix up: d and f, e and i, h and j, r and w.', 'Look at which side of the cell the dots lean towards.']],
+  'letters.words': ['Words', ['Everyday words of three or four letters, written letter by letter as in Grade 1.', 'In Draw, fill every cell of the word: each cell turns faintly green when it is right. In Guess, read the whole word.']],
   'symbols.num': ['Numbers', ['There are no separate digit cells. A number sign in front turns a–j into digits: a is 1, b is 2 and so on to i for 9 and j for 0.', 'One number sign covers the whole number, so 25 is the number sign, then b, then e. A comma or decimal point inside a number keeps it going; a space ends it.']],
   'symbols.punct': ['Punctuation', ['Most punctuation marks are lower signs. ' + LOWER_NOTE + ' The comma is a moved down, the period is d moved down, the exclamation mark is f.', 'The dash and the brackets take two cells: a prefix, then the sign. In Grade 2 the same lower cells are also contractions; where they sit in the word tells you which it is.']],
   'symbols.signs': ['Maths & money signs', ['These take two cells: a prefix, then a cell that names the sign.', 'Plus, minus, times, divided by, equals and the asterisk share the same prefix (the middle-right dot), so it is the second cell that tells them apart. Dollar, at and ampersand use the top-right dot instead: dollar is that dot plus s, at is that dot plus a.']],
@@ -696,6 +733,7 @@ const HELP_KEYS = {
 const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_KEYS[k] ? `<p class="help-keys">${icon('keyboard', 18)}<span>${esc(HELP_KEYS[k])}</span></p>` : '');
 
 views.practice = (q, sub) => {
+  if (sub === 'stats') return statsView();
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
   store.set('pmode', mode); store.set('pvisited', true);
   setTitle('Practice');
@@ -717,7 +755,7 @@ function quizMode(mode, q) {
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
-      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
+      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span><a class="st-link" href="#/practice/stats">Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery"></div>
     </div>`}`;
   const stage = $('#stage');
@@ -789,6 +827,7 @@ function quizMode(mode, q) {
   }
   function result(ok, item) {
     if (state.firstTry) {
+      logDay();
       state.total++;
       if (ok) { state.right++; state.streak++; } else state.streak = 0;
       if (item.key) bump(item.key, ok ? 1 : -1);
@@ -940,7 +979,11 @@ function quizMode(mode, q) {
   }
   let dead = false;
   function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
-  const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; state.key && state.key(e); };
+  // Six-key input in Guess: a chord spelling one of the answers picks it (Draw already uses F D S J K L for its dots).
+  const six = mode === 'read' && sixKeyOn() ? chord((ds, cell, letter) => { if (letter && state.key) state.key({ key: letter, preventDefault() {} }); }) : null;
+  const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; if (six && six.down(e)) return; state.key && state.key(e); };
+  const onKeyUp = (e) => { if (six && sheet.hidden) six.up(e); };
+  document.addEventListener('keyup', onKeyUp);
   const onSet = (e) => {
     if (e.detail === 'mastery') { Object.keys(m).forEach((k) => delete m[k]); renderMastery(); }
   };
@@ -948,7 +991,7 @@ function quizMode(mode, q) {
   window.addEventListener('settings', onSet);
   window.addEventListener('resize', fitMastery);
   renderPicker(); renderMastery(); wScore(); next();
-  return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); window.removeEventListener('settings', onSet); window.removeEventListener('resize', fitMastery); };
+  return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); window.removeEventListener('settings', onSet); window.removeEventListener('resize', fitMastery); };
 }
 
 // ---------- sweep ----------
@@ -1788,12 +1831,13 @@ views.translate = (q) => {
   $('#trCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#trOut').dataset.uni); $('#trCopy').textContent = 'Copied ✓'; setTimeout(() => ($('#trCopy').textContent = 'Copy braille'), 1400); } catch {} };
   syncDD(); render(); showDir();
   const onKey = (e) => { if (dir === 'dots' && dotsKey) dotsKey(e); };
-  document.addEventListener('keydown', onKey);
-  return () => document.removeEventListener('keydown', onKey);
+  const onKeyUp = (e) => { if (dir === 'dots' && dotsKeyUp) dotsKeyUp(e); };
+  document.addEventListener('keydown', onKey); document.addEventListener('keyup', onKeyUp);
+  return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); };
 };
 
 // Braille to text: tap dots across one or more cells; every possible reading is listed.
-let dotsKey = null, dotsClear = null;
+let dotsKey = null, dotsKeyUp = null, dotsClear = null;
 function dotsEditor(root) {
   let cells = store.get('trDots', [[5], [1, 2, 4]]);
   if (!Array.isArray(cells) || !cells.length) cells = [[]];
@@ -1833,8 +1877,12 @@ function dotsEditor(root) {
       ${reads.length > shown.length ? `<p class="muted small">and ${reads.length - shown.length} less likely readings.</p>` : ''}`;
   }
   const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
+  // Six-key mode: a chord fills the current cell (or a new one after a filled cell) and the next chord goes after it.
+  const six = sixKeyOn() ? chord((ds) => { if (cells[cur].length) { cells.splice(cur + 1, 0, []); cur++; } cells[cur] = ds.map(Number); save(); draw(); }) : null;
+  dotsKeyUp = (e) => { if (six && !(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) six.up(e); };
   dotsKey = (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;
+    if (six && six.down(e)) return;
     const n = KEYS[e.key.toLowerCase()];
     if (n) { const d = cells[cur]; cells[cur] = d.includes(n) ? d.filter((x) => x !== n) : [...d, n]; save(); draw(); }
     else if (e.key === ' ') { e.preventDefault(); cells.splice(cur + 1, 0, []); cur++; save(); draw(); }
