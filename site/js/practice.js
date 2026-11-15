@@ -7,6 +7,7 @@ import { COMMON_WORDS } from './wordlist.js';
 import { PHRASES, signLine, numberLine } from './phrases.js';
 import { chord } from './sixkey.js';
 import { PASSAGES } from './passages.js';
+import { G2_EXAMPLES } from './g2examples.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
 import { $, $$, INDICATORS, S, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
@@ -135,15 +136,71 @@ export function likeness(a, b) {
 }
 // Every reading of these cells anywhere in the course (b is also "but", bb also "be" and ";").
 export const readingsOf = (cells) => autoCourse().filter((u) => u.cells === cells).map((u) => u.answer);
-export function guessOptions(item, pool) {
-  const bad = new Set([item.answer, ...readingsOf(item.cells)]);
+// Where in a word a sign may sit (none for signs that are never part of a word: wordsigns, punctuation, digits).
+export function allowedPos(x) {
+  if (x.kind === 'letter') return ['start', 'mid', 'end'];
+  if (x.kind !== 'contraction') return [];
+  switch (x.grp) {
+    case 'Alphabetic wordsigns': case 'Strong wordsigns': case 'Lower wordsigns': case 'Shortforms': return [];
+    case 'Strong groupsigns': return x.answer === 'ing' ? ['mid', 'end'] : ['start', 'mid', 'end'];
+    case 'Lower groupsigns': return ['ea', 'bb', 'cc', 'ff', 'gg'].includes(x.answer) ? ['mid'] : ['be', 'con', 'dis'].includes(x.answer) ? ['start'] : ['start', 'mid', 'end'];
+    case 'Final-letter groupsigns': return ['mid', 'end'];
+    default: return ['start', 'mid', 'end'];
+  }
+}
+// Shown on its own (pos null), no other reading of the same cells is offered, so the choices alone settle it.
+// Shown inside a real word (pos start/mid/end), the word settles it, so readings that can't sit there
+// become the best wrong answers (bb in rabbit is offered with be and ;).
+export function guessOptions(item, pool, pos = null) {
+  const same = autoCourse().filter((u) => u.cells === item.cells && u.answer !== item.answer);
+  const fits = same.filter((u) => !pos || allowedPos(u).includes(pos));
+  const bad = new Set([item.answer, ...fits.map((u) => u.answer)]);
   const seen = new Set(), cands = [];
-  for (const x of pool) {
-    if (x.cells === item.cells || bad.has(x.answer) || seen.has(x.answer)) continue;
-    seen.add(x.answer); cands.push([likeness(item, x) + Math.random() * 9, x]);
+  for (const x of [...pool, ...(pos ? same : [])]) {
+    if ((!pos && x.cells === item.cells) || bad.has(x.answer) || seen.has(x.answer)) continue;
+    seen.add(x.answer); cands.push([(x.cells === item.cells ? 100 : likeness(item, x)) + Math.random() * 9, x]);
   }
   return cands.sort((p, q) => q[0] - p[0]).slice(0, 3).map(([, x]) => x);
 }
+// ---------- Guess: signs inside real words ----------
+// Grade 2 signs that live inside words are asked inside a real word: the sign at full strength, the rest of
+// the word faded. Wordsigns and shortforms stand alone, so they are shown alone.
+const IN_WORD_ONLY = ['Strong groupsigns', 'Lower groupsigns', 'Final-letter groupsigns'];
+const IN_WORD_SOMETIMES = ['Strong contractions', 'Initial-letter contractions'];
+const WORD_CACHE = new Map();
+let WORD_SOURCE = null;
+export function wordsFor(item) {
+  if (WORD_CACHE.has(item.key)) return WORD_CACHE.get(item.key);
+  WORD_SOURCE = WORD_SOURCE || [...new Set([...COMMON_WORDS, ...Object.values(G2_EXAMPLES).flatMap((x) => x.ok || []).filter((w) => /^[a-z]+$/.test(w))])];
+  const out = [];
+  for (const w of WORD_SOURCE) {
+    if (w.length < 3 || w.length > 10 || !w.includes(item.answer) || w === item.answer) continue;
+    const parts = translate(w, 'en', 2);
+    const n = parts.reduce((a, x) => a + [...x.cells].length, 0);
+    if (n < 2 || n > 6) continue;
+    let at = 0;
+    for (let i = 0; i < parts.length; i++) {
+      const x = parts[i];
+      if (x.kind === 'contraction' && x.print === item.answer && x.cells === item.cells) {
+        const len = [...x.cells].length;
+        out.push({ word: w, parts, at, len, pos: at === 0 ? 'start' : at + len === n ? 'end' : 'mid' });
+        break;
+      }
+      at += [...x.cells].length;
+    }
+  }
+  WORD_CACHE.set(item.key, out);
+  return out;
+}
+export function wordContext(item) {
+  if (item.kind !== 'contraction') return null;
+  const always = IN_WORD_ONLY.includes(item.grp);
+  if (!always && !(IN_WORD_SOMETIMES.includes(item.grp) && Math.random() < 0.5)) return null;
+  const list = wordsFor(item);
+  return list.length ? list[Math.floor(Math.random() * list.length)] : null;
+}
+// The word's cells: the asked sign at full strength, every other cell faded.
+export const wordCellsHTML = (wc) => [...wc.parts.map((x) => x.cells).join('')].map((c, i) => cellHTML(c, i >= wc.at && i < wc.at + wc.len ? '' : 'dim')).join('');
 // ---------- practice help: what the chosen set is ----------
 export const LOWER_NOTE = 'Lower signs are the shapes of a–j moved down one row, so they never use the top dots.';
 export const SET_HELP = {
@@ -196,7 +253,7 @@ export function deck(list) {
 }
 export const WORD_LEN = { short: ['Short', (w) => w.length >= 2 && w.length <= 4], medium: ['Medium', (w) => w.length >= 5 && w.length <= 7], long: ['Long', (w) => w.length >= 8] };
 export const HELP = {
-  read: ['A braille cell appears. Pick what it says.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
+  read: ['A braille cell appears. Pick what it says.', 'Grade 2 signs that sit inside words are shown in a real word, with the rest of the word faded. Where the sign falls in the word tells you what it means.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
   sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
@@ -322,13 +379,15 @@ export function quizMode(mode, q) {
   function renderIntro(item) {
     state.last = item;
     stage.classList.remove('glow-good', 'glow-bad');
+    const wc = mode === 'read' ? wordContext(item) : null;
     stage.innerHTML = `<div class="intro">
       <span class="intro-tag">New sign</span>
-      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
+      <div class="prompt-cells${wc ? ' in-word' : ''}">${wc ? wordCellsHTML(wc) : [...item.cells].map((c) => cellHTML(c)).join('')}</div>
       <div class="intro-ans">${esc(item.answer)}</div>
+      ${wc ? `<p class="intro-note">as in “${esc(wc.word)}”</p>` : ''}
       ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
       <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
-    const go = () => { autoMeet(pre, item.key); state.forced = item; next(); };
+    const go = () => { autoMeet(pre, item.key); state.forced = item; state.wc = wc ? [item.key, wc] : null; next(); };
     $('#gotIt').onclick = go;
     state.key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   }
@@ -339,10 +398,12 @@ export function quizMode(mode, q) {
     let pool = items().filter((x) => x.key !== item.key);
     // Early in Auto, top up from the sign's own group so there are always three wrong answers.
     if (auto() && pool.length < 6) pool = [...pool, ...autoList('all').filter((x) => x.src === item.src && x.key !== item.key && !pool.some((o) => o.key === x.key))];
-    const opts = shuffle([item, ...guessOptions(item, pool)]);
+    const wc = state.wc && state.wc[0] === item.key ? state.wc[1] : wordContext(item);
+    state.wc = null;
+    const opts = shuffle([item, ...guessOptions(item, pool, wc && wc.pos)]);
     const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
-      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
+      <div class="prompt-cells${wc ? ' in-word' : ''}">${wc ? wordCellsHTML(wc) : [...item.cells].map((c) => cellHTML(c)).join('')}</div>
       <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
     let misses = 0;
     const choose = (btn) => {
