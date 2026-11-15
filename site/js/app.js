@@ -383,9 +383,7 @@ views[''] = () => {
   const lastGame = GAMES[ren(gameStore.get('last', null))] ? ren(gameStore.get('last', null)) : played[played.length - 1] || null;
   const isNew = !seen.length && !pVisited && !played.length;
   const card = (href, k, t, d, go = false) => `<a class="hcard ${go ? 'go' : ''}" href="${href}"><span class="k">${k}</span><b>${t}</b><span class="d">${d}</span></a>`;
-  const tile = (href, t, ic, cls = '') => `<a class="hl" href="${href}"><span class="hl-ic ${cls}">${icon(ic, 22)}</span><span class="hl-t">${t}</span>${icon('right', 18)}</a>`;
   const head = (ic, t, href, prog) => `<div class="hsec-h"><h2 class="sec-h">${icon(ic, 26)} ${t}</h2><a href="${href}">See all</a></div>${prog ? `<div class="hprog"><span>${prog[1]}</span></div>` : ''}`;
-  const carousel = (items) => `<div class="hlist">${items.join('')}</div>`;
 
   // Learn
   const secs = REF_SECTIONS.filter(([k]) => k !== 'cheatsheet');
@@ -401,10 +399,8 @@ views[''] = () => {
     lA = card(`#/reference/${lastSec}`, 'Continue', secName(lastSec), SEC_DESC[lastSec]);
     lB = nextSec ? card(`#/reference/${nextSec[0]}`, 'Up next', nextSec[1], SEC_DESC[nextSec[0]], true) : card('#/reference/cheatsheet', 'All done', 'Cheat Sheet', SEC_DESC.cheatsheet, true);
   }
-  const lUsed = [!seen.length ? 'overview' : lastSec, !seen.length ? 'alphabet' : (nextSec ? nextSec[0] : 'cheatsheet')];
   const learn = `${head('book', 'Learn', '#/reference', seen.length ? [doneL.length / LESSONS.length, `${doneL.length} of ${LESSONS.length} lessons done`] : null)}
-    <div class="hsplit">${lA}${lB}</div>
-    ${carousel(REF_SECTIONS.filter(([k]) => !lUsed.includes(k)).map(([k, t]) => tile(`#/reference/${k}`, t, SEC_ICON[k])))}`;
+    <div class="hsplit">${lA}${lB}</div>`;
 
   // Practice
   const az = 'abcdefghijklmnopqrstuvwxyz';
@@ -414,7 +410,7 @@ views[''] = () => {
   const missTop = Object.entries(misses).filter(([k]) => /^[rw]:[a-z]$/.test(k)).sort((x, y) => y[1] - x[1]).map(([k]) => k[2]).filter((l, i, a) => a.indexOf(l) === i && (m['r:' + l] || 0) < 4).slice(0, 5);
   const nextSet = [['aj', 'abcdefghij'], ['kt', 'klmnopqrst'], ['uz', 'uvwxyz']].find(([, ls]) => [...ls].some((l) => (m['r:' + l] || 0) < 4));
   let pA, pB;
-  if (!pVisited) { pA = card('#/practice/read?cat=letters&set=aj', 'Get started', 'Guess a–j', 'Ten letters, top dots only', true); pB = card('#/practice/write?cat=letters&set=aj', 'Or', 'Draw a–j', 'Tap the dots'); }
+  if (!pVisited) { pA = card('#/practice/read?cat=auto&set=g1', 'Get started', 'Auto', 'One new sign at a time, brought back as you learn', true); pB = card('#/practice/write?cat=letters&set=aj', 'Or', 'Draw a–j', 'Tap the dots'); }
   else {
     const label = pmode === 'sweep' ? 'Read' : `${MODES[pmode]} · ${psel.cat === 'auto' ? (psel.set === 'all' ? 'Auto' : `Auto ${pset ? pset[0] : ''}`) : pset ? pset[0] : 'a–j'}`;
     const items = pmode !== 'sweep' && pset ? pset[1](pmode === 'write' ? 'w:' : 'r:') : [];
@@ -425,23 +421,21 @@ views[''] = () => {
       : card('#/practice/read?cat=contractions&set=k0', 'Up next', 'Grade 2', 'Start the contractions', true);
   }
   const practice = `${head('practice', 'Practice', '#/practice', pVisited ? [knownL / 26, `${knownL} of 26 letters`] : null)}
-    <div class="hsplit">${pA}${pB}</div>
-    ${carousel([...Object.entries(MODES).map(([k, t]) => tile(`#/practice/${k}`, t, k === 'sweep' ? 'sweep' : k)), tile('#/practice/read?cat=auto&set=all', 'Auto', 'auto')])}`;
+    <div class="hsplit">${pA}${pB}</div>`;
 
   // Games
   const nextGame = GAME_ORDER.find((k) => !played.includes(k) && k !== lastGame) || GAME_ORDER.find((k) => k !== lastGame);
   let gA, gB;
   if (!played.length) { gA = card('#/games/memory', 'Easy first', 'Memory', 'Pair cells and letters', true); gB = card('#/games/wordle', 'Or', 'Braidle', 'With letters shown'); }
   else { gA = card(`#/games/${lastGame}`, 'Resume', GAMES[lastGame].name, GAMES[lastGame].desc); gB = card(`#/games/${nextGame}`, 'Try next', GAMES[nextGame].name, GAMES[nextGame].desc, true); }
-  const gUsed = !played.length ? ['memory', 'wordle'] : [lastGame, nextGame];
   const games = `${head('games', 'Games', '#/games', played.length ? [played.length / GAME_ORDER.length, `${played.length} of ${GAME_ORDER.length} played`] : null)}
-    <div class="hsplit">${gA}${gB}</div>
-    ${carousel(Object.entries(GAMES).filter(([k]) => !gUsed.includes(k)).map(([k, g]) => tile(`#/games/${k}`, g.name, g.icon, `gc-${k}`)))}`;
+    <div class="hsplit">${gA}${gB}</div>`;
 
   view.innerHTML = `
     <div class="home-head">
       <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
+    ${isNew ? '' : `<p class="h-overall">${[`<b>${knownL}</b> of 26 letters known`, `<b>${doneL.length}</b> of ${LESSONS.length} lessons`, `<b>${played.length}</b> of ${GAME_ORDER.length} games played`].join('<span aria-hidden="true"> · </span>')}</p>`}
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>
@@ -1130,7 +1124,7 @@ function signsSection(regionKey) {
     jumps: parts.map(([id, t]) => ({ value: id, label: t })),
     html: `<div class="picker"><div id="regionDD"></div></div>
       ${region === 'jp' ? '' : `<p class="lead-p">Tap a sign to see what each cell means. ${esc(R.note || 'Shown in UEB Grade 2, the way new signs are made.')}</p>`}
-      ${parts.map(([id, t, h]) => `<div class="sg" id="${id}"><h3 class="sg-h">${t}</h3>${h}</div>`).join('')}`,
+      <div class="g2-groups">${parts.map(([id, t, h], i) => foldHTML(id, t, h, i === 0)).join('')}</div>`,
     bind: () => {
       dropdown($('#regionDD'), { label: 'Region', options: Object.entries(SIGN_REGIONS).map(([k, r]) => ({ value: k, label: r.name })), value: region, onChange: (v) => { location.hash = '#/reference/signs/' + v; } });
       $$('.plate').forEach((p) => p.addEventListener('click', () => p.classList.toggle('decoded')));
@@ -1261,6 +1255,8 @@ function overviewSection() {
       <div class="row"><a class="btn primary" href="#/reference/alphabet">Learn the alphabet</a><a class="btn" href="#/practice/read">Start practising</a></div>`,
   };
 }
+// A long page's sections fold like the Grade 2 groups: the first starts open, Jump to opens the one it goes to.
+const foldHTML = (id, title, body, open = false, sub = '') => `<details class="g2-group fold" id="${id}"${open ? ' open' : ''}><summary><span class="g2-t"><h3>${title}</h3>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${icon('chevron', 20)}</summary><div class="g2-body">${body}</div></details>`;
 function numbersSection() {
   const parts = [
     ['nu-num', 'Numbers', groupBlock('Numbers', 'Numbers', 'number sign ⠼ + a–j', '#/practice/read?cat=symbols&set=num') + exBlock([
@@ -1285,7 +1281,7 @@ function numbersSection() {
   ];
   return {
     jumps: parts.map(([value, label]) => ({ value, label })),
-    html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p>${parts.map(([id, , h]) => `<div class="sg" id="${id}">${h}</div>`).join('')}`,
+    html: `<p class="lead-p">Numbers, punctuation and the indicators that change how the next cells are read.</p><div class="g2-groups">${parts.map(([id, t, h], i) => foldHTML(id, t, h, i === 0)).join('')}</div>`,
   };
 }
 // Printable cheat sheets: Grade 1 on one page (letters laid out by decade), Grade 2 over a few pages.
@@ -1695,15 +1691,17 @@ views.translate = (q) => {
   let mode = q.get('lang') ? (q.get('lang') === 'en' ? 'en2' : q.get('lang')) : store.get('trMode', 'en2');
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
-  let dir = store.get('trDir', 'text');
+  let dir = q.get('text') ? 'text' : store.get('trDir', 'text');
   setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${dirIcon(v)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div><button type="button" class="btn small-btn tr-clear" id="trClear" hidden>Clear all</button>`);
   view.innerHTML = `
     <div id="trText">
       <div class="tr-ex" id="exDD"></div>
       <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
+      <div class="tr-view">${radios('trView', [['line', 'Line'], ['sign', 'As a sign']], store.get('trView', 'line'))}</div>
       <div class="card tr-out" id="trOut"></div>
       <div class="tr-tools">
         <button class="btn" id="trCopy">Copy braille</button>
+        <button class="btn" id="trShare">Share</button>
       </div>
       <p class="muted small">Grade 2 follows the main UEB contraction rules but is simplified — a learning aid, not a transcription tool. Other languages are uncontracted.</p>
     </div>
@@ -1719,7 +1717,11 @@ views.translate = (q) => {
   const render = () => {
     const [lang, grade] = mode.startsWith('en') ? ['en', Number(mode[2])] : [mode, 1];
     const parts = translate(inp.value, lang, grade);
-    $('#trOut').innerHTML = lineHTML(parts);
+    // "As a sign" shows the text the way a door or wall sign would carry it (pictogram, raised print, braille below).
+    const asSign = store.get('trView', 'line') === 'sign' && inp.value.trim();
+    $('#trOut').classList.toggle('as-sign', !!asSign);
+    $('#trOut').innerHTML = asSign ? `<div class="sign-gallery tr-sign">${plateHTML(inp.value.trim(), lang, grade)}</div>` : lineHTML(parts);
+    if (asSign) $('.plate', $('#trOut')).onclick = (e) => e.currentTarget.classList.toggle('decoded');
     $('#trOut').dataset.uni = unicodeOf(parts);
     store.set('trMode', mode); store.set('trText', inp.value);
   };
@@ -1729,6 +1731,13 @@ views.translate = (q) => {
     dropdown($('#exDD'), { label: 'Examples', plain: true, options: LANG_INFO[exLang()].phrases.map((p) => ({ value: p, label: p })), value: null, onChange: (v) => { inp.value = v; render(); } });
   };
   inp.oninput = render;
+  bindRadios($('.tr-view'), (k, v) => { store.set('trView', v); render(); });
+  // Share a link that opens this translation (the page reads ?lang= and ?text=); falls back to copying the link.
+  $('#trShare').onclick = async () => {
+    const url = `${location.origin}${location.pathname}#/translate?lang=${encodeURIComponent(mode === 'en2' ? 'en' : mode)}&text=${encodeURIComponent(inp.value)}`;
+    try { if (navigator.share) { await navigator.share({ title: 'Learn Braille', text: inp.value, url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); $('#trShare').textContent = 'Link copied ✓'; setTimeout(() => ($('#trShare').textContent = 'Share'), 1400); } catch {}
+  };
   $('#trCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#trOut').dataset.uni); $('#trCopy').textContent = 'Copied ✓'; setTimeout(() => ($('#trCopy').textContent = 'Copy braille'), 1400); } catch {} };
   syncDD(); render(); showDir();
   const onKey = (e) => { if (dir === 'dots' && dotsKey) dotsKey(e); };
