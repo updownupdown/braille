@@ -2,7 +2,7 @@
 import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, translate, unicodeOf } from './braille.js';
 import { LANG_INFO } from './data.js';
 
-import { chord, sixKeyOn } from './sixkey.js';
+import { chord } from './sixkey.js';
 
 import { $, INDICATORS, bindRadios, cellHTML, dropdown, esc, icon, lineHTML, radios, setSub, setTitle, store, view, views } from './core.js';
 import { plateHTML } from './learn.js';
@@ -162,7 +162,7 @@ export function dotsEditor(root) {
   }
   const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
   // Six-key mode: a chord fills the current cell (or a new one after a filled cell) and the next chord goes after it.
-  const six = sixKeyOn() ? chord((ds) => { if (cells[cur].length) { cells.splice(cur + 1, 0, []); cur++; } cells[cur] = ds.map(Number); save(); draw(); }) : null;
+  const six = chord((ds) => { if (cells[cur].length) { cells.splice(cur + 1, 0, []); cur++; } cells[cur] = ds.map(Number); save(); draw(); });
   dotsKeyUp = (e) => { if (six && !(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) six.up(e); };
   dotsKey = (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;

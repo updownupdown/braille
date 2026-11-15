@@ -9,16 +9,17 @@
 //   learnDone          lessons whose check was passed       learnSeen  Learn sections opened
 //   psel, pmode        last practice category/set and mode  pvisited   Practice opened at least once
 //   pwlen, pwgrade, pwbest1, pwbest2   Type mode options and best streaks
-//   swSrc, swPass, swBest1, swBest2   Read source, passage reached, best words a minute
+//   swSrc, swPass1, swPass2, swBest1, swBest2   Read source, passage reached and best words a minute, per grade
 //   refSec, refLang, csGrade, signRegion, mOpen, topic   where each Learn page was left
 //   trText, trMode, trDir, trDots, trView   Translate state
 //   g.*                games: best.<game><level>, played, last, agent.p.<case>, maze, snow, riddles…
 //   schema             the storage layout version (below)
 const PREFIX = 'dots.';
-export const SCHEMA = 1;
+export const SCHEMA = 2;
 // MIGRATIONS[n] upgrades saved data from version n - 1 to n. Add one whenever a key is renamed or reshaped.
 const MIGRATIONS = {
   1: () => {}, // version 1 is the layout as of November 2026; nothing to change, it only stamps the version.
+  2: () => { const v = store.get('swPass', null); if (v != null) { store.set('swPass1', v); store.remove('swPass'); } }, // Read keeps a passage place per grade
 };
 
 const ls = () => { try { return window.localStorage; } catch { return null; } };
