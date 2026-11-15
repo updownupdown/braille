@@ -1788,3 +1788,20 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* v38: Cheat Sheet Print on the right */
 .cs-head .row { flex: 1 1 100%; }
 .cs-head #csPrint { margin-left: auto; }
+
+/* v40: practice help lists the set; Auto intro card */
+.help-mode { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 16px 0 4px; }
+.help-mode summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; font-weight: 500; }
+.help-mode summary::-webkit-details-marker { display: none; }
+.help-mode summary .ic { color: var(--muted); transition: transform .2s; flex: none; }
+.help-mode[open] summary .ic { transform: rotate(180deg); }
+.help-mode > div { padding: 0 0 14px; }
+.help-h { font-size: 1rem; font-weight: 600; margin: 20px 0 10px; display: flex; align-items: baseline; gap: 8px; }
+.help-h .count { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.help .ctable.help-list { margin: 0; }
+.intro { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.intro-tag { font-size: .85rem; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 3px 10px; border-radius: 99px; }
+.intro .prompt-cells { margin: 6px 0 0; }
+.intro-ans { font-size: 2.2rem; font-weight: 600; line-height: 1.1; }
+.intro-note { margin: 0; color: var(--muted); font-size: .9rem; max-width: 34ch; }
+.intro .btn { margin-top: 6px; min-width: 140px; }

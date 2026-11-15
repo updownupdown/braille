@@ -1,15 +1,15 @@
 import {
   LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel,
   translate, toCells, unicodeOf, LANGS,
-} from './braille.js?v=38';
+} from './braille.js?v=40';
 import {
   SIGN_WORDS, WORDS, SENTENCES, SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY, SIGN_REGIONS,
-} from './data.js?v=38';
-import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=38';
-import { COMMON_WORDS } from './wordlist.js?v=38';
-import { LANG_CONTRACTIONS } from './langcontractions.js?v=38';
-import { G2_EXAMPLES } from './g2examples.js?v=38';
-import { PHRASES, signLine, numberLine } from './phrases.js?v=38';
+} from './data.js?v=40';
+import { GAMES, GAME_GROUPS, gameStore, letterPad, paintTyped, typeHint } from './games.js?v=40';
+import { COMMON_WORDS } from './wordlist.js?v=40';
+import { LANG_CONTRACTIONS } from './langcontractions.js?v=40';
+import { G2_EXAMPLES } from './g2examples.js?v=40';
+import { PHRASES, signLine, numberLine } from './phrases.js?v=40';
 
 // ---------- helpers ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -231,7 +231,7 @@ function openSettings() {
       <p class="set-note">Everything is saved on this device only. Each reset asks you to tap again to confirm.</p>
       <div class="reset-list">
         <div class="reset-row" data-r="games"><span><b>Game progress</b><small>Scores, bests, levels, solved riddles and Secret Agent cases</small></span><button class="btn" type="button">Reset</button></div>
-        <div class="reset-row" data-r="learn"><span><b>Learning progress</b><small>Practice, the daily review and finished lessons</small></span><button class="btn" type="button">Reset</button></div>
+        <div class="reset-row" data-r="learn"><span><b>Learning progress</b><small>Practice, Auto and finished lessons</small></span><button class="btn" type="button">Reset</button></div>
         <div class="reset-row" data-r="all"><span><b>Everything</b><small>All of the above, plus these settings</small></span><button class="btn" type="button">Reset</button></div>
       </div>
     </div>
@@ -366,7 +366,7 @@ function progressHTML() {
     <div class="pc-body">
       <table class="ptable"><thead><tr><th></th><th>Read</th><th>Write</th></tr></thead><tbody>${rows}</tbody></table>
       <p class="muted small">Something counts as learned after a few correct answers in a row. Tap a tally to practise it.</p>
-      <div class="row"><a class="btn primary" href="#/practice">Practice</a><a class="btn" href="#/practice/read?cat=review&set=today">Daily review</a></div>
+      <div class="row"><a class="btn primary" href="#/practice">Practice</a><a class="btn" href="#/practice/read?cat=auto&set=all">Auto</a></div>
     </div></details>`;
 }
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
@@ -416,17 +416,17 @@ views[''] = () => {
   let pA, pB;
   if (!pVisited) { pA = card('#/practice/read?cat=letters&set=aj', 'Get started', 'Guess a–j', 'Ten letters, top dots only', true); pB = card('#/practice/write?cat=letters&set=aj', 'Or', 'Draw a–j', 'Tap the dots'); }
   else {
-    const label = pmode === 'sweep' ? 'Read' : `${MODES[pmode]} · ${pset ? pset[0] : 'a–j'}`;
-    const items = pmode !== 'sweep' && pset ? pset[1]() : [];
+    const label = pmode === 'sweep' ? 'Read' : `${MODES[pmode]} · ${psel.cat === 'auto' ? (psel.set === 'all' ? 'Auto' : `Auto ${pset ? pset[0] : ''}`) : pset ? pset[0] : 'a–j'}`;
+    const items = pmode !== 'sweep' && pset ? pset[1](pmode === 'write' ? 'w:' : 'r:') : [];
     const pre = pmode === 'write' ? 'w:' : 'r:';
     pA = card(pmode === 'sweep' ? '#/practice/sweep' : `#/practice/${pmode}?cat=${psel.cat}&set=${psel.set}`, 'Continue', label, items.length ? `${items.filter((x) => (m[pre + x.key] || 0) >= 4).length} of ${items.length} known` : 'Pick up where you left off');
-    pB = missTop.length ? card('#/practice/read?cat=review&set=today', 'Needs work', missTop.join(', '), '15-item daily review', true)
+    pB = missTop.length ? card('#/practice/read?cat=auto&set=all', 'Needs work', missTop.join(', '), 'Auto brings them back', true)
       : nextSet ? card(`#/practice/read?cat=letters&set=${nextSet[0]}`, 'Up next', `Guess ${CATS.letters.sets[nextSet[0]][0]}`, 'Learn the next letters', true)
       : card('#/practice/read?cat=contractions&set=k0', 'Up next', 'Grade 2', 'Start the contractions', true);
   }
   const practice = `${head('practice', 'Practice', '#/practice', pVisited ? [knownL / 26, `${knownL} of 26 letters`] : null)}
     <div class="hsplit">${pA}${pB}</div>
-    ${carousel([...Object.entries(MODES).map(([k, t]) => tile(`#/practice/${k}`, t, k === 'sweep' ? 'sweep' : k)), tile('#/practice/read?cat=review&set=today', 'Daily Review', 'restart')])}`;
+    ${carousel([...Object.entries(MODES).map(([k, t]) => tile(`#/practice/${k}`, t, k === 'sweep' ? 'sweep' : k)), tile('#/practice/read?cat=auto&set=all', 'Auto', 'auto')])}`;
 
   // Games
   const nextGame = GAME_ORDER.find((k) => !played.includes(k) && k !== lastGame) || GAME_ORDER.find((k) => k !== lastGame);
@@ -449,8 +449,10 @@ views[''] = () => {
 };
 
 // ---------- practice data ----------
-const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l }));
-const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d]) => ({ key: 'c' + w, cells: cellsOf(d), answer: w }));
+const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
+// The note is only shown in the help sheet's list, never in the quiz.
+const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d, n]) => ({ key: 'c' + w, cells: cellsOf(d), answer: w, kind: 'contraction', grp: cat,
+  note: n || (cat === 'Shortforms' ? SHORT_SPELL[w] || '' : G2_EXAMPLE[w] ? 'e.g. ' + G2_EXAMPLE[w] : '') }));
 const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
 const CATS = {
   letters: { name: 'ABC', sets: {
@@ -458,34 +460,123 @@ const CATS = {
     az: ['All letters', L('abcdefghijklmnopqrstuvwxyz')], mirror: ['Mirror pairs', L('dfeihjrw'), 'd/f, e/i, h/j, r/w'],
   } },
   symbols: { name: '!?#', sets: {
-    num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d }))],
-    punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1] }))],
-    signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1] }))],
-    ind: ['Indicators', () => INDICATORS.map(([p, d]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p }))],
+    num: ['Numbers', () => '1234567890'.split('').map((d) => ({ key: 'n' + d, cells: IND.number + LETTERS['jabcdefghi'[Number(d)]], answer: d, kind: 'digit' }))],
+    punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1], kind: 'punct' }))],
+    signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1], kind: 'math' }))],
+    ind: ['Indicators', () => INDICATORS.map(([p, d, n]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p, kind: 'indicator', note: n }))],
   } },
-  review: { name: 'Review', sets: { today: ['Today’s mix', () => reviewItems()] } },
   contractions: { name: 'Grade 2', sets: {
     start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean), 'the 18 most common'],
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
     all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
   } },
+  // Auto: the set is the signs introduced so far (per mode), drawn from the whole course or one grade of it.
+  auto: { name: 'Auto', sets: {
+    all: ['All', (pre) => autoItems(pre, 'all'), 'Grade 1, then Grade 2'],
+    g1: ['Grade 1', (pre) => autoItems(pre, 'g1'), 'Letters, numbers, punctuation'],
+    g2: ['Grade 2', (pre) => autoItems(pre, 'g2'), 'Contractions only'],
+  } },
 };
-// Daily review: the 15 items you miss most (then the least practised), fixed for the day.
-function reviewItems() {
-  const all = new Map();
-  for (const [c, cat] of Object.entries(CATS)) if (c !== 'review') for (const [k, [, f]] of Object.entries(cat.sets)) for (const it of f()) all.set(it.key, it);
-  const today = new Date().toISOString().slice(0, 10);
-  let r = store.get('review', null);
-  if (!r || r.date !== today || !r.keys.every((k) => all.has(k))) {
-    const ms = store.get('misses', {}), m = mastery();
-    const miss = (k) => (ms['r:' + k] || 0) + (ms['w:' + k] || 0);
-    const sc = (k) => (m['r:' + k] || 0) + (m['w:' + k] || 0);
-    const tried = [...all.keys()].filter((k) => miss(k) > 0).sort((a, b) => miss(b) - miss(a) || sc(a) - sc(b));
-    const rest = shuffle([...all.keys()].filter((k) => !tried.includes(k) && /^[a-z]$/.test(k))).sort((a, b) => sc(a) - sc(b));
-    r = { date: today, keys: [...tried, ...rest].slice(0, 15) };
-    store.set('review', r);
+// ---------- Auto: spaced practice ----------
+// The course in teaching order: Grade 1 (letters, numbers, punctuation, indicators, maths) then Grade 2
+// (the starter signs, then each contraction group). An item appears once, at its first place.
+let AUTO_COURSE = null;
+function autoCourse() {
+  if (AUTO_COURSE) return AUTO_COURSE;
+  const S = CATS.symbols.sets, G = CATS.contractions.sets;
+  const tag = (src, list) => list.map((x) => ({ ...x, src }));
+  const g1 = [CATS.letters.sets.aj, CATS.letters.sets.kt, CATS.letters.sets.uz, S.num, S.punct, S.ind, S.signs].flatMap(([n, f]) => tag(n, f()));
+  const g2order = ['Strong contractions', 'Alphabetic wordsigns', 'Strong groupsigns', 'Strong wordsigns', 'Lower groupsigns', 'Lower wordsigns', 'Initial-letter contractions', 'Final-letter groupsigns', 'Shortforms'];
+  const g2 = [...tag('start', G.start[1]()), ...g2order.flatMap((c) => tag(c, C(c)()))];
+  const seen = new Set(), out = [];
+  for (const [g, list] of [[1, g1], [2, g2]]) for (const it of list) if (!seen.has(it.key)) { seen.add(it.key); out.push({ ...it, g }); }
+  AUTO_COURSE = out;
+  return out;
+}
+const autoList = (scope) => autoCourse().filter((x) => scope === 'g1' ? x.g === 1 : scope === 'g2' ? x.g === 2 : true);
+// Each sign sits in a box; a right answer moves it up a box and it comes back after that many more turns.
+// A miss sends it back to the first box.
+const AUTO_GAP = [1, 3, 6, 12, 25, 50, 100];
+const AUTO_NEW_AT_ONCE = 3; // signs still in the first two boxes before another new one arrives
+function autoState(pre) {
+  const all = store.get('auto', {}), k = pre[0];
+  if (!all[k]) {
+    // First visit: signs already known from other practice start further along, so they're only reviewed.
+    const m = mastery(), st = { turn: 0, s: {} };
+    autoCourse().forEach((x, i) => {
+      const sc = m[pre + x.key] || 0;
+      if (sc >= 4) st.s[x.key] = [3, 4 + (i % 20)];
+      else if (sc > 0) st.s[x.key] = [1, 0];
+    });
+    all[k] = st; store.set('auto', all);
   }
-  return r.keys.map((k) => all.get(k));
+  return all[k];
+}
+const autoSave = (pre, st) => { const all = store.get('auto', {}); all[pre[0]] = st; store.set('auto', all); };
+function autoItems(pre, scope) { const st = autoState(pre || 'r:'); return autoList(scope).filter((x) => st.s[x.key]); }
+function autoPick(pre, scope, lastKey) {
+  const st = autoState(pre), list = autoList(scope);
+  const met = list.filter((x) => st.s[x.key]);
+  const learning = met.filter((x) => st.s[x.key][0] < 2).length;
+  const fresh = list.find((x) => !st.s[x.key]);
+  if (fresh && learning < AUTO_NEW_AT_ONCE) return { ...fresh, isNew: true };
+  const pool = met.filter((x) => x.key !== lastKey);
+  if (!pool.length) return met[0] || (fresh && { ...fresh, isNew: true });
+  // Most overdue first; among signs due on the same turn, a random one.
+  const due = (x) => st.s[x.key][1];
+  const best = Math.min(...pool.map(due));
+  const tied = pool.filter((x) => due(x) === best);
+  return tied[Math.floor(Math.random() * tied.length)];
+}
+function autoMeet(pre, key) { const st = autoState(pre); if (!st.s[key]) st.s[key] = [0, st.turn]; autoSave(pre, st); }
+function autoResult(pre, key, ok) {
+  const st = autoState(pre);
+  st.turn++;
+  const box = ok ? Math.min(AUTO_GAP.length - 1, ((st.s[key] || [0])[0]) + 1) : 0;
+  st.s[key] = [box, st.turn + (ok ? AUTO_GAP[box] : 2)];
+  autoSave(pre, st);
+}
+
+// ---------- practice help: what the chosen set is ----------
+const LOWER_NOTE = 'Lower signs are the shapes of a–j moved down one row, so they never use the top dots.';
+const SET_HELP = {
+  'letters.aj': ['Letters a–j', ['The first ten letters use only the top four dots of the cell. They are the pattern the rest of the alphabet is built on, so they are worth knowing well.', 'After a number sign, the same ten cells are the digits 1 to 0.']],
+  'letters.kt': ['Letters k–t', ['k to t are a to j with the lower-left dot added: k is a plus that dot, l is b plus it, and so on to t, which is j plus it.', 'If you know a–j, you only need to spot the extra dot.']],
+  'letters.uz': ['Letters u–z', ['u, v, x, y and z are a to e with both bottom dots added.', 'w is the odd one out. French had no w when Louis Braille made the system, so it was added later and doesn’t follow the pattern: it is j plus the lower-right dot.']],
+  'letters.az': ['All letters', ['The alphabet comes in three rows of ten. a–j use only the top four dots. k–t add the lower-left dot. u, v, x, y, z add both bottom dots to a–e, and w is j plus the lower-right dot.']],
+  'letters.mirror': ['Mirror pairs', ['These letters are left-to-right mirror images of each other, so they are the easiest to mix up: d and f, e and i, h and j, r and w.', 'Look at which side of the cell the dots lean towards.']],
+  'symbols.num': ['Numbers', ['There are no separate digit cells. A number sign in front turns a–j into digits: a is 1, b is 2 and so on to i for 9 and j for 0.', 'One number sign covers the whole number, so 25 is the number sign, then b, then e. A comma or decimal point inside a number keeps it going; a space ends it.']],
+  'symbols.punct': ['Punctuation', ['Most punctuation marks are lower signs. ' + LOWER_NOTE + ' The comma is a moved down, the period is d moved down, the exclamation mark is f.', 'The dash and the brackets take two cells: a prefix, then the sign. In Grade 2 the same lower cells are also contractions; where they sit in the word tells you which it is.']],
+  'symbols.signs': ['Maths & money signs', ['These take two cells: a prefix, then a cell that names the sign.', 'Plus, minus, times, divided by, equals and the asterisk share the same prefix (the middle-right dot), so it is the second cell that tells them apart. Dollar, at and ampersand use the top-right dot instead: dollar is that dot plus s, at is that dot plus a.']],
+  'symbols.ind': ['Indicators', ['Indicators are not printed characters. They change how the next cells are read.', 'The capital sign makes the next letter a capital; two make the whole word capitals, and three a whole passage, closed by the terminator. The number sign starts digits. The grade 1 indicator says the next cell is a plain letter, not a contraction. Italic and bold mark emphasis.']],
+  'contractions.start': ['Starter signs', ['The 18 signs that turn up most in everyday text: the five strong contractions (and, for, of, the, with), a few one-letter wordsigns (but, can, do, it, that, you) and the commonest letter groups (ing, st, sh, th, ch, er, ed).', 'Knowing these makes most Grade 2 text much easier to read.']],
+  'contractions.all': ['All contractions', ['Grade 2 uses about 180 contractions to make braille shorter. Many cells mean different things alone and inside a word, so each sign has rules for where it may go.', 'Learn them group by group; this set mixes every group.']],
+  'Alphabetic wordsigns': ['Alphabetic wordsigns', ['When a letter stands alone, with a space or punctuation on each side, it means a whole word: b alone is “but”, c is “can”, d is “do”.', 'Inside a word the letter is just a letter. a, i and o are already words, so they have no wordsign; x is “it”, y is “you” and z is “as”.']],
+  'Strong contractions': ['Strong contractions', ['and, for, of, the and with each have their own cell. They are “strong” because they can go anywhere: as a whole word (the) or inside one (them, form, often, without).', 'They fill the cell from the top, so they are easy to tell apart from the lower signs.']],
+  'Strong groupsigns': ['Strong groupsigns', ['Common letter groups get one cell each and can be used anywhere in a word: ch in chip, ed in edit, ar in park.', 'The one exception is ing, which never starts a word. Where a group spans two parts of a compound word (like the t and h in pothole), the letters are written out.']],
+  'Strong wordsigns': ['Strong wordsigns', ['Six of the strong groupsigns double as whole words when they stand alone: ch is “child”, sh is “shall”, th is “this”, wh is “which”, ou is “out” and st is “still”.', 'Inside a word they go back to being the letter group.']],
+  'Lower groupsigns': ['Lower groupsigns', [LOWER_NOTE + ' ea is a moved down, bb is b, cc is c, en is e, in is i.', 'Because they look alike, position matters. ea, bb, cc, ff and gg go only in the middle of a word, never first or last. en and in can go anywhere. be, con and dis only start a word, as its first syllable. The same cell can mean two things by position: one is both bb and be, another both cc and con.']],
+  'Lower wordsigns': ['Lower wordsigns', ['be, enough, were, his, in and was each use one lower cell when they stand alone as a word. ' + LOWER_NOTE, 'A word made only of lower cells is hard to place in the line, so these are only used when nothing touches them. Next to punctuation the word is written another way.']],
+  'Initial-letter contractions': ['Initial-letter contractions', ['A prefix from the right-hand column of the cell, then the first letter (or groupsign) of the word: the middle-right dot plus d is “day”, plus m is “mother”.', 'There are three prefixes, each with its own list: the middle-right dot alone, the top and middle-right dots, and the whole right column. They work as words and inside words: someone, daytime, mother’s.']],
+  'Final-letter groupsigns': ['Final-letter groupsigns', ['Common word endings: a prefix, then the last letter of the ending. ound, ance, sion, less and ount use the top-right and bottom-right dots as the prefix; ence, ong, ful, tion, ness, ment and ity use the middle-right and bottom-right dots.', 'They only ever follow letters, never start a word: pound, dance, nation, city.']],
+  'Shortforms': ['Shortforms', ['Shortforms are abbreviated spellings of common words: about is ab, could is cd, braille is brl. Each one is listed with its spelling.', 'They are mainly used as whole words, and some take endings (friends, braille’s). Inside longer words only some are allowed, so learn them as words first.']],
+  'auto': ['Auto', ['Auto teaches you braille a few signs at a time, in the order most courses use: letters, numbers and punctuation first, then Grade 2 contractions.', 'Each new sign is shown to you before it is asked. Signs you get right come back less and less often; a miss brings a sign back soon. A new one arrives once the last few are settling in.', 'Use the drop-down to stick to Grade 1 or Grade 2. Guess and Draw keep their own progress, and signs you already know from other practice start as known.']],
+};
+const setHelpKey = (cat, set) => cat === 'auto' ? 'auto' : cat === 'contractions' && /^k\d+$/.test(set) ? Object.keys(CONTRACTIONS)[Number(set.slice(1))] : `${cat}.${set}`;
+const helpTitle = (cat, set) => (SET_HELP[setHelpKey(cat, set)] || [MODES.read])[0];
+function practiceHelp(mode, cat, set) {
+  const info = SET_HELP[setHelpKey(cat, set)];
+  const pre = mode === 'write' ? 'w:' : 'r:';
+  const sets = CATS[cat] && CATS[cat].sets;
+  const list = sets && sets[set] ? sets[set][1](pre) : [];
+  const rows = list.map((x) => crowHTML(x.cells, x.answer, { kind: x.kind || '', note: x.label || x.note || '' })).join('');
+  const listH = cat === 'auto' ? (list.length ? `Signs so far <span class="count">${list.length} of ${autoList(set).length}</span>` : 'Signs so far') : `Signs in this set <span class="count">${list.length}</span>`;
+  return `<div class="help">
+    ${info ? info[1].map((t) => `<p>${esc(t)}</p>`).join('') : ''}
+    <details class="help-mode"><summary><span>How ${esc(MODES[mode])} works</span>${icon('chevron', 18)}</summary><div>${helpHTML(mode)}</div></details>
+    <h3 class="help-h">${listH}</h3>
+    ${rows ? `<div class="ctable help-list">${rows}</div>` : '<p class="muted">Your first sign is on its way.</p>'}
+  </div>`;
 }
 // Merge items that share the same cells (e.g. "bb" and "be") so a reading quiz is never ambiguous.
 function mergeByCells(items) {
@@ -532,22 +623,26 @@ views.practice = (q, sub) => {
 
 function quizMode(mode, q) {
   const saved = store.get('psel', { cat: 'letters', set: 'aj' });
-  const state = { cat: q.get('cat') || saved.cat, set: q.get('set') || saved.set, wgrade: store.get('pwgrade', 1), wlen: store.get('pwlen', 'medium'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
+  if (saved.cat === 'review') saved.cat = 'auto';
+  const state = { cat: (q.get('cat') === 'review' ? 'auto' : q.get('cat')) || saved.cat, set: q.get('set') || saved.set, wgrade: store.get('pwgrade', 1), wlen: store.get('pwlen', 'medium'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
   if (!CATS[state.cat]) state.cat = 'letters';
   if (!CATS[state.cat].sets[state.set]) state.set = Object.keys(CATS[state.cat].sets)[0];
   const m = mastery();
   const picker = $('#picker'), body = $('#modeBody');
+  if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? '<div id="wkb"></div>' : `<div class="below-stage">
       <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery"></div>
     </div>`}`;
   const stage = $('#stage');
-  const items = () => {
-    const it = CATS[state.cat].sets[state.set][1]();
-    return mode === 'read' ? mergeByCells(it) : it;
-  };
   const pre = mode === 'write' ? 'w:' : 'r:';
+  const auto = () => state.cat === 'auto';
+  // Auto never merges: its options already skip anything with the same cells as the answer.
+  const items = () => {
+    const it = CATS[state.cat].sets[state.set][1](pre);
+    return mode === 'read' && !auto() ? mergeByCells(it) : it;
+  };
   const score = (k) => m[pre + k] || 0;
   const bump = (k, d) => {
     m[pre + k] = Math.max(0, Math.min(5, score(k) + d)); store.set('mastery', m);
@@ -562,7 +657,6 @@ function quizMode(mode, q) {
       wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[state.wlen][1]));
     } else {
       picker.innerHTML = radios('cat', Object.entries(CATS).map(([k, c]) => [k, c.name]), state.cat) + '<div id="setDD"></div>';
-      if (state.cat === 'review') return;
       dropdown($('#setDD'), { options: Object.entries(CATS[state.cat].sets).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
     }
   }
@@ -579,7 +673,8 @@ function quizMode(mode, q) {
     if (mode === 'words') return;
     const it = items(), box = $('#mastery');
     box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
-    $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length; $('#kTotal').textContent = it.length;
+    // Auto lists only the signs met so far, but counts against the whole course.
+    $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
     fitMastery(); requestAnimationFrame(fitMastery);
   }
   function fitMastery() {
@@ -593,6 +688,7 @@ function quizMode(mode, q) {
   }
   if (mode !== 'words') $('#mMore').onclick = () => { mOpen = !mOpen; store.set('mOpen', mOpen); renderMastery(); };
   function nextItem() {
+    if (auto()) return autoPick(pre, state.set, state.last && state.last.key);
     const it = items();
     let pool = it.filter((x) => !state.last || x.key !== state.last.key);
     if (!pool.length) pool = it;
@@ -606,6 +702,7 @@ function quizMode(mode, q) {
       state.total++;
       if (ok) { state.right++; state.streak++; } else state.streak = 0;
       if (item.key) bump(item.key, ok ? 1 : -1);
+      if (item.key && auto()) autoResult(pre, item.key, ok);
     }
     state.firstTry = false;
     if (mode === 'words') return;
@@ -617,10 +714,27 @@ function quizMode(mode, q) {
     stage.classList.add(ok ? 'glow-good' : 'glow-bad');
   };
 
-  function renderRead() {
-    const item = nextItem(); state.last = item; state.firstTry = true;
+  // Auto: a new sign is shown with its answer before it is asked.
+  function renderIntro(item) {
+    state.last = item;
     stage.classList.remove('glow-good', 'glow-bad');
-    const opts = shuffle([item, ...shuffle(items().filter((x) => x.cells !== item.cells)).slice(0, 3)]);
+    stage.innerHTML = `<div class="intro">
+      <span class="intro-tag">New sign</span>
+      <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
+      <div class="intro-ans">${esc(item.answer)}</div>
+      ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
+      <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
+    const go = () => { autoMeet(pre, item.key); state.forced = item; next(); };
+    $('#gotIt').onclick = go;
+    state.key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  }
+
+  function renderRead() {
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
+    stage.classList.remove('glow-good', 'glow-bad');
+    let others = shuffle(items().filter((x) => x.cells !== item.cells));
+    if (auto() && others.length < 3) others = [...others, ...shuffle(autoList('all').filter((x) => x.src === item.src && x.cells !== item.cells && !others.some((o) => o.key === x.key)))];
+    const opts = shuffle([item, ...others.slice(0, 3)]);
     const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
       <div class="prompt-cells">${[...item.cells].map((c) => cellHTML(c)).join('')}</div>
@@ -635,14 +749,14 @@ function quizMode(mode, q) {
     stage.onclick = (e) => choose(e.target.closest('.choice'));
     state.key = (e) => {
       const btns = $$('.choice', stage);
-      if (/^[1-4]$/.test(e.key) && state.set !== 'num') return choose(btns[Number(e.key) - 1]);
+      if (/^[1-4]$/.test(e.key) && !opts.some((o) => /^[0-9]$/.test(o.answer))) return choose(btns[Number(e.key) - 1]);
       const o = opts.find((x) => x.answer === e.key.toLowerCase());
       if (o) choose(btns.find((b) => b.dataset.k === o.key));
     };
   }
 
   function renderWrite() {
-    const item = nextItem(); state.last = item; state.firstTry = true;
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
     stage.classList.remove('glow-good', 'glow-bad');
     const targets = [...item.cells];
     let done = false, shown = false;
@@ -710,6 +824,13 @@ function quizMode(mode, q) {
   // Type mode: one on-screen keyboard for the whole session; each word plugs in its own handlers.
   let wOnInput = () => {}, wOnEnter = () => {};
   const wpad = mode === 'words' ? letterPad({ mount: $('#wkb'), onInput: () => wOnInput(), onEnter: () => wOnEnter() }) : null;
+  // The next item to ask; in Auto a brand-new sign gets its intro card first.
+  function takeItem() {
+    if (state.forced) { const f = state.forced; state.forced = null; return f; }
+    const it = nextItem();
+    if (it && it.isNew) { renderIntro(it); return null; }
+    return it;
+  }
   let dead = false;
   function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
   const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; state.key && state.key(e); };
