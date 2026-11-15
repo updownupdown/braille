@@ -1819,6 +1819,6 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .subbar #langDD { margin-left: auto; }
 
 /* Guess: a sign inside a real word; the other cells of the word are faded */
-.prompt-cells .cell.dim { opacity: .4; }
+.prompt-cells .cell.dim { opacity: .15; }
 .stage .prompt-cells.in-word { flex-wrap: nowrap; }
 .stage .prompt-cells.in-word .cell { --s: clamp(9px, 2.9vw, 18px); }
