@@ -94,7 +94,7 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   else if (await page.$('#rsDrill')) {
     await page.click('#rsDrill'); await page.waitForTimeout(300);
     const t = await page.$eval('#pRound', (e) => e.textContent);
-    if (!/Round: 1 \/ ([2-9]|10) /.test(t)) failures.push(`Practice: drill round reads "${t}"`);
+    if (!/Round: 1 \/ ([2-9]|10)$/.test(t)) failures.push(`Practice: drill round reads "${t}"`);
   }
   if (errs.length) failures.push('Practice rounds: ' + errs.join(' | '));
   await page.close();

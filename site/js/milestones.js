@@ -1,5 +1,5 @@
 // Milestones: real points on the way to reading braille, noted once with the day they were first seen.
-// Home shows a quiet line for a milestone from the last three days; Stats lists them all and the next one up.
+// Stats lists every milestone reached and the next one up.
 // Saved as `miles` ({ id: 'YYYY-MM-DD' }). The first time this runs, anything already reached is stored as
 // 'earlier' so it doesn't show up on Home as new.
 import { store, mastery, level } from './core.js';
@@ -62,15 +62,6 @@ const ago = (d) => {
   const t = new Date(), y = new Date(); y.setDate(t.getDate() - 1);
   return d === dayKey(t) ? 'today' : d === dayKey(y) ? 'yesterday' : new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
-// Home: the newest milestone from the last three days, as one quiet line (empty when there isn't one).
-// On the same day, the one listed first wins: knowing signs comes before lessons, which come before counts.
-export function milestoneLine() {
-  const rec = checkMilestones(), since = new Date(); since.setDate(since.getDate() - 2);
-  const recent = MILESTONES.filter(([id]) => rec[id] && rec[id] !== 'earlier' && rec[id] >= dayKey(since)).sort((a, b) => (rec[b[0]] > rec[a[0]] ? 1 : rec[b[0]] < rec[a[0]] ? -1 : MILESTONES.indexOf(a) - MILESTONES.indexOf(b)));
-  if (!recent.length) return '';
-  const [id, text] = recent[0], more = recent.length - 1;
-  return `<a class="h-mile" href="#/practice/stats" data-stats><span class="h-mile-dot" aria-hidden="true"></span><span><b>${text}</b> · ${ago(rec[id])}${more ? ` · ${more} more` : ''}</span></a>`;
-}
 // Stats: every milestone reached, newest first, then the next two not yet reached with how far along they are.
 export function milestonesHTML() {
   const rec = checkMilestones(), c = context();

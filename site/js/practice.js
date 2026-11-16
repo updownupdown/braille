@@ -350,7 +350,7 @@ export function quizMode(mode, q) {
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
-      <div class="mastery-h"><span><span id="pRound"></span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
+      <div class="mastery-h"><span class="m-line"><span id="pRound"></span><span class="m-part">Known: <b id="known">0</b> of <b id="kTotal">0</b></span><span id="mLearn"></span></span><a class="st-link" href="#/practice/stats" data-stats>Stats</a><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery" role="list" aria-label="Signs in this set"></div>
       <p class="pl-link" id="plLink" hidden>Know braille already? <a href="#/practice/place">Take the placement check</a></p>
       <p class="kb-hint">${mode === 'read' ? 'Keys: press the answer, or <b>1</b>–<b>4</b> for the choices. <b>Enter</b> moves on after a new sign.' : 'Keys: <b>F D S</b> and <b>J K L</b> are dots 1 2 3 and 4 5 6.'}</p>
@@ -403,7 +403,7 @@ export function quizMode(mode, q) {
   function renderMastery() {
     if (mode === 'words') return;
     const it = items(), box = $('#mastery');
-    $('#pRound').innerHTML = `Round: <b>${Math.min(round.n + 1, rlen())}</b> / ${rlen()} <span class="m-sep">·</span> `;
+    $('#pRound').innerHTML = `<span class="m-part">Round: <b>${Math.min(round.n + 1, rlen())}</b> / ${rlen()}</span>`;
     const LV = ['new', 'learning', 'learning', 'learning', 'known'];
     box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}" role="listitem">${esc(x.answer)}<span class="visually-hidden">, ${LV[level(score(x.key))]}</span></span>`).join('');
     // Auto lists only the signs met so far, but counts against the whole course.
@@ -412,10 +412,14 @@ export function quizMode(mode, q) {
     const learning = it.filter((x) => { const l = level(score(x.key)); return l > 0 && l < 4; }).length;
     // Early in Auto, offer the placement check so people who know some braille can skip ahead.
     const pl = $('#plLink'); if (pl) pl.hidden = !(auto() && it.length < 12);
-    $('#mLearn').innerHTML = learning ? ` <span class="m-sep">·</span> Learning: <b>${learning}</b>` : ''; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
+    $('#mLearn').innerHTML = learning ? `<span class="m-part">Learning: <b>${learning}</b></span>` : ''; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
     fitMastery(); requestAnimationFrame(fitMastery);
   }
   function fitMastery() {
+    // Each part ends with a separator dot, hidden (but still taking its space, so nothing reflows) at the end of a line.
+    const parts = $$('.mastery-h .m-part');
+    parts.forEach((p, i) => p.classList.toggle('last', i === parts.length - 1));
+    parts.forEach((p, i) => { p.classList.toggle('end', i < parts.length - 1 && parts[i + 1].offsetTop > p.offsetTop + 2); });
     const box = $('#mastery'), more = $('#mMore'); if (!box || !more) return;
     box.classList.remove('clamp');
     const first = box.firstElementChild;
@@ -567,6 +571,7 @@ export function quizMode(mode, q) {
       <div class="target" tabindex="-1" aria-label="Draw ${esc(item.answer)}${item.label ? ', ' + esc(item.label) : ''}${targets.length > 1 ? `, ${targets.length} cells` : ''}">${esc(item.answer)}</div>
       <div class="pads" style="--n:${targets.length}">${targets.map((_, ci) => `<div class="dotpad" data-c="${ci}">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-pressed="false" aria-label="${targets.length > 1 ? `Cell ${ci + 1}, ` : ''}dot ${d}">${d}</button>`).join('')}</div>`).join('')}</div>
       <button class="link-btn corner" id="skip">Show me</button>`;
+    fitTarget($('.target', stage), $('#skip', stage));
     const pads = $$('.dotpad', stage);
     const paint = (ci) => { [1, 2, 3, 4, 5, 6].forEach((d) => { const b = $(`[data-d="${d}"]`, pads[ci]); b.classList.toggle('on', on[ci].has(d)); b.setAttribute('aria-pressed', String(on[ci].has(d))); }); pads[ci].classList.toggle('ok', ok[ci]); };
     refocus(stage, $('.target', stage));
@@ -628,7 +633,13 @@ export function quizMode(mode, q) {
       if (wpad.value === target) { done = true; result(true, {}); glow(true); paint('', true); setTimeout(next, 900); }
       else paint(wpad.value);
     };
-    wOnInput = () => { if (!hinting) check(); };
+    // A wrong letter doesn't move on: it stays red in its slot and the next key typed replaces it.
+    wOnInput = () => {
+      if (hinting) return;
+      const v = wpad.value; let k = 0; while (k < v.length && v[k] === target[k]) k++;
+      if (v.length > k + 1) wpad.value = v.slice(0, k) + v.slice(-1);
+      check();
+    };
     wOnEnter = () => { if (!done && wpad.value) { result(false, {}); glow(false); } };
     wpad.value = ''; check();
     $('#hint').onclick = () => {
@@ -638,6 +649,19 @@ export function quizMode(mode, q) {
     };
     $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paint('', true); announce(`The word was ${word}`); setTimeout(next, 1300); };
     state.key = null;
+  }
+  // Draw's prompt: as big as it fits on one line beside the Show me button. A long name ("grade 1 symbol") on a
+  // narrow or zoomed-in screen shrinks; if it would get too small, it moves below the button and uses the full width.
+  function fitTarget(el, corner) {
+    if (!el) return;
+    el.classList.remove('below'); el.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(el).fontSize), full = el.parentElement.clientWidth - 36;
+    const side = corner ? corner.offsetWidth + 10 : 0, beside = full - 2 * side;
+    el.style.whiteSpace = 'nowrap'; const w = el.scrollWidth; el.style.whiteSpace = '';
+    if (w <= beside) return;
+    let f = base * beside / w;
+    if (f < base * 0.62) { el.classList.add('below'); f = Math.max(base * 0.5, Math.min(base, base * full / w)); }
+    el.style.fontSize = `${Math.floor(f)}px`;
   }
   // Type mode slots: each cell that takes letters gets a slot; the first unfilled (or wrong) one is the current one.
   function markSlots(lbls, cells, solved) {
@@ -731,9 +755,12 @@ export function quizMode(mode, q) {
   };
   document.addEventListener('keydown', onKey);
   window.addEventListener('settings', onSet);
-  window.addEventListener('resize', fitMastery);
+  // Fonts arriving or the screen turning can change how much fits.
+  const onResize = () => { fitMastery(); fitTarget($('.target', stage), $('#skip', stage)); };
+  window.addEventListener('resize', onResize);
+  document.fonts?.ready.then(() => { if (!dead) onResize(); });
   renderPicker(); renderMastery(); wScore(); next();
-  return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); window.removeEventListener('settings', onSet); window.removeEventListener('resize', fitMastery); };
+  return () => { dead = true; if (wpad) wpad.off(); document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); window.removeEventListener('settings', onSet); window.removeEventListener('resize', onResize); };
 }
 // ---------- sweep ----------
 export function sweepMode(q) {
