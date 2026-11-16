@@ -89,7 +89,10 @@ views.translate = (q) => {
   bindRadios($('.tr-dir'), (k, v) => { dir = v; store.set('trDir', v); showDir(); });
   $('#trClear').onclick = () => { if (dotsClear) dotsClear(); };
   const inp = $('#trIn');
+  // The box grows with the text (field-sizing in CSS; measured here where that isn't supported).
+  const fit = CSS.supports('field-sizing', 'content') ? () => {} : () => { inp.style.height = 'auto'; inp.style.height = inp.scrollHeight + 2 + 'px'; };
   const render = () => {
+    fit();
     const [lang, grade] = mode.startsWith('en') ? ['en', Number(mode[2])] : [mode, 1];
     const parts = translate(inp.value, lang, grade);
     // "As a sign" shows the text the way a door or wall sign would carry it (pictogram, raised print, braille below).

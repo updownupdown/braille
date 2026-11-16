@@ -266,7 +266,8 @@ export const headTitle = $('#headTitle');
 export const helpBtn = $('#helpBtn');
 export const subbar = $('#subbar');
 export const PAGE_ICON = { home: 'home', practice: 'practice', reference: 'book', games: 'games', translate: 'translate' };
-export const setTitle = (t) => { headTitle.innerHTML = `<span class="ht-ic">${icon(PAGE_ICON[document.body.dataset.page] || 'home', 22)}</span><span class="ht-t">${esc(titleCase(t))}</span>`; };
+// A game passes its key and icon so the bar shows the game's own coloured icon, as on its Games tile.
+export const setTitle = (t, game) => { headTitle.innerHTML = `${game ? `<span class="ht-ic ht-game hrow-ic gc-${game[0]}">${icon(game[1], 18)}</span>` : `<span class="ht-ic">${icon(PAGE_ICON[document.body.dataset.page] || 'home', 22)}</span>`}<span class="ht-t">${esc(titleCase(t))}</span>`; };
 export const setSub = (html) => { subbar.innerHTML = html; subbar.hidden = !html; syncHeadH(); };
 export function syncHeadH() { requestAnimationFrame(() => document.documentElement.style.setProperty('--head-h', $('.top').offsetHeight + 'px')); }
 // ---------- settings modal ----------

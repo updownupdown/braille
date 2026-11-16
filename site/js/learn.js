@@ -453,7 +453,9 @@ export function bindQuiz(key) {
 export function learnIndex() {
   setTitle('Learn'); setSub('');
   const done = lessonsDone();
-  const row = (k, t, n) => `<a class="hrow g-tile ${done.includes(k) ? 'li-done' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(done.includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${n ? `${n}. ` : ''}${titleCase(t)}</b><span>${done.includes(k) ? 'Done · ' : ''}${SEC_DESC[k]}</span></div>${icon('right', 18)}</a>`;
+  // The first lesson not yet done is outlined, once at least one is done (Home already says where to start).
+  const next = done.length ? REF_SECTIONS.find(([k]) => isLesson(k) && !done.includes(k))?.[0] : null;
+  const row = (k, t, n) => `<a class="hrow g-tile ${done.includes(k) ? 'li-done' : ''}${k === next ? ' li-next' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(done.includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${n ? `${n}. ` : ''}${titleCase(t)}</b><span>${done.includes(k) ? 'Done · ' : ''}${SEC_DESC[k]}</span></div>${icon('right', 18)}</a>`;
   const les = REF_SECTIONS.filter(([k]) => isLesson(k)), ref = REF_SECTIONS.filter(([k]) => !isLesson(k));
   view.innerHTML = `<h2 class="sec-h li-h">Lessons</h2>
     <p class="lead-p li-p">${les.length} short lessons, from the six-dot cell to every contraction. Each one ends with a quick check.</p>

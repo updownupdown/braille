@@ -17,13 +17,12 @@ views.games = (q, sub) => {
   const g = GAMES[sub];
   if (!g) {
     setTitle('Games'); setSub('');
-    // Same card as the Learn index: icon, name and line, then a chevron.
-    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><span class="hrow-ic gc-${k}">${icon(x.icon, 24)}</span><div class="hrow-text"><b>${titleCase(x.name)}</b><span>${x.desc}</span></div>${icon('right', 20)}</a>`; };
-    view.innerHTML = `<p class="lead-p g-intro">Play with braille. Each game has its own difficulty levels, and your best scores are saved on this device.</p>
-      ${GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${titleCase(t)}</h2><div class="hrows g-tiles">${ks.map(row).join('')}</div>`).join('')}`;
+    // Two-column grid of tiles: icon, name, then a two-line description.
+    const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><span class="hrow-ic gc-${k}">${icon(x.icon, 22)}</span><div class="hrow-text"><b>${titleCase(x.name)}</b><span>${x.desc}</span></div></a>`; };
+    view.innerHTML = GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${titleCase(t)}</h2><div class="hrows g-tiles g-grid">${ks.map(row).join('')}</div>`).join('');
     return;
   }
-  setTitle(g.name);
+  setTitle(g.name, [sub, g.icon]);
   gameStore.set('last', sub);
   { const pl = gameStore.get('played', []); if (!pl.includes(sub)) gameStore.set('played', [...pl, sub]); }
   helpBtn.hidden = false;

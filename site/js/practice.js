@@ -9,7 +9,7 @@ import { chord } from './sixkey.js';
 import { PASSAGES } from './passages.js';
 import { G2_EXAMPLES } from './g2examples.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
-import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
+import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, markMulti, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
 import { feedback, cellsLabel, say, refocus, nativeKey } from './a11y.js';
 import { spotItems } from './rules.js';
@@ -289,6 +289,7 @@ views.practice = (q, sub) => {
   view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
   return mode === 'sweep' ? sweepMode(q) : mode === 'compose' ? composeMode(q) : quizMode(mode, q);
 };
+export const ROUND_LEN = 20;
 export function quizMode(mode, q) {
   const saved = store.get('psel', { cat: 'auto', set: 'g1' });
   if (saved.cat === 'review') saved.cat = 'auto';
@@ -298,13 +299,18 @@ export function quizMode(mode, q) {
   const setsFor = (cat) => Object.entries(CATS[cat].sets).filter(([, x]) => !x[3] || x[3] === mode);
   if (!CATS[state.cat].sets[state.set] || !setsFor(state.cat).some(([k]) => k === state.set)) state.set = setsFor(state.cat)[0][0];
   const m = mastery();
+  // Practice runs in rounds of ROUND_LEN scored questions, then shows a summary (see renderSummary).
+  const newRound = () => ({ n: 0, right: 0, best: 0, run: 0, met: 0, start: Date.now(), log: [] });
+  let round = newRound(), queue = [];
+  const rlen = () => round.len || ROUND_LEN;
   const picker = $('#picker'), body = $('#modeBody');
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
-      <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
+      <div class="mastery-h"><span><span id="pRound"></span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery" role="list" aria-label="Signs in this set"></div>
       <p class="pl-link" id="plLink" hidden>Know some braille already? <a href="#/practice/place">Take the placement check</a></p>
+      <p class="kb-hint">${mode === 'read' ? 'Keys: press the answer, or <b>1</b>–<b>4</b> for the choices. <b>Enter</b> moves on after a new sign.' : 'Keys: <b>F D S</b> and <b>J K L</b> are dots 1 2 3 and 4 5 6.'}</p>
     </div>`}`;
   const stage = $('#stage');
   const pre = mode === 'write' ? 'w:' : 'r:';
@@ -333,16 +339,17 @@ export function quizMode(mode, q) {
   }
   const saveSel = () => store.set('psel', { cat: state.cat, set: state.set });
   bindRadios(picker, (k, v) => {
-    if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); wScore(); next(); return; }
-    if (k === 'wlen') { state.wlen = v; store.set('pwlen', v); wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[v][1])); next(); return; }
+    if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); round = newRound(); queue = []; wScore(); next(); return; }
+    if (k === 'wlen') { state.wlen = v; store.set('pwlen', v); wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[v][1])); round = newRound(); queue = []; wScore(); next(); return; }
     state.cat = v; state.set = setsFor(v)[0][0]; saveSel(); renderPicker(); restart();
   });
-  function restart() { state.last = null; renderMastery(); next(); }
+  function restart() { state.last = null; round = newRound(); queue = []; renderMastery(); next(); }
   // Pills for every symbol in the set, collapsed to four rows with a fade; the chevron only shows when there is more.
   let mOpen = store.get('mOpen', false);
   function renderMastery() {
     if (mode === 'words') return;
     const it = items(), box = $('#mastery');
+    $('#pRound').innerHTML = `Round: <b>${Math.min(round.n + 1, rlen())}</b> / ${rlen()} <span class="m-sep">·</span> `;
     const LV = ['new', 'learning', 'learning', 'learning', 'known'];
     box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}" role="listitem">${esc(x.answer)}<span class="visually-hidden">, ${LV[level(score(x.key))]}</span></span>`).join('');
     // Auto lists only the signs met so far, but counts against the whole course.
@@ -381,6 +388,9 @@ export function quizMode(mode, q) {
       if (ok) { state.right++; state.streak++; } else state.streak = 0;
       if (item.key) bump(item.key, ok ? 1 : -1);
       if (item.key && auto()) autoResult(pre, item.key, ok);
+      round.n++; round.run = ok ? round.run + 1 : 0; round.best = Math.max(round.best, round.run);
+      if (ok) round.right++;
+      round.log.push({ item: mode === 'words' ? state.last : item, ok, ms: Date.now() - state.shownAt, wrong: ok ? null : state.wrongAns });
     }
     state.firstTry = false;
     if (mode === 'words') { wScore(); return; }
@@ -406,7 +416,7 @@ export function quizMode(mode, q) {
       ${wc ? `<p class="intro-note">as in “${esc(wc.word)}”</p>` : ''}
       ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
       <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
-    const go = () => { autoMeet(pre, item.key); state.forced = item; state.wc = wc ? [item.key, wc] : null; next(); };
+    const go = () => { autoMeet(pre, item.key); round.met++; state.forced = item; state.wc = wc ? [item.key, wc] : null; next(); };
     $('#gotIt').onclick = go;
     refocus(stage, $('#gotIt'));
     say(`New sign: ${item.answer}. ${promptLabel(item, wc)}`);
@@ -414,7 +424,7 @@ export function quizMode(mode, q) {
   }
 
   function renderRead() {
-    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true; state.shownAt = Date.now(); state.wrongAns = null;
     if (item.spot) return renderSpot(item);
     stage.classList.remove('glow-good', 'glow-bad');
     let pool = items().filter((x) => x.key !== item.key);
@@ -433,6 +443,7 @@ export function quizMode(mode, q) {
     const choose = (btn) => {
       if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong') || $('.choice.right', stage)) return;
       const ok = btn.dataset.k === item.key;
+      state.wrongAns = ok ? null : (opts.find((o) => o.key === btn.dataset.k) || {}).answer;
       result(ok, item); glow(ok);
       btn.classList.add(ok ? 'right' : 'wrong');
       if (ok) setTimeout(next, 650);
@@ -491,7 +502,7 @@ export function quizMode(mode, q) {
   }
 
   function renderWrite() {
-    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true; state.shownAt = Date.now(); state.wrongAns = null;
     stage.classList.remove('glow-good', 'glow-bad');
     const targets = [...item.cells];
     let done = false, shown = false;
@@ -533,8 +544,8 @@ export function quizMode(mode, q) {
   }
 
   function renderWords() {
-    const word = wordDeck();
-    state.last = word; state.firstTry = true;
+    const word = queue.length ? queue.shift() : wordDeck();
+    state.last = word; state.firstTry = true; state.shownAt = Date.now(); state.wrongAns = null;
     stage.classList.remove('glow-good', 'glow-bad');
     const cells = toCells(translate(word, 'en', state.wgrade));
     let done = false, hinting = false;
@@ -567,7 +578,7 @@ export function quizMode(mode, q) {
   function wScore() {
     const el = $('#wScore'); if (!el) return;
     const bk = 'pwbest' + state.wgrade, b = Math.max(store.get(bk, 0), state.streak); store.set(bk, b);
-    el.innerHTML = `<span>Right: <b>${state.right}</b> of ${state.total}</span><span>Streak: <b>${state.streak}</b></span><span>Best: <b>${b}</b></span>`;
+    el.innerHTML = `<span>Round: <b>${Math.min(round.n + 1, rlen())}</b> / ${rlen()}</span><span>Right: <b>${state.right}</b> of ${state.total}</span><span>Streak: <b>${state.streak}</b></span><span>Best: <b>${b}</b></span>`;
   }
   // Type mode: one on-screen keyboard for the whole session; each word plugs in its own handlers.
   let wOnInput = () => {}, wOnEnter = () => {};
@@ -575,12 +586,60 @@ export function quizMode(mode, q) {
   // The next item to ask; in Auto a brand-new sign gets its intro card first.
   function takeItem() {
     if (state.forced) { const f = state.forced; state.forced = null; return f; }
+    if (queue.length) return queue.shift();
     const it = nextItem();
     if (it && it.isNew) { renderIntro(it); return null; }
     return it;
   }
   let dead = false;
-  function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
+  function next() {
+    if (dead) return;
+    if (round.n >= rlen()) return renderSummary();
+    ({ read: renderRead, write: renderWrite, words: renderWords })[mode]();
+  }
+  // End of a round: score, a few facts, then the signs worth another look (misses first, then the slowest).
+  function renderSummary() {
+    stage.classList.remove('glow-good', 'glow-bad');
+    const secs = Math.round((Date.now() - round.start) / 1000);
+    const cellsOf = (x) => (mode === 'words' ? toCells(translate(x, 'en', state.wgrade)).map((c) => c.cell).join('') : x.cells);
+    const keyOf = (x) => (mode === 'words' ? x : x.key);
+    const seen = new Map();
+    for (const r of round.log) {
+      const k = keyOf(r.item), s = seen.get(k) || { item: r.item, miss: 0, wrong: new Map(), ms: 0 };
+      if (!r.ok) { s.miss++; if (r.wrong) s.wrong.set(r.wrong, (s.wrong.get(r.wrong) || 0) + 1); }
+      s.ms = Math.max(s.ms, r.ms); seen.set(k, s);
+    }
+    const missed = [...seen.values()].filter((s) => s.miss).sort((a, b) => b.miss - a.miss);
+    const slow = [...seen.values()].filter((s) => !s.miss && s.ms >= 5000).sort((a, b) => b.ms - a.ms);
+    const look = [...missed, ...slow].slice(0, 5);
+    const note = (s) => {
+      if (!s.miss) return `Slow: ${Math.round(s.ms / 1000)} s`;
+      const w = [...s.wrong.entries()].sort((a, b) => b[1] - a[1])[0];
+      const times = s.miss > 1 ? (s.miss === 2 ? ', twice' : `, ${s.miss} times`) : '';
+      return w ? `Mixed up with ${w[0]}${times}` : `Missed${times}`;
+    };
+    const label = (x) => (mode === 'words' ? x : x.answer);
+    const facts = [auto() && !round.len ? [round.met, 'new signs'] : [round.best, 'best run'], [`${Math.round(round.right / Math.max(1, round.n) * 100)}%`, 'first try'], [`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, 'time']];
+    stage.innerHTML = `<div class="rsum">
+      <h3>${round.len ? 'Practice Done' : 'Round Done'}</h3>
+      <div class="rs-big">${round.right}<small> / ${round.n}</small></div>
+      <div class="rs-facts">${facts.map(([v, k]) => `<div><b>${v}</b>${k}</div>`).join('')}</div>
+      ${look.length ? `<div class="rs-k">Worth another look</div><div class="ctable narrow rs-rows">${look.map((s) => crowHTML(cellsOf(s.item), label(s.item), { note: note(s) })).join('')}</div>` : '<p class="rs-k rs-clean">Nothing missed this round.</p>'}
+      <div class="rs-acts">${look.length ? `<button class="btn" id="rsDrill" type="button">Practise ${look.length === 1 ? 'This One' : `These ${look.length}`}</button>` : ''}<button class="btn primary" id="rsNext" type="button">Next Round</button></div></div>`;
+    const go = (items) => {
+      round = newRound(); state.last = null;
+      // A drill asks each sign twice, spread out; it is a short round of its own.
+      if (items) { queue = shuffle([...items, ...items]); round.len = queue.length; } else queue = [];
+      if (mode === 'words') wScore(); else renderMastery();
+      next();
+    };
+    markMulti(stage);
+    $('#rsNext').onclick = () => go();
+    if ($('#rsDrill')) $('#rsDrill').onclick = () => go(look.map((s) => s.item));
+    state.key = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
+    if (mode === 'words') { wOnInput = () => {}; wOnEnter = () => go(); }
+    if (mode === 'words') wScore(); else renderMastery();
+  }
   // Six-key input in Guess: a chord spelling one of the answers picks it (Draw already uses F D S J K L for its dots).
   const six = mode === 'read' ? chord((ds, cell, letter) => { if (letter && state.key) state.key({ key: letter, preventDefault() {} }); }) : null;
   const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden || nativeKey(e)) return; if (six && six.down(e)) return; state.key && state.key(e); };
