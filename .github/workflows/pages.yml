@@ -29,6 +29,8 @@ jobs:
         run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
       - name: Every route loads without errors
         run: node tests/smoke.mjs
+      - name: Search overlay
+        run: node tests/search.mjs
 
   deploy:
     needs: test
