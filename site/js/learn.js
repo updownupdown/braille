@@ -4,7 +4,7 @@ import { SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY
 
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
-import { feedback, cellsLabel, say, refocus } from './a11y.js';
+import { feedback, haptic, cellsLabel, say, refocus } from './a11y.js';
 import { MISTAKES, mistake } from './rules.js';
 
 import { $, $$, titleCase, DICT, P, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, exBlock, groupBlock, groupsHTML, icon, letterDetail, lineHTML, markMulti, openSheet, pick, practiseLink, radios, setSub, setTitle, shuffle, store, view, views } from './core.js';
@@ -423,6 +423,7 @@ export function bindQuiz(key) {
   }
   function finish() {
     const pass = right >= QUIZ_PASS;
+    haptic('done');
     if (pass) { const d = store.get('learnDone', []); if (!d.includes(key)) store.set('learnDone', [...d, key]); }
     const i = REF_SECTIONS.findIndex(([k]) => k === key), nx = REF_SECTIONS[i + 1];
     box.classList.remove('glow-good', 'glow-bad');

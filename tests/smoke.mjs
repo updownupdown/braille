@@ -158,6 +158,30 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   if (bad.length) failures.push('Auto days:\n  ' + bad.join('\n  '));
   await page.close();
 }
+// Haptics: off by default; turning it on gives one tick; in Draw a raised dot ticks and a wrong dot gives the
+// two-tap pattern. Laptops (no touch) don't offer the setting.
+for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true }], ['laptop', { viewport: { width: 1280, height: 800 } }]]) {
+  const ctx = await browser.newContext(opts);
+  await ctx.addInitScript(() => { window.__vib = []; navigator.vibrate = (p) => { window.__vib.push(JSON.stringify(p)); return true; }; });
+  const page = await ctx.newPage();
+  const vib = () => page.evaluate(() => window.__vib.splice(0));
+  const draw = async () => { await page.goto(base + '#/practice/write?cat=letters&set=aj'); await page.waitForTimeout(400); };
+  await draw();
+  await page.click('.dotpad [data-d="1"]');
+  if ((await vib()).length) failures.push(`Haptics ${tag}: vibrated while the setting is off`);
+  await page.click('#settingsBtn'); await page.waitForTimeout(200);
+  const row = await page.$('[data-seg="haptics"]');
+  if (tag === 'laptop') { if (row) failures.push('Haptics: the setting shows on a laptop'); await ctx.close(); continue; }
+  if (!row) { failures.push('Haptics: no setting on a phone'); await ctx.close(); continue; }
+  await page.click('[data-seg="haptics"] [data-v="1"]');
+  const pre = await vib();
+  if (pre.join() !== '[14]') failures.push(`Haptics: turning it on gave ${JSON.stringify(pre)}`);
+  await page.keyboard.press('Escape'); await page.reload(); await page.waitForTimeout(400);
+  await page.click('.dotpad [data-d="3"]'); // no letter a–j uses dot 3
+  const got = await vib();
+  if (got.join(' ') !== '[8] [10,70,10]') failures.push(`Haptics: a wrong dot in Draw gave ${JSON.stringify(got)}`);
+  await ctx.close();
+}
 // Offline: every file the app loads must be in the service worker's SHELL, or that page breaks offline
 // until it has been visited online once.
 {

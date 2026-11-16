@@ -5,7 +5,7 @@ import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
-import { announce, feedback, cellsLabel, say, reducedMotion, nativeKey } from './a11y.js';
+import { announce, feedback, haptic, cellsLabel, say, reducedMotion, nativeKey } from './a11y.js';
 // Game content (trivia, riddles, word lists, Secret Agent cases) is about 110 KB, so it loads the first time a game
 // opens instead of with the app. loadGameData() is safe to call again; gameDataReady() says whether it's in.
 let TRIVIA, RIDDLES, RIDDLE_CLASH, WORDLE, ANAGRAM_WORDS, SNOWMAN_WORDS, CASES, dataP = null;
@@ -215,7 +215,7 @@ function chunt(el, level) {
       setTimeout(() => {
         $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`; $('#left', el).textContent = '';
         box.innerHTML = '<button class="btn primary" id="again">Play again</button>';
-        announce(`Game over. ${sc} words.`);
+        haptic('done'); announce(`Game over. ${sc} words.`);
         $('#again', el).onclick = () => { sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
       }, 1600);
     }
@@ -273,7 +273,7 @@ function signhunt(el, level) {
       busy = true; lock(); $$('.hunt-line', el).forEach((x) => { if (x.dataset.t === target) x.classList.add('right'); });
       setTimeout(() => {
         $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`;
-        $('#plate', el).innerHTML = '<button class="btn primary" id="again">Play again</button>';
+        haptic('done'); $('#plate', el).innerHTML = '<button class="btn primary" id="again">Play again</button>';
         $('#again', el).onclick = () => { sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
       }, 1200);
     }
@@ -366,7 +366,7 @@ function memory(el, level) {
     if (a.dataset.l === b.dataset.l) {
       a.classList.add('done'); b.classList.add('done'); open = []; matched++; $('#pairs', el).textContent = matched;
       label(a, x0(a) + ', matched'); label(b, x0(b) + ', matched'); announce(`Pair ${matched} of ${n}`);
-      if (matched === n) { const bb = bestLow('mem.' + level, moves); $('#best', el).textContent = bb; $('#msg', el).textContent = `All ${n} pairs in ${moves} moves.`; }
+      if (matched === n) { haptic('done'); const bb = bestLow('mem.' + level, moves); $('#best', el).textContent = bb; $('#msg', el).textContent = `All ${n} pairs in ${moves} moves.`; }
     } else {
       lock = true;
       announce('No match');
@@ -410,7 +410,7 @@ function quiz(el, level, { next, choices = 4, onAnswer = null }) {
     n++;
     if (n < 10) { card.classList.remove('revealed'); show(); return; }
     const b = best('quiz.' + (el.dataset.k || '') + level, sc);
-    card.classList.remove('revealed', 'glow-good', 'glow-bad');
+    card.classList.remove('revealed', 'glow-good', 'glow-bad'); haptic('done');
     card.innerHTML = `<div class="g-end"><b>${sc} / 10</b><span>Best ${b}</span><button class="btn primary" id="again">Play again</button></div>`;
     $('#nextBtn', el).hidden = true;
     $('#again', el).onclick = () => { n = 0; sc = 0; q$('#sc').textContent = 0; show(); };
@@ -507,7 +507,7 @@ function rain(el, level) {
     running = false; cancelAnimationFrame(raf);
     items.forEach((i) => i.d.remove()); items = [];
     const b = best('rain.' + level, sc); $('#best', el).textContent = b;
-    const ov = $('#ov', el); ov.hidden = false;
+    const ov = $('#ov', el); ov.hidden = false; haptic('done');
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
@@ -551,7 +551,7 @@ function timeAttack(el, level) {
   function over() {
     running = false; cancelAnimationFrame(raf); $('#cells', el).innerHTML = ''; $('#skip', el).hidden = true;
     const b = best('time.' + level, sc); $('#best', el).textContent = b;
-    const ov = $('#ov', el); ov.hidden = false;
+    const ov = $('#ov', el); ov.hidden = false; haptic('done');
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
@@ -839,7 +839,7 @@ function mirror(el, level) {
   function over() {
     running = false; cancelAnimationFrame(raf); $('#cells', el).innerHTML = ''; $('#opts', el).innerHTML = '';
     const b = best('mirror.' + level, sc); $('#best', el).textContent = b;
-    const ov = $('#ov', el); ov.hidden = false;
+    const ov = $('#ov', el); ov.hidden = false; haptic('done');
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
