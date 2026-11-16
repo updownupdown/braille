@@ -26,7 +26,7 @@ export const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i-
 export const pick = (a) => a[Math.floor(Math.random() * a.length)];
 // Screen-reader announcements, optional speech and sounds, cells described as dots: see a11y.js.
 export { announce, feedback, cellsLabel, cellLabel, reducedMotion, speak } from './a11y.js';
-import { speak, stopSpeech, tone, speechAvailable } from './a11y.js';
+import { speak, stopSpeech, tone, speechAvailable, haptic, hapticsAvailable } from './a11y.js';
 // ---------- icons ----------
 export const P = {
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
@@ -85,10 +85,10 @@ export const P = {
 };
 export const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 // ---------- settings ----------
-// speech and sounds are accessibility aids, off unless turned on in Settings.
+// speech, sounds and haptics are accessibility aids, off unless turned on in Settings.
 // swSize: braille size, 'large' or 'real' (true size, in Guess, Type, Read and Translate). mmPx: screen pixels in a real
 // millimetre, set by holding a coin to the screen in Settings (0 = not set yet: a guess from the kind of device).
-export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', mmPx: 0, speech: false, sounds: false };
+export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', mmPx: 0, speech: false, sounds: false, haptics: false };
 // A phone's CSS pixel is smaller than the nominal 1/96 inch, so CSS millimetres come out about 40% too small there.
 export const mmGuess = () => (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600 ? 6.3 : 96 / 25.4);
 export const LOONIE_MM = 26.5; // the Canadian dollar coin's diameter
@@ -133,7 +133,7 @@ export function lineHTML(parts, { labels = true, cls = '' } = {}) {
 // Colour-coding kind for a translated cell (the number sign belongs with its digits).
 export function kindOf(c) {
   if (c.kind === 'indicator' && /number/.test(c.note || '')) return 'digit';
-  return ['letter', 'digit', 'punct', 'contraction', 'indicator'].includes(c.kind) ? c.kind : '';
+  return ['letter', 'digit', 'punct', 'contraction', 'indicator', 'math'].includes(c.kind) ? c.kind : '';
 }
 export const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, cls, { kind })).join('');
 // Compact row: cells · label · dot numbers · note (a button when it opens a detail sheet).
@@ -205,7 +205,7 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
   const cur = options.find((o) => o.value === value);
   let lastGroup = null;
   el.classList.add('dd');
-  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox" aria-expanded="false"${label && plain ? '' : ` aria-label="${esc([aria || label, cur ? cur.label : ''].filter(Boolean).join(': '))}"`}>${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
+  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox" aria-expanded="false"${label && (plain || !cur) ? '' : ` aria-label="${esc([aria || label, cur ? cur.label : ''].filter(Boolean).join(': '))}"`}>${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain || (label && !cur) ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
     <div class="dd-menu" role="listbox">${options.map((o) => {
       const g = o.group && o.group !== lastGroup ? `<div class="dd-group">${esc(o.group)}</div>` : '';
       lastGroup = o.group || lastGroup;
@@ -248,7 +248,7 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
 }
 // Segmented radio group. Screen readers hear the group's name (RADIO_LABEL) and which option is on;
 // only the chosen button is a Tab stop and the arrow keys move between options (the usual radio pattern).
-export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', pkg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', wsrc: 'What to write', cgrade: 'Grade' };
+export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', pkg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', haptics: 'Haptics', wsrc: 'What to write', cgrade: 'Grade' };
 export const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}"${RADIO_LABEL[name] ? ` aria-label="${RADIO_LABEL[name]}"` : ''}>${opts.map(([v, l]) => { const on = String(v) === String(value); return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-v="${v}" class="${on ? 'on' : ''}">${l}</button>`; }).join('')}</div>`;
 export function bindRadios(root, fn) {
   root.addEventListener('click', (e) => {
@@ -279,12 +279,21 @@ export const setTitle = (t, game) => { headTitle.innerHTML = `${game ? `<span cl
 export const setSub = (html) => { subbar.innerHTML = html; subbar.hidden = !html; syncHeadH(); };
 export function syncHeadH() { requestAnimationFrame(() => document.documentElement.style.setProperty('--head-h', $('.top').offsetHeight + 'px')); }
 // ---------- settings modal ----------
-export const COLOR_KEY = [['letter', 'Letters (Grade 1)'], ['digit', 'Numbers'], ['contraction', 'Contractions (Grade 2)'], ['punct', 'Punctuation'], ['indicator', 'Indicators'], ['math', 'Maths signs']];
+// Settings preview: one short line that shows every dot colour (capital, Grade 2 sign, number, letters, maths, punctuation).
+// It follows the live settings, so theme, unraised dots and colours change in place as you tap.
+// Compact: one label per word, so it fits on one line on most phones and two on the smallest.
+const settingsPreview = () => {
+  const words = [[]];
+  translate('The 2 cats + 1!', 'en', 2).forEach((p) => { if (p.kind === 'space') words.push([]); else words.at(-1).push(p.print === '+' ? { ...p, kind: 'math' } : p); });
+  const word = (ps) => `<span class="sp-w"><span class="sp-c">${ps.map((p) => [...p.cells].map((c) => cellHTML(c, '', { kind: kindOf(p) })).join('')).join('')}</span><span class="sp-l">${esc(ps.map((p) => (p.kind === 'indicator' ? '' : p.print)).join(''))}</span></span>`;
+  return `<div class="set-prev" aria-hidden="true"><small>Preview</small><div class="sp-line">${words.map(word).join('')}</div></div>`;
+};
 export function openSettings() {
   const pv = (mode) => `<span class="cell pv-${mode}" aria-hidden="true">${[1, 2, 3, 4, 5, 6].map((d) => `<i class="${[1, 4, 5].includes(d) ? 'on' : ''}"></i>`).join('')}</span>`;
   openSheet(`<div class="settings">
     <div class="set-group">
       <div class="set-row stack"><span>Appearance</span>${radios('theme', [['auto', `${icon('auto', 18)}Auto`], ['light', `${icon('sun', 18)}Light`], ['dark', `${icon('moon', 18)}Dark`]], S.theme)}</div>
+      ${settingsPreview()}
       <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
       <div class="set-row stack"><span>Braille size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
       <div class="mm-cal" id="mmCal" ${S.swSize === 'real' ? '' : 'hidden'}>
@@ -294,14 +303,14 @@ export function openSettings() {
         <p class="set-note mm-state" id="mmState">${S.mmPx ? 'Matched to a coin on this screen.' : 'Not matched yet: sizes are a guess for this kind of device.'}</p>
       </div>
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
-      <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
-      <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key (F D S J K L)']], S.sixKey ? '1' : '0')}</div>
-      <p class="set-note six-note">Six-key types braille like a Perkins brailler: hold the keys for one cell together, then let go. Works in Guess, Draw, Write, Type, the games and Braille to text.</p>
+      <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key']], S.sixKey ? '1' : '0')}</div>
+      <p class="set-note six-note">Six-key types braille like a Perkins brailler with F D S J K L (dots 1 to 6): hold the keys for one cell together, then let go. Works in Guess, Draw, Write, Type, the games and Braille to text.</p>
     </div>
     <div class="set-group"><h3>Accessibility</h3>
       <div class="set-row stack"><span>Spoken feedback</span>${radios('speech', [['0', 'Off'], ['1', 'On']], S.speech ? '1' : '0')}</div>
       <div class="set-row stack"><span>Sounds</span>${radios('sounds', [['0', 'Off'], ['1', 'On']], S.sounds ? '1' : '0')}</div>
-      <p class="set-note">Spoken feedback reads out right and wrong answers, new questions and braille cells as dot numbers${speechAvailable() ? '' : ' (this browser has no speech voices, so only sounds will play)'}. Turn it off if you use a screen reader, which already hears all of this. Sounds play a soft tone for right and wrong answers. Animations follow your device’s reduce-motion setting.</p>
+      ${hapticsAvailable() ? `<div class="set-row stack"><span>Haptics</span>${radios('haptics', [['0', 'Off'], ['1', 'On']], S.haptics ? '1' : '0')}</div>` : ''}
+      <p class="set-note">Spoken feedback reads out right and wrong answers, new questions and braille cells as dot numbers${speechAvailable() ? '' : ' (this browser has no speech voices, so only sounds will play)'}. Turn it off if you use a screen reader, which already hears all of this. Sounds play a soft tone for right and wrong answers.${hapticsAvailable() ? ' Haptics: a light tap when you raise a dot, one tick for right, two for wrong, and a short-long pulse when a round, lesson or game ends.' : ''} Animations follow your device’s reduce-motion setting.</p>
     </div>
     <div class="set-group"><h3>Your data</h3>
       <p class="set-note">Everything is saved on this device only. Save a backup file to keep it safe or move it to another device. Each reset asks you to tap again to confirm.</p>
@@ -317,11 +326,12 @@ export function openSettings() {
       <a class="gh-link" href="https://github.com/updownupdown/braille" target="_blank" rel="noopener">${icon('github', 16)} Source code on GitHub</a></div>
   </div>`, { title: 'Settings' });
   bindRadios($('.settings', sheet), (k, v) => {
-    if (k === 'color') { setS('color', v === '1'); $('.color-key', sheet).classList.toggle('off', v !== '1'); return; }
+    if (k === 'color') { setS('color', v === '1'); return; }
     if (k === 'sixKey') { setS('sixKey', v === '1'); return; }
     if (k === 'speech') { setS('speech', v === '1'); if (v === '1') speak('Spoken feedback is on'); else stopSpeech(); return; }
     if (k === 'sounds') { setS('sounds', v === '1'); if (v === '1') tone(true); return; }
     if (k === 'swSize') $('#mmCal', sheet).hidden = v !== 'real';
+    if (k === 'haptics') { setS('haptics', v === '1'); if (v === '1') haptic('right', { force: true }); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
   // Coin calibration: the circle is LOONIE_MM "millimetres" wide at the current scale.

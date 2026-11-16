@@ -38,13 +38,18 @@
       <button class="icon-btn plain" id="searchBtn" aria-label="Search" title="Search" data-icon="search"></button>
       <button class="icon-btn plain" id="settingsBtn" aria-label="Settings" title="Settings" data-icon="settings"></button>
     </div>
-    <div class="search-bar" id="searchBar" hidden>
-      <input id="gq" type="search" aria-label="Search" aria-controls="searchPanel" placeholder="Search letters, contractions, signs, games…" autocomplete="off" spellcheck="false">
-      <button class="icon-btn plain" id="searchClose" aria-label="Close search" data-icon="close"></button>
-    </div>
     <div class="subbar" id="subbar" hidden></div>
   </header>
-  <div class="search-panel" id="searchPanel" role="region" aria-label="Search results" hidden></div>
+  <div class="search-ov" id="searchOv" hidden>
+    <div class="so-box" role="dialog" aria-modal="true" aria-label="Search">
+      <div class="so-field">
+        <span class="so-ic" data-icon="search"></span>
+        <input id="gq" type="search" aria-label="Search" aria-controls="searchPanel" placeholder="Search signs, lessons, games…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <button class="icon-btn plain" id="searchClose" aria-label="Close search" data-icon="close"></button>
+      </div>
+      <div class="so-body" id="searchPanel"></div>
+    </div>
+  </div>
   <div id="srStatus" class="visually-hidden" role="status" aria-live="polite"></div>
 
   <main id="view" tabindex="-1"></main>

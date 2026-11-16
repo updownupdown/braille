@@ -6,7 +6,7 @@ import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS, PHRASES } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
-import { announce, feedback, cellsLabel, say, reducedMotion, nativeKey, refocus } from './a11y.js';
+import { announce, feedback, haptic, cellsLabel, say, reducedMotion, nativeKey, refocus } from './a11y.js';
 // Game content (trivia, riddles, word lists, Secret Agent cases) is about 110 KB, so it loads the first time a game
 // opens instead of with the app. loadGameData() is safe to call again; gameDataReady() says whether it's in.
 let TRIVIA, RIDDLES, RIDDLE_CLASH, WORDLE, ANAGRAM_WORDS, SNOWMAN_WORDS, CASES, dataP = null;
@@ -149,7 +149,8 @@ function setTimer(el, frac, secs) {
 // One stats row for every game: left, centre and right slots.
 const statBar = (l = '', c = '', r = '') => `<div class="g-bar"><span class="l">${l}</span><span class="c">${c}</span><span class="r">${r}</span></div>`;
 const scoreBest = (k, extra = '') => `<span class="g-score">Score: <b id="sc">0</b></span><span class="g-sep">/</span><span class="g-best">Best: <b id="best">${store.get('best.' + k, '–') ?? '–'}</b></span>${extra}`;
-const livesHTML = (n, of = 3) => Array.from({ length: of }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
+const HEART = 'M12 20.5s-7.4-4.6-9.5-9.3A5.2 5.2 0 0 1 12 5.8a5.2 5.2 0 0 1 9.5 5.4c-2.1 4.7-9.5 9.3-9.5 9.3z';
+const livesHTML = (n, of = 3) => `<span class="visually-hidden">${n} of ${of} lives left</span>${Array.from({ length: of }, (_, i) => `<svg class="${i < n ? 'on' : ''}" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="${HEART}"/></svg>`).join('')}`;
 // Start screen for timed games: what to do, which symbols are in play at this level, then Start.
 const startScreen = (how, incl) => `<p class="g-how">${how}</p><p class="g-incl"><b>Includes</b> ${incl}</p><button class="btn primary" id="go">Start</button>`;
 
@@ -178,11 +179,12 @@ function chunt(el, level) {
   el.innerHTML = `${statBar('', '<span class="lives" id="lives"></span>', scoreBest('chunt.' + level))}
     <div class="card g-card chunt" id="card"><p class="ch-q" id="q"></p><div class="ch-word" id="word" role="group"></div><p class="ch-left" id="left" aria-live="polite"></p></div>`;
   const card = $('#card', el), box = $('#word', el);
-  let sc = 0, lives = 3, list = [], found = new Set(), busy = false, word = '';
+  let sc = 0, n = 0, lives = 3, list = [], found = new Set(), busy = false, word = '';
   const total = () => list.filter((c) => c.kind === 'contraction' && c.idx === 0).length;
   const left = () => { const n = total() - found.size; $('#left', el).textContent = n ? `${n} to find` : ''; };
   function round() {
     busy = false; found = new Set(); card.classList.remove('glow-good', 'glow-bad');
+    $('.g-bar .l', el).innerHTML = `Word <b>${++n}</b>`;
     word = pick(pool);
     list = toCells(translate(word, 'en', 2));
     // Each cell knows which print piece it belongs to (g), so a two-cell sign is found with either cell.
@@ -216,8 +218,8 @@ function chunt(el, level) {
       setTimeout(() => {
         $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`; $('#left', el).textContent = '';
         box.innerHTML = '<button class="btn primary" id="again">Play again</button>';
-        announce(`Game over. ${sc} words.`);
-        $('#again', el).onclick = () => { sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
+        haptic('done'); announce(`Game over. ${sc} words.`);
+        $('#again', el).onclick = () => { sc = 0; n = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
       }, 1600);
     }
   };
@@ -317,7 +319,7 @@ function signhunt(el, level) {
   el.innerHTML = `${statBar('', '<span class="lives" id="lives"></span>', scoreBest('hunt.' + level))}
     <div class="card g-card hunt" id="card"><p class="hunt-q" id="q"></p><div class="plate hunt-plate" id="plate"></div></div>`;
   const card = $('#card', el);
-  let sc = 0, lives = 3, target = null, busy = false;
+  let sc = 0, n = 0, lives = 3, target = null, busy = false;
   const cap = (t) => t.replace(/\b[a-z]/g, (c) => c.toUpperCase());
   // Hard: lines that start alike (same first letter or a shared word) so the first cell is not enough.
   function lines() {
@@ -332,6 +334,7 @@ function signhunt(el, level) {
   }
   function round() {
     busy = false; card.classList.remove('glow-good', 'glow-bad');
+    $('.g-bar .l', el).innerHTML = `Sign <b>${++n}</b>`;
     const [t, ls] = lines(); target = t;
     $('#q', el).innerHTML = `Which line says <b>${esc(cap(t))}</b>?`;
     const plate = $('#plate', el);
@@ -356,8 +359,8 @@ function signhunt(el, level) {
       busy = true; lock(); $$('.hunt-line', el).forEach((x) => { if (x.dataset.t === target) x.classList.add('right'); });
       setTimeout(() => {
         $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`;
-        $('#plate', el).innerHTML = '<button class="btn primary" id="again">Play again</button>';
-        $('#again', el).onclick = () => { sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
+        haptic('done'); $('#plate', el).innerHTML = '<button class="btn primary" id="again">Play again</button>';
+        $('#again', el).onclick = () => { sc = 0; n = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
       }, 1200);
     }
   };
@@ -429,7 +432,7 @@ function memory(el, level) {
   function start() {
     const letters = pickLetters();
     const cards = shuffle(letters.flatMap((l) => [{ l, t: 'b' }, { l, t: 'p' }]));
-    grid.innerHTML = cards.map((c, i) => `<button class="mem-card" data-i="${i}" data-l="${c.l}" data-say="${c.t === 'b' ? esc(cellsLabel(LETTERS[c.l])) : 'letter ' + c.l}" aria-label="Card ${i + 1}, face down"><span class="mem-back" aria-hidden="true"></span><span class="mem-face" aria-hidden="true">${c.t === 'b' ? letterCell(c.l) : `<b>${c.l}</b>`}</span></button>`).join('');
+    grid.innerHTML = cards.map((c, i) => `<button class="mem-card" data-i="${i}" data-l="${c.l}" data-say="${c.t === 'b' ? esc(cellsLabel(LETTERS[c.l])) : 'letter ' + c.l}" aria-label="Card ${i + 1}, face down"><span class="mem-back" aria-hidden="true"><span class="cell"><i></i><i></i><i></i><i></i><i></i><i></i></span></span><span class="mem-face" aria-hidden="true">${c.t === 'b' ? letterCell(c.l) : `<b>${c.l}</b>`}</span></button>`).join('');
     open = []; moves = 0; matched = 0; lock = false; clearTimeout(timer);
     $('#moves', el).textContent = 0; $('#pairs', el).textContent = 0; $('#msg', el).textContent = '';
     const b = store.get('best.mem.' + level, null); $('#best', el).textContent = b == null ? '–' : b;
@@ -449,7 +452,7 @@ function memory(el, level) {
     if (a.dataset.l === b.dataset.l) {
       a.classList.add('done'); b.classList.add('done'); open = []; matched++; $('#pairs', el).textContent = matched;
       label(a, x0(a) + ', matched'); label(b, x0(b) + ', matched'); announce(`Pair ${matched} of ${n}`);
-      if (matched === n) { const bb = bestLow('mem.' + level, moves); $('#best', el).textContent = bb; $('#msg', el).textContent = `All ${n} pairs in ${moves} moves.`; }
+      if (matched === n) { haptic('done'); const bb = bestLow('mem.' + level, moves); $('#best', el).textContent = bb; $('#msg', el).textContent = `All ${n} pairs in ${moves} moves.`; }
     } else {
       lock = true;
       announce('No match');
@@ -493,7 +496,7 @@ function quiz(el, level, { next, choices = 4, onAnswer = null }) {
     n++;
     if (n < 10) { card.classList.remove('revealed'); show(); return; }
     const b = best('quiz.' + (el.dataset.k || '') + level, sc);
-    card.classList.remove('revealed', 'glow-good', 'glow-bad');
+    card.classList.remove('revealed', 'glow-good', 'glow-bad'); haptic('done');
     card.innerHTML = `<div class="g-end"><b>${sc} / 10</b><span>Best ${b}</span><button class="btn primary" id="again">Play again</button></div>`;
     $('#nextBtn', el).hidden = true;
     $('#again', el).onclick = () => { n = 0; sc = 0; q$('#sc').textContent = 0; show(); };
@@ -558,7 +561,7 @@ function rain(el, level) {
   const inp = letterPad({ display: $('#typed', el), mount: $('#kb', el), onInput: () => check() });
   let items = [], raf = 0, last = 0, spawnT = 0, sc = 0, lives = 3, lv = 1, running = false;
   const H = () => field.clientHeight;
-  const setLives = () => { $('#lives', el).innerHTML = [0, 1, 2].map((i) => `<i class="${i < lives ? 'on' : ''}"></i>`).join(''); };
+  const setLives = () => { $('#lives', el).innerHTML = livesHTML(Math.max(0, lives)); };
   function spawn() {
     const word = lv >= cfg.words && Math.random() < 0.5;
     const text = word ? pick(shortWords) : pick([...cfg.pool]);
@@ -590,7 +593,7 @@ function rain(el, level) {
     running = false; cancelAnimationFrame(raf);
     items.forEach((i) => i.d.remove()); items = [];
     const b = best('rain.' + level, sc); $('#best', el).textContent = b;
-    const ov = $('#ov', el); ov.hidden = false;
+    const ov = $('#ov', el); ov.hidden = false; haptic('done');
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
@@ -634,7 +637,7 @@ function timeAttack(el, level) {
   function over() {
     running = false; cancelAnimationFrame(raf); $('#cells', el).innerHTML = ''; $('#skip', el).hidden = true;
     const b = best('time.' + level, sc); $('#best', el).textContent = b;
-    const ov = $('#ov', el); ov.hidden = false;
+    const ov = $('#ov', el); ov.hidden = false; haptic('done');
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
@@ -922,7 +925,7 @@ function mirror(el, level) {
   function over() {
     running = false; cancelAnimationFrame(raf); $('#cells', el).innerHTML = ''; $('#opts', el).innerHTML = '';
     const b = best('mirror.' + level, sc); $('#best', el).textContent = b;
-    const ov = $('#ov', el); ov.hidden = false;
+    const ov = $('#ov', el); ov.hidden = false; haptic('done');
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }

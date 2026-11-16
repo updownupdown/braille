@@ -15,6 +15,7 @@
 //   miles              milestones reached ({ id: 'YYYY-MM-DD', or 'earlier' for ones reached before they were tracked })
 //   refSec, refLang, csGrade, signRegion, mOpen, topic   where each Learn page was left
 //   trText, trMode, trDir, trDots, trView   Translate state
+//   searchHist         recent searches, newest first (up to 8)
 //   g.*                games: best.<game><level>, played, last, agent.p.<case>, maze, snow, riddles…
 //   schema             the storage layout version (below)
 const PREFIX = 'dots.';

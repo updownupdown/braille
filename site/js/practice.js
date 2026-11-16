@@ -11,7 +11,7 @@ import { G2_EXAMPLES } from './g2examples.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp, setPeek } from './learn.js';
 import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, markMulti, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
-import { feedback, cellsLabel, say, refocus, nativeKey } from './a11y.js';
+import { feedback, haptic, cellsLabel, say, refocus, nativeKey } from './a11y.js';
 import { spotItems } from './rules.js';
 import { composeMode } from './compose.js';
 import { placementView } from './placement.js';
@@ -577,7 +577,7 @@ export function quizMode(mode, q) {
       if (added && !w.has(added)) { result(false, item); glow(false); pads[ci].classList.remove('bad'); void pads[ci].offsetWidth; pads[ci].classList.add('bad'); }
       const was = ok[ci];
       ok[ci] = on[ci].size === w.size && [...w].every((d) => on[ci].has(d)); paint(ci);
-      if (ok[ci] && !was && targets.length > 1 && !ok.every(Boolean)) announce(`Cell ${ci + 1} done`);
+      if (ok[ci] && !was && targets.length > 1 && !ok.every(Boolean)) { haptic('right'); announce(`Cell ${ci + 1} done`); }
       // After "Show me", stay three times as long so the answer can sink in.
       if (ok.every(Boolean)) { done = true; result(true, item); glow(true); setTimeout(next, shown ? 2250 : 750); }
     };
@@ -585,7 +585,12 @@ export function quizMode(mode, q) {
       if (done) return;
       if (on[ci].has(d)) { on[ci].delete(d); paint(ci); evaluate(ci, 0); } else { on[ci].add(d); paint(ci); evaluate(ci, d); }
     };
-    stage.querySelector('.pads').onclick = (e) => { const b = e.target.closest('button[data-d]'); if (b) tog(Number(b.closest('.dotpad').dataset.c), Number(b.dataset.d)); };
+    stage.querySelector('.pads').onclick = (e) => {
+      const b = e.target.closest('button[data-d]'); if (!b) return;
+      const ci = Number(b.closest('.dotpad').dataset.c), d = Number(b.dataset.d);
+      if (!done && !on[ci].has(d)) haptic('dot');
+      tog(ci, d);
+    };
     $('#skip').onclick = () => {
       if (done) return;
       if (state.firstTry) result(false, item);
@@ -613,10 +618,15 @@ export function quizMode(mode, q) {
     say(`Word: ${cellsLabel(cells.map((c) => c.cell).join(''))}`);
     const lbls = $$('#wcells .lbl');
     const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Slot width: as wide as fits, so long words stay on one line on a phone.
+    const wc = $('#wcells', stage);
+    wc.classList.add('slots');
+    wc.style.setProperty('--slot', `${Math.max(20, Math.min(40, Math.floor((Math.min(stage.clientWidth, 460) - 36) / cells.length)))}px`);
+    const paint = (v, solved = false) => { paintTyped(lbls, cells, v, solved); markSlots(lbls, cells, solved); };
     const check = () => {
       if (done) return;
-      if (wpad.value === target) { done = true; result(true, {}); glow(true); paintTyped(lbls, cells, '', true); setTimeout(next, 900); }
-      else paintTyped(lbls, cells, wpad.value);
+      if (wpad.value === target) { done = true; result(true, {}); glow(true); paint('', true); setTimeout(next, 900); }
+      else paint(wpad.value);
     };
     wOnInput = () => { if (!hinting) check(); };
     wOnEnter = () => { if (!done && wpad.value) { result(false, {}); glow(false); } };
@@ -624,10 +634,26 @@ export function quizMode(mode, q) {
     $('#hint').onclick = () => {
       if (done || hinting) return;
       state.firstTry = false; hinting = true;
-      typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paintTyped(lbls, cells, wpad.value); }, () => done || state.last !== word);
+      typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paint(wpad.value); }, () => done || state.last !== word);
     };
-    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paintTyped(lbls, cells, '', true); announce(`The word was ${word}`); setTimeout(next, 1300); };
+    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paint('', true); announce(`The word was ${word}`); setTimeout(next, 1300); };
     state.key = null;
+  }
+  // Type mode slots: each cell that takes letters gets a slot; the first unfilled (or wrong) one is the current one.
+  function markSlots(lbls, cells, solved) {
+    let cur = false;
+    cells.forEach((c, i) => {
+      const l = lbls[i]; if (!l) return;
+      const k = c.idx === 0 ? (c.print || '').toLowerCase().replace(/[^a-z0-9]/g, '').length : 0;
+      l.classList.remove('slot', 'cur', 'done', 'miss', 'multi');
+      if (!k) return;
+      const bad = !!l.querySelector('.bad'), got = l.textContent.length;
+      l.classList.add('slot');
+      if (k > 2) l.classList.add('multi');
+      if (bad) l.classList.add('miss');
+      else if (solved || got >= k) l.classList.add('done');
+      if (!cur && !solved && (bad || got < k)) { l.classList.add('cur'); cur = true; }
+    });
   }
   // Type mode score: words right first time this session, the current streak and the best streak ever (per grade).
   function wScore() {
@@ -654,7 +680,7 @@ export function quizMode(mode, q) {
   }
   // End of a round: score, a few facts, then the signs worth another look (misses first, then the slowest).
   function renderSummary() {
-    stage.classList.remove('glow-good', 'glow-bad');
+    stage.classList.remove('glow-good', 'glow-bad'); haptic('done');
     const secs = Math.round((Date.now() - round.start) / 1000);
     const cellsOf = (x) => (mode === 'words' ? toCells(translate(x, 'en', state.wgrade)).map((c) => c.cell).join('') : x.cells);
     const keyOf = (x) => (mode === 'words' ? x : x.key);
@@ -724,7 +750,7 @@ export function sweepMode(q) {
       <div class="finger" id="finger"></div>
       <div class="sweep-top"><button class="link-btn pillish" id="restart">${icon('restart', 16)} Restart</button>
         <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
-      <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
+      <div class="sweep-hint" id="hint">Put your finger on the line and slide right.</div>
     </div>
     <p class="sw-info" id="swInfo" aria-live="polite"></p>
 `;
@@ -764,7 +790,7 @@ export function sweepMode(q) {
     if (!t0 && active) t0 = performance.now();
     const last = cells.length - 1;
     if (t0 && !tDone && last >= 0 && pos > lefts[last] + widths[last]) {
-      tDone = performance.now();
+      tDone = performance.now(); haptic('done');
       const secs = (tDone - t0) / 1000, wpm = Math.round(words() / (secs / 60));
       const bk = 'swBest' + S.swGrade, b = Math.max(store.get(bk, 0), wpm);
       const counts = secs > 2 && !peeked, best = counts ? b : store.get(bk, 0);

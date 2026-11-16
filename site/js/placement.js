@@ -2,7 +2,7 @@
 // for people who already know some braille. Groups you get all right are marked known, so Auto (and the Known
 // counts) start where you are instead of at a. It stops after two groups in a row go badly.
 import { $, $$, cellHTML, esc, icon, mastery, setSub, setTitle, shuffle, store, view, sheet } from './core.js';
-import { announce, feedback, cellsLabel, say, refocus, nativeKey } from './a11y.js';
+import { announce, feedback, haptic, cellsLabel, say, refocus, nativeKey } from './a11y.js';
 import { autoCourse, autoState, autoSave, guessOptions } from './practice.js';
 import { logDay } from './home.js';
 
@@ -81,7 +81,7 @@ export function placementView() {
     keyFn = (e) => { const btns = $$('.choice', stage); if (/^[1-4]$/.test(e.key) && !opts.some((o) => /^[0-9]$/.test(o.answer))) answer(btns[Number(e.key) - 1].dataset.k === item.key, btns[Number(e.key) - 1]); };
   }
   function finish() {
-    keyFn = null;
+    keyFn = null; haptic('done');
     const knownSet = new Set(known.map((x) => x.key));
     const learn = learning.filter((x) => !knownSet.has(x.key));
     applyPlacement(known, learn);

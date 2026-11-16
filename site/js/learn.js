@@ -4,11 +4,11 @@ import { SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY
 
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
-import { feedback, cellsLabel, say, refocus } from './a11y.js';
+import { feedback, haptic, cellsLabel, say, refocus } from './a11y.js';
 import { MISTAKES, mistake } from './rules.js';
 
 import { $, $$, titleCase, DICT, P, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, exBlock, groupBlock, groupsHTML, icon, letterDetail, lineHTML, markMulti, openSheet, pick, practiseLink, radios, setSub, setTitle, shuffle, store, view, views } from './core.js';
-import { SEC_DESC, SEC_ICON } from './home.js';
+import { SEC_DESC, secIcon } from './home.js';
 import { C, CATS } from './practice.js';
 // ---------- signs ----------
 export const SIGN_ICONS = {
@@ -157,7 +157,7 @@ export function grade2Section(key = 'grade2') {
     <div class="group-title"><h3>Start with These</h3><span>The most frequent signs. Learn a few at a time.</span></div>
     <div class="ctable narrow">${G2_START.map((w) => { const i = DICT.findIndex((e) => e.print === w && e.group !== 'Letters'); return crowHTML(DICT[i].cells, w, { kind: 'contraction', i, note: G2_USE[DICT[i].cat] || DICT[i].cat }); }).join('')}</div>${practiseBtn('#/practice/read?cat=contractions&set=start')}
     <div class="group-title"><h3>Five Lessons</h3><span>Each covers a few groups and ends with its own check.</span></div>
-    <div class="hrows g-tiles g2-lessons">${Object.entries(G2_LESSONS).map(([k, [t, cs]]) => `<a class="hrow g-tile ${lessonsDone().includes(k) ? 'li-done' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(lessonsDone().includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${titleCase(t)}</b><span>${cs.reduce((n, c) => n + CONTRACTIONS[c].items.length, 0)} signs · ${cs.join(', ')}</span></div>${icon('right', 20)}</a>`).join('')}</div>
+    <div class="hrows g-tiles g2-lessons">${Object.entries(G2_LESSONS).map(([k, [t, cs]]) => `<a class="hrow g-tile ${lessonsDone().includes(k) ? 'li-done' : ''}" href="#/reference/${k}"><span class="hrow-ic">${secIcon(k, lessonsDone().includes(k))}</span><div class="hrow-text"><b>${titleCase(t)}</b><span>${cs.reduce((n, c) => n + CONTRACTIONS[c].items.length, 0)} signs · ${cs.join(', ')}</span></div>${icon('right', 20)}</a>`).join('')}</div>
     ${exBlock([['the children', 'Two wordsigns: “the” and “children”.'], ['mother and father', 'Initial-letter contractions plus “and”.'], ['with you', '“with” and the wordsign for “you”.'], ['knowledge', 'One cell for a whole word.']], 2)}`;
   const bind = () => {
     // The comparison strip scrolls sideways on narrow screens: fade the right edge while there is more to see.
@@ -252,7 +252,6 @@ export function numbersSection() {
 // Each block has an id (cs-letters, cs-numbers, cs-signs, cs-g0… for the contraction groups) so a peek can open at it.
 export function cheatHTML(g) {
   const item = (cells, label, kind, cls = '') => `<div class="cs-i ${cls}${cells.length > 1 ? ' wide' : ''}"><span class="cs-c">${[...cells].map((c) => cellHTML(c, '', { kind })).join('')}</span><b>${esc(label)}</b></div>`;
-  const blank = '<div class="cs-i cs-blank" aria-hidden="true"></div>';
   const block = (id, title, body, cls = '', note = '') => `<section class="cs-block ${cls}" data-cs="${id}"><h3>${title}${note ? `<span>${note}</span>` : ''}</h3><div class="cs-grid">${body}</div></section>`;
   const L = (str) => [...str].map((l) => item(LETTERS[l], l, 'letter')).join('');
   const P = (ch, label) => item(UEB_PUNCT[ch][0], label || ch, 'punct');
@@ -260,7 +259,7 @@ export function cheatHTML(g) {
     ${Object.entries(CONTRACTIONS).map(([cat, { blurb }], i) => block('g' + i, esc(cat), DICT.filter((e) => e.group === cat).map((e) => item(e.cells, e.print, 'contraction', e.cells.length > 1 ? 'wide' : '')).join(''), 'cs-g2', esc(blurb))).join('')}
     <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>`;
   return `<h2 class="cs-title">Braille Cheat Sheet · Grade 1 <small>Unified English Braille</small></h2>
-    ${block('letters', 'Letters', `${L('abcdefghij')}${L('klmnopqrst')}${L('uvxyz')}${blank.repeat(4)}${L('w')}`, 'cs-decades', 'each row adds dots to the one above')}
+    ${block('letters', 'Letters', `${L('abcdefghij')}${L('klmnopqrst')}${L('uvxyz')}<div class="cs-i cs-wnote">w came later: French had no w in 1824, so it isn’t in the pattern →</div>${L('w')}`, 'cs-decades', 'each row adds dots to the one above')}
     ${block('numbers', 'Numbers', '1234567890'.split('').map((d) => item(LETTERS['jabcdefghi'[Number(d)]], d, 'digit')).join(''), 'cs-decades', `put ${cellHTML(IND.number, 'cs-inline', { kind: 'digit' })} before a number: 1–0 are a–j`)}
     ${block('signs', 'Signs', [item(IND.capital, 'capital', 'indicator'), item(IND.capital + IND.capital, 'all caps', 'indicator'), item(IND.number, 'number', 'digit'), P('.'), P(','), P('?'), P('!'), P('’', '’'), P('-'), P(':'), P(';'), P('“'), P('”'), P('('), P(')'), P('/')].join(''), 'cs-decades')}
     <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>`;
@@ -438,19 +437,19 @@ export function bindQuiz(key) {
     box.classList.remove('glow-good', 'glow-bad');
     const Q = qs[n]; first = true;
     const long = Q.choices.some((c) => c.t.length > 2 || c.small);
-    box.innerHTML = `${pips()}${Q.q ? `<p class="lq-q">${esc(Q.q)}</p>` : ''}${Q.cells ? `<div class="prompt-cells" role="img" tabindex="-1" aria-label="Sign: ${esc(cellsLabel(Q.cells))}">${[...Q.cells].map((c) => cellHTML(c)).join('')}</div>` : ''}
+    box.innerHTML = `${pips()}<p class="lq-n" aria-hidden="true">Question ${n + 1} of ${QUIZ_LEN}</p>${Q.q ? `<p class="lq-q">${esc(Q.q)}</p>` : ''}${Q.cells ? `<div class="prompt-cells" role="img" tabindex="-1" aria-label="Sign: ${esc(cellsLabel(Q.cells))}">${[...Q.cells].map((c) => cellHTML(c)).join('')}</div>` : ''}
       <div class="choices ${long ? 'words' : ''}" role="group" aria-label="Answers">${Q.choices.map((c) => `<button class="choice" data-t="${esc(c.t)}">${esc(c.t)}${c.small ? `<small>${esc(c.small)}</small>` : ''}</button>`).join('')}</div>`;
     if (n > 0) refocus(box, $('.prompt-cells', box) || $('.lq-q', box));
     say([`Question ${n + 1}`, Q.q, Q.cells ? cellsLabel(Q.cells) : '', 'Choices: ' + Q.choices.map((c) => c.t).join(', ')].filter(Boolean).join('. '));
   }
   function finish() {
     const pass = right >= QUIZ_PASS;
+    haptic('done');
     if (pass) { const d = store.get('learnDone', []); if (!d.includes(key)) store.set('learnDone', [...d, key]); }
-    const i = REF_SECTIONS.findIndex(([k]) => k === key), nx = REF_SECTIONS[i + 1];
     box.classList.remove('glow-good', 'glow-bad');
     box.innerHTML = `<div class="lq-score ${pass ? 'pass' : ''}">${pass ? icon('check', 30) : ''}<b>${right} of ${QUIZ_LEN}</b></div>
       <p class="lq-q">${pass ? 'Lesson complete.' : `Get ${QUIZ_PASS} right to complete this lesson.`}</p>
-      <div class="row lq-row">${pass && nx ? `<a class="btn primary" href="#/reference/${nx[0]}">Next: ${nx[1]}</a>` : ''}<button class="btn ${pass ? '' : 'primary'}" id="lqAgain">Try again</button></div>`;
+      <div class="row lq-row"><button class="btn ${pass ? '' : 'primary'}" id="lqAgain">Try again</button></div>`;
     if (pass) { const h = $('#check h3'); if (h && !$('.lq-done', h)) h.insertAdjacentHTML('beforeend', '<span class="count lq-done">Done</span>'); }
     $('#lqAgain').onclick = start;
     announce(`${right} of ${QUIZ_LEN}. ${pass ? 'Lesson complete.' : `Get ${QUIZ_PASS} right to complete this lesson.`}`);
@@ -477,7 +476,7 @@ export function learnIndex() {
   const done = lessonsDone();
   // The first lesson not yet done is outlined, once at least one is done (Home already says where to start).
   const next = done.length ? REF_SECTIONS.find(([k]) => isLesson(k) && !done.includes(k))?.[0] : null;
-  const row = (k, t, n) => `<a class="hrow g-tile ${done.includes(k) ? 'li-done' : ''}${k === next ? ' li-next' : ''}" href="#/reference/${k}"><span class="hrow-ic">${icon(done.includes(k) ? 'check' : SEC_ICON[k], 24)}</span><div class="hrow-text"><b>${n ? `${n}. ` : ''}${titleCase(t)}</b><span>${done.includes(k) ? 'Done · ' : ''}${SEC_DESC[k]}</span></div>${icon('right', 18)}</a>`;
+  const row = (k, t, n) => `<a class="hrow g-tile ${done.includes(k) ? 'li-done' : ''}${k === next ? ' li-next' : ''}" href="#/reference/${k}"><span class="hrow-ic">${secIcon(k, done.includes(k))}</span><div class="hrow-text"><b>${n ? `${n}. ` : ''}${titleCase(t)}</b><span>${done.includes(k) ? 'Done · ' : ''}${SEC_DESC[k]}</span></div>${icon('right', 18)}</a>`;
   const les = REF_SECTIONS.filter(([k]) => isLesson(k)), ref = REF_SECTIONS.filter(([k]) => !isLesson(k));
   view.innerHTML = `<h2 class="sec-h li-h">Lessons</h2>
     <p class="lead-p li-p">${les.length} short lessons, from the six-dot cell to every contraction. Each one ends with a quick check.</p>
@@ -500,8 +499,15 @@ views.reference = (q, sub, sub2) => {
   setSub(`<a class="back-link ref-back" href="#/reference" aria-label="All Learn sections">${icon('right', 18)}</a><div id="secDD" class="dd-strong"></div>${sec.jumps ? '<div id="jumpDD" class="dd-right"></div>' : ''}`);
   dropdown($('#secDD'), { lead: 'book', options: REF_SECTIONS.map(([k, t]) => ({ value: k, label: t, group: isLesson(k) ? 'Lessons' : 'Reference' })), value: key, onChange: (v) => { location.hash = '#/reference/' + v; } });
   if (sec.jumps) dropdown($('#jumpDD'), { label: 'Jump to', options: sec.jumps, value: null, onChange: (v) => { const el = document.getElementById(v); if (!el) return; if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
-  view.innerHTML = `${sec.html}${lesson ? quizHTML(key) : ''}
-      <div class="pager">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
+  const nx = REF_SECTIONS[i + 1];
+  const nextCard = lesson && nx ? `<a class="next-card" href="#/reference/${nx[0]}"><span class="hrow-ic">${secIcon(nx[0])}</span><span class="nc-t"><small>${isLesson(nx[0]) ? 'Next lesson' : 'Next'}</small><b>${isLesson(nx[0]) ? `${LESSONS.indexOf(nx[0]) + 1}. ` : ''}${titleCase(nx[1])}</b><span>${SEC_DESC[nx[0]] || ''}</span></span>${icon('right', 20)}</a>` : '';
+  view.innerHTML = `${sec.html}${lesson ? quizHTML(key) + nextCard : ''}
+      <div class="pager${lesson ? ' lesson-pager' : ''}">${i > 0 ? `<a class="btn" href="#/reference/${REF_SECTIONS[i - 1][0]}"><span class="pg-dir">${icon('right', 18)}</span><span><small>Previous</small>${REF_SECTIONS[i - 1][1]}</span></a>` : '<span></span>'}${i < REF_SECTIONS.length - 1 ? `<a class="btn next" href="#/reference/${REF_SECTIONS[i + 1][0]}"><span><small>Next</small>${REF_SECTIONS[i + 1][1]}</span>${icon('right', 18)}</a>` : ''}</div>`;
+  if (lesson) {
+    $('.pager .next', view)?.remove();
+    // A button in the lesson that goes to the next lesson repeats the card below the check.
+    if (nx) $$(`.row a.btn[href="#/reference/${nx[0]}"]`, view).forEach((a) => { const r = a.parentElement; a.remove(); if (!r.children.length) r.remove(); });
+  }
   if (sec.bind) sec.bind();
   if (lesson) bindQuiz(key);
   markMulti(view);

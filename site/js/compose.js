@@ -9,7 +9,7 @@ import { COMMON_WORDS } from './wordlist.js';
 import { PHRASES, formatLine } from './phrases.js';
 import { chord, sixKeyOn } from './sixkey.js';
 import { $, $$, cellHTML, esc, radios, bindRadios, shuffle, store, sheet } from './core.js';
-import { announce, feedback, tone, cellLabel, say, refocus, reducedMotion } from './a11y.js';
+import { announce, feedback, cue, haptic, cellLabel, say, refocus, reducedMotion } from './a11y.js';
 import { logDay } from './home.js';
 import { setPeek } from './learn.js';
 
@@ -106,12 +106,12 @@ export function composeMode(q) {
       if (wi >= words.length) return finish();
       msg += `. Next word: ${words[wi].print}`;
     }
-    paint(); fresh = null; announce(msg);
+    haptic('right'); paint(); fresh = null; announce(msg);
   }
   function slip(what) {
     slips++;
     const p = $('#cwPad', stage); p.classList.remove('wrong'); void p.offsetWidth; p.classList.add('wrong');
-    tone(false); announce(what);
+    cue(false); announce(what);
   }
   // Tapping a dot: right when the pad now matches the cell; a dot that isn't in the cell is shown red until tapped off.
   function toggle(d) {
@@ -151,12 +151,12 @@ export function composeMode(q) {
     $('#cwEdit', stage).hidden = true; $('#cwFoot', stage).hidden = false;
     stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth; stage.classList.add(ok ? 'glow-good' : 'glow-bad');
     const speed = `${stats.wpm} words a minute`;
-    if (ok) feedback(true, `All right first time. ${speed}`); else { tone(true); announce(`Done, with ${slips} ${slips === 1 ? 'slip' : 'slips'}. ${speed}`); }
+    if (ok) feedback(true, `All right first time. ${speed}`); else { cue(true); announce(`Done, with ${slips} ${slips === 1 ? 'slip' : 'slips'}. ${speed}`); }
     refocus(stage, $('#cwNext', stage));
   }
   stage.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.d) return toggle(Number(b.dataset.d));
+    if (b.dataset.d) { const d = Number(b.dataset.d); if (!done && !pad.has(d)) haptic('dot'); return toggle(d); }
     ({ cwHint: hint, cwSkip: start, cwNext: start })[b.id]?.();
   });
   // Keyboard: F D S J K L toggle the dots (or, with six-key typing on, a chord writes a whole cell). Enter: next.
