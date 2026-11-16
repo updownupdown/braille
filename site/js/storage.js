@@ -15,11 +15,21 @@
 //   g.*                games: best.<game><level>, played, last, agent.p.<case>, maze, snow, riddles…
 //   schema             the storage layout version (below)
 const PREFIX = 'dots.';
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 // MIGRATIONS[n] upgrades saved data from version n - 1 to n. Add one whenever a key is renamed or reshaped.
 const MIGRATIONS = {
   1: () => {}, // version 1 is the layout as of November 2026; nothing to change, it only stamps the version.
   2: () => { const v = store.get('swPass', null); if (v != null) { store.set('swPass1', v); store.remove('swPass'); } }, // Read keeps a passage place per grade
+  3: () => { // Trivia and Riddles levels became Grade 1 (easy) / Grade 2 (hard): Medium folds into Grade 1
+    const g = gameStore;
+    const solved = g.get('riddles.solved.medium', null);
+    if (solved) { g.set('riddles.solved.easy', [...new Set([...g.get('riddles.solved.easy', []), ...solved])]); g.remove('riddles.solved.medium'); }
+    for (const k of ['trivia', 'riddles']) {
+      const m = g.get('best.quiz.' + k + 'medium', null), e = g.get('best.quiz.' + k + 'easy', null);
+      if (m != null) { if (e == null || m > e) g.set('best.quiz.' + k + 'easy', m); g.remove('best.quiz.' + k + 'medium'); }
+      if (g.get('lvl.' + k, null) === 'medium') g.set('lvl.' + k, 'easy');
+    }
+  },
 };
 
 const ls = () => { try { return window.localStorage; } catch { return null; } };

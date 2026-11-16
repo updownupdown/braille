@@ -650,15 +650,6 @@ export const WORDLE = ('about above actor adult after again agree alarm album al
   'sugar sunny sweet table taste teach thank tiger toast today tooth topic torch total touch tower track trade train treat trust truth uncle under unity upper ' +
   'usual value video visit vital voice water whale wheat wheel white whole world worry write young youth zebra').split(' ');
 
-// [word, category clue]
-export const HANGMAN = [
-  ...['tiger', 'rabbit', 'turtle', 'penguin', 'giraffe', 'dolphin', 'octopus', 'beaver', 'moose', 'eagle', 'squirrel', 'kangaroo', 'hedgehog', 'raccoon', 'walrus'].map((w) => [w, 'An animal']),
-  ...['banana', 'cookie', 'pancake', 'noodle', 'cheese', 'carrot', 'muffin', 'pickle', 'waffle', 'tomato', 'pretzel', 'blueberry', 'sandwich', 'popcorn', 'avocado'].map((w) => [w, 'Something to eat']),
-  ...['castle', 'island', 'forest', 'desert', 'library', 'bakery', 'museum', 'harbour', 'airport', 'garden', 'hospital', 'theatre', 'village', 'stadium', 'lighthouse'].map((w) => [w, 'A place']),
-  ...['guitar', 'rocket', 'candle', 'ladder', 'kettle', 'pencil', 'blanket', 'compass', 'lantern', 'umbrella', 'backpack', 'scissors', 'magnet', 'telescope', 'keyboard'].map((w) => [w, 'An object']),
-  ...['rainbow', 'thunder', 'volcano', 'glacier', 'meadow', 'canyon', 'blossom', 'pebble', 'blizzard', 'waterfall', 'sunrise', 'tornado', 'iceberg', 'lightning', 'mountain'].map((w) => [w, 'Nature and weather']),
-];
-
 // Secret Agent: a ten-part case. Grade 1 lowercase, then capitals and numbers, then Grade 2.
 export const MISSIONS = [
   { title: 'The empty case', brief: 'Agent, the Blue Maple diamond has vanished from the city museum. Our informant slipped a note under the door.', msg: 'check the coat room', grade: 1, after: 'In the coat room, tucked in a pocket, you find a train ticket stub.' },

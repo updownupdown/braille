@@ -126,7 +126,7 @@ export const cellsK = (str, kind, cls = '') => [...str].map((c) => cellHTML(c, c
 // Compact row: cells · label · dot numbers · note (a button when it opens a detail sheet).
 export function crowHTML(cells, label, { kind = '', note = '', i = null, added = null, pre = '', ex = '' } = {}) {
   const tag = 'div';
-  return `<${tag} class="crow${ex ? ' has-ex' : ''}"><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${pre ? `<span class="pre">${esc(pre)}</span>` : ''}${esc(label)}</b><span class="cdots">${[...cells].map((c) => toDots(c).join('') || '0').join(' ')}</span>${ex ? '<button type="button" class="ex-tog" aria-expanded="false">Examples</button>' : ''}<span class="cnote">${esc(note)}</span>${ex ? `<div class="crow-ex" hidden>${ex}</div>` : ''}</${tag}>`;
+  return `<${tag} class="crow${ex ? ' has-ex' : ''}"><span class="cells">${[...cells].map((c) => cellHTML(c, '', { kind, added })).join('')}</span><b>${pre ? `<span class="pre">${esc(pre)}</span>` : ''}${esc(label)}</b>${ex ? '<button type="button" class="ex-tog" aria-expanded="false">Examples</button>' : ''}<span class="cnote">${esc(note)}</span>${ex ? `<div class="crow-ex" hidden>${ex}</div>` : ''}</${tag}>`;
 }
 // Tables holding any multi-cell symbol collapse to one column sooner, so every row in a section lines up.
 export function markMulti(root = document) {
@@ -206,7 +206,6 @@ export function bindRadios(root, fn) {
     fn(g.dataset.seg, b.dataset.v);
   });
 }
-export const switchRow = (name, label, checked) => `<label class="set-row switch"><span>${label}</span><input type="checkbox" data-set="${name}" ${checked ? 'checked' : ''}></label>`;
 // ---------- header + sticky control row ----------
 export const headTitle = $('#headTitle');
 export const helpBtn = $('#helpBtn');
@@ -290,7 +289,7 @@ export function letterDetail(l) {
   else row = `Third row: ${'abcdefghij'['uvxyz'.indexOf(l)]} plus both bottom dots.`;
   const m = mirrorLetter(l);
   return `<div class="detail">
-    <div class="detail-top">${cellHTML(c, 'xl')}<div><div class="big">${l}</div><div class="muted dots-info">${dotsLabel(c)}</div></div></div>
+    <div class="detail-top">${cellHTML(c, 'xl')}<div><div class="big">${l}</div></div></div>
     <p>${row}</p>
     <dl>
       ${DIGIT_OF[l] ? `<dt>As a number</dt><dd>After ${cellHTML(IND.number, 'sm')} it means <b>${DIGIT_OF[l]}</b></dd>` : ''}
@@ -308,7 +307,7 @@ export function symbolDetail(e) {
     <h2>${esc(e.print)}</h2>
     <dl>
       <dt>Type</dt><dd>${esc(e.cat)}</dd>
-      <dt class="dots-info">Dots</dt><dd class="dots-info">${cells.map((c) => toDots(c).join('') || '—').join(' · ')}</dd>
+      
       ${e.note ? `<dt>Note</dt><dd>${esc(e.note)}</dd>` : ''}
       ${e.blurb ? `<dt>Rule</dt><dd>${esc(e.blurb)}</dd>` : ''}
     </dl>
@@ -336,7 +335,6 @@ for (const [cat, { blurb, items }] of Object.entries(CONTRACTIONS)) for (const [
 export const KIND_OF_GROUP = { Letters: 'letter', Numbers: 'digit', Punctuation: 'punct', Indicators: 'indicator' };
 for (const e of DICT) e.kind = KIND_OF_GROUP[e.group] || 'contraction';
 export const SEC_OF_GROUP = { Letters: 'alphabet', Numbers: 'numbers', Punctuation: 'numbers', Indicators: 'numbers' };
-export const symHTML = (e, i) => `<button class="sym" data-i="${i}"><span class="cells">${[...e.cells].map((c) => cellHTML(c, '', { kind: e.kind })).join('')}</span><b>${esc(e.print)}</b>${e.note && e.note.length < 26 ? `<small>${esc(e.note)}</small>` : ''}</button>`;
 export const practiseLink = (href) => `<a class="gt-link" href="${href}">Practise ${icon('right', 16)}</a>`;
 export const groupBlock = (g, title, blurb, href) => `<div class="group-title"><h3>${titleCase(title)}</h3>${blurb ? `<span>${esc(blurb)}</span>` : ''}${href ? practiseLink(href) : ''}</div><div class="ctable narrow">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === g).map(([e, i]) => crowHTML(e.cells, e.print, { kind: e.kind, i, note: e.group === 'Numbers' ? '' : e.note })).join('')}</div>`;
 // "Examples" block that closes a section: [print, note] pairs.
