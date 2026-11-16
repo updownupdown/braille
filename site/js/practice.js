@@ -11,7 +11,7 @@ import { G2_EXAMPLES } from './g2examples.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
 import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, markMulti, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
-import { feedback, cellsLabel, say, refocus, nativeKey } from './a11y.js';
+import { feedback, haptic, cellsLabel, say, refocus, nativeKey } from './a11y.js';
 import { spotItems } from './rules.js';
 import { composeMode } from './compose.js';
 import { placementView } from './placement.js';
@@ -534,7 +534,7 @@ export function quizMode(mode, q) {
       if (added && !w.has(added)) { result(false, item); glow(false); pads[ci].classList.remove('bad'); void pads[ci].offsetWidth; pads[ci].classList.add('bad'); }
       const was = ok[ci];
       ok[ci] = on[ci].size === w.size && [...w].every((d) => on[ci].has(d)); paint(ci);
-      if (ok[ci] && !was && targets.length > 1 && !ok.every(Boolean)) announce(`Cell ${ci + 1} done`);
+      if (ok[ci] && !was && targets.length > 1 && !ok.every(Boolean)) { haptic('right'); announce(`Cell ${ci + 1} done`); }
       // After "Show me", stay three times as long so the answer can sink in.
       if (ok.every(Boolean)) { done = true; result(true, item); glow(true); setTimeout(next, shown ? 2250 : 750); }
     };
@@ -542,7 +542,12 @@ export function quizMode(mode, q) {
       if (done) return;
       if (on[ci].has(d)) { on[ci].delete(d); paint(ci); evaluate(ci, 0); } else { on[ci].add(d); paint(ci); evaluate(ci, d); }
     };
-    stage.querySelector('.pads').onclick = (e) => { const b = e.target.closest('button[data-d]'); if (b) tog(Number(b.closest('.dotpad').dataset.c), Number(b.dataset.d)); };
+    stage.querySelector('.pads').onclick = (e) => {
+      const b = e.target.closest('button[data-d]'); if (!b) return;
+      const ci = Number(b.closest('.dotpad').dataset.c), d = Number(b.dataset.d);
+      if (!done && !on[ci].has(d)) haptic('dot');
+      tog(ci, d);
+    };
     $('#skip').onclick = () => {
       if (done) return;
       if (state.firstTry) result(false, item);
@@ -611,7 +616,7 @@ export function quizMode(mode, q) {
   }
   // End of a round: score, a few facts, then the signs worth another look (misses first, then the slowest).
   function renderSummary() {
-    stage.classList.remove('glow-good', 'glow-bad');
+    stage.classList.remove('glow-good', 'glow-bad'); haptic('done');
     const secs = Math.round((Date.now() - round.start) / 1000);
     const cellsOf = (x) => (mode === 'words' ? toCells(translate(x, 'en', state.wgrade)).map((c) => c.cell).join('') : x.cells);
     const keyOf = (x) => (mode === 'words' ? x : x.key);
@@ -720,7 +725,7 @@ export function sweepMode(q) {
     if (!t0 && active) t0 = performance.now();
     const last = cells.length - 1;
     if (t0 && !tDone && last >= 0 && pos > lefts[last] + widths[last]) {
-      tDone = performance.now();
+      tDone = performance.now(); haptic('done');
       const secs = (tDone - t0) / 1000, wpm = Math.round(words() / (secs / 60));
       const bk = 'swBest' + S.swGrade, b = Math.max(store.get(bk, 0), wpm);
       if (secs > 2) store.set(bk, b);

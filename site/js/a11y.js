@@ -1,5 +1,5 @@
-// Accessibility helpers shared by every module: screen-reader announcements, optional speech and sounds
-// (both off by default, Settings), braille cells described as dots, and the reduced-motion preference.
+// Accessibility helpers shared by every module: screen-reader announcements, optional speech, sounds and haptics
+// (all off by default, Settings), braille cells described as dots, and the reduced-motion preference.
 import { toDots } from './braille.js';
 import { store } from './storage.js';
 
@@ -83,6 +83,30 @@ export function tone(ok, { force = false } = {}) {
   } catch {}
 }
 
+// ---------- haptics (Settings: Haptics) ----------
+// Four short patterns, each with one meaning, so they can be told apart without looking at the screen:
+//   dot    a dot raised on a dot pad (Draw, Write): the feel of pressing a brailler key. Lowering a dot is silent.
+//   right  one short tick: a right answer, or a finished cell in Draw and Write.
+//   wrong  two light taps: a wrong answer or a wrong dot. Same strength as right, only the rhythm differs.
+//   done   short-long: a round, lesson check, placement, game or Read line has ended (often by a timer).
+// Nothing else vibrates: not navigation, keyboards, settings or scrolling. Durations stay very short because
+// longer buzzes felt too strong on a Pixel 7. Phones that can't vibrate (iOS Safari) simply get nothing.
+const HAPTIC = { dot: [8], right: [14], wrong: [10, 70, 10], done: [16, 110, 28] };
+const RANK = { dot: 0, right: 1, wrong: 2, done: 3 };
+export const hapticsAvailable = () => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
+  && typeof matchMedia === 'function' && matchMedia('(any-pointer: coarse)').matches;
+let hUntil = 0, hRank = -1;
+export function haptic(kind, { force = false } = {}) {
+  const p = HAPTIC[kind];
+  if (!p || (!force && !setting('haptics')) || !hapticsAvailable() || document.hidden) return;
+  // A weaker pattern never cuts off a stronger one that is still playing (a dot tick can't swallow "wrong").
+  const now = performance.now();
+  if (now < hUntil && RANK[kind] < hRank) return;
+  try { if (navigator.vibrate(p)) { hRank = RANK[kind]; hUntil = now + p.reduce((a, b) => a + b, 0); } } catch {}
+}
+// Right or wrong without words: the tone and the haptic together (each only if its setting is on).
+export function cue(ok) { tone(ok); haptic(ok ? 'right' : 'wrong'); }
+
 // ---------- announcements ----------
 // One polite live region (#srLive in index.html). Messages sent within a moment of each other are joined,
 // so "Correct" and the next question's prompt arrive together instead of one cutting the other off.
@@ -98,9 +122,9 @@ export function announce(text) {
     speak(msg);
   }, 120);
 }
-// Right or wrong: the sound (if on) plays at once; the words go to the screen reader and speech.
+// Right or wrong: the sound and haptic (if on) play at once; the words go to the screen reader and speech.
 export function feedback(ok, extra = '') {
-  tone(ok);
+  cue(ok);
   announce((ok ? 'Correct' : 'Not quite') + (extra ? '. ' + extra : ''));
 }
 // Enter or Space on a focused button, link or radio does that control's own job; page-wide shortcuts leave it alone.

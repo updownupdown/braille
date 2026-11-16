@@ -26,7 +26,7 @@ export const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i-
 export const pick = (a) => a[Math.floor(Math.random() * a.length)];
 // Screen-reader announcements, optional speech and sounds, cells described as dots: see a11y.js.
 export { announce, feedback, cellsLabel, cellLabel, reducedMotion, speak } from './a11y.js';
-import { speak, stopSpeech, tone, speechAvailable } from './a11y.js';
+import { speak, stopSpeech, tone, speechAvailable, haptic, hapticsAvailable } from './a11y.js';
 // ---------- icons ----------
 export const P = {
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
@@ -83,8 +83,8 @@ export const P = {
 };
 export const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 // ---------- settings ----------
-// speech and sounds are accessibility aids, off unless turned on in Settings.
-export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', speech: false, sounds: false };
+// speech, sounds and haptics are accessibility aids, off unless turned on in Settings.
+export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', speech: false, sounds: false, haptics: false };
 export const S = { ...DEFAULTS, ...store.get('settings', {}) };
 export function applySettings() {
   const r = document.documentElement;
@@ -240,7 +240,7 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
 }
 // Segmented radio group. Screen readers hear the group's name (RADIO_LABEL) and which option is on;
 // only the chosen button is a Tab stop and the arrow keys move between options (the usual radio pattern).
-export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', wsrc: 'What to write', cgrade: 'Grade' };
+export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', haptics: 'Haptics', wsrc: 'What to write', cgrade: 'Grade' };
 export const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}"${RADIO_LABEL[name] ? ` aria-label="${RADIO_LABEL[name]}"` : ''}>${opts.map(([v, l]) => { const on = String(v) === String(value); return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-v="${v}" class="${on ? 'on' : ''}">${l}</button>`; }).join('')}</div>`;
 export function bindRadios(root, fn) {
   root.addEventListener('click', (e) => {
@@ -286,7 +286,8 @@ export function openSettings() {
     <div class="set-group"><h3>Accessibility</h3>
       <div class="set-row stack"><span>Spoken feedback</span>${radios('speech', [['0', 'Off'], ['1', 'On']], S.speech ? '1' : '0')}</div>
       <div class="set-row stack"><span>Sounds</span>${radios('sounds', [['0', 'Off'], ['1', 'On']], S.sounds ? '1' : '0')}</div>
-      <p class="set-note">Spoken feedback reads out right and wrong answers, new questions and braille cells as dot numbers${speechAvailable() ? '' : ' (this browser has no speech voices, so only sounds will play)'}. Turn it off if you use a screen reader, which already hears all of this. Sounds play a soft tone for right and wrong answers. Animations follow your device’s reduce-motion setting.</p>
+      ${hapticsAvailable() ? `<div class="set-row stack"><span>Haptics</span>${radios('haptics', [['0', 'Off'], ['1', 'On']], S.haptics ? '1' : '0')}</div>` : ''}
+      <p class="set-note">Spoken feedback reads out right and wrong answers, new questions and braille cells as dot numbers${speechAvailable() ? '' : ' (this browser has no speech voices, so only sounds will play)'}. Turn it off if you use a screen reader, which already hears all of this. Sounds play a soft tone for right and wrong answers.${hapticsAvailable() ? ' Haptics: a light tap when you raise a dot, one tick for right, two for wrong, and a short-long pulse when a round, lesson or game ends.' : ''} Animations follow your device’s reduce-motion setting.</p>
     </div>
     <div class="set-group"><h3>Your data</h3>
       <p class="set-note">Everything is saved on this device only. Save a backup file to keep it safe or move it to another device. Each reset asks you to tap again to confirm.</p>
@@ -306,6 +307,7 @@ export function openSettings() {
     if (k === 'sixKey') { setS('sixKey', v === '1'); return; }
     if (k === 'speech') { setS('speech', v === '1'); if (v === '1') speak('Spoken feedback is on'); else stopSpeech(); return; }
     if (k === 'sounds') { setS('sounds', v === '1'); if (v === '1') tone(true); return; }
+    if (k === 'haptics') { setS('haptics', v === '1'); if (v === '1') haptic('right', { force: true }); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
   // Each reset needs a second tap; it goes back to normal after a few seconds if left alone.
