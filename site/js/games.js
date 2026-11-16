@@ -28,8 +28,9 @@ function cell(c, cls = '') {
   for (let i = 1; i <= 6; i++) d += `<i class="${on.has(i) ? 'on' : ''}"></i>`;
   return `<span class="cell ${cls}" aria-hidden="true">${d}</span>`;
 }
-// A braille line for any text; labels shown under the first cell of each print character when asked.
-function line(text, { grade = 1, labels = false, cls = '', blank = false } = {}) {
+// A braille line for any text. slots: an empty label under each print character's first cell (spanning its
+// other cells), for typed letters to fill in (Secret Agent).
+function line(text, { grade = 1, slots = false, cls = '' } = {}) {
   let out = '', word = '';
   const flush = () => { if (word) out += `<span class="bword">${word}</span>`; word = ''; };
   const list = toCells(translate(text, 'en', grade));
@@ -37,9 +38,8 @@ function line(text, { grade = 1, labels = false, cls = '', blank = false } = {})
     const c = list[i];
     if (c.kind === 'space') { word += '<span class="bw space"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'; flush(); continue; }
     if (c.kind === 'newline') continue;
-    const l = labels && !blank && c.idx === 0 ? (c.print || '') : '';
     let n = 1; if (c.idx === 0) while (list[i + n] && list[i + n].idx > 0 && list[i + n].kind !== 'space') n++;
-    word += `<span class="bw">${cell(c.cell, cls)}${labels ? `<span class="lbl${n > 1 ? ' span" style="--n:' + n : ''}">${esc(l)}</span>` : ''}</span>`;
+    word += `<span class="bw">${cell(c.cell, cls)}${slots ? `<span class="lbl${n > 1 ? ' span" style="--n:' + n : ''}"></span>` : ''}</span>`;
   }
   flush();
   return `<span class="braille-line" role="img" aria-label="${esc(text)} in braille">${out}</span>`;
@@ -62,6 +62,9 @@ function keys(fn) {
   return () => { document.removeEventListener('keydown', h); document.removeEventListener('keyup', u); };
 }
 const LV3 = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
+// Trivia and Riddles: the questions have no difficulty of their own, so the only choice is the braille grade.
+// Keys stay easy/hard so saved bests and solved riddles carry over.
+const GRADES = [['easy', 'Grade 1'], ['hard', 'Grade 2']];
 // On-screen print keyboard for games, in place of a text box (no phone keyboard popping up and taking half the screen).
 // The physical keyboard works too. Returns an input-like object: value, disabled, off().
 const KB_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
@@ -137,7 +140,7 @@ const statBar = (l = '', c = '', r = '') => `<div class="g-bar"><span class="l">
 const scoreBest = (k, extra = '') => `<span class="g-score">Score: <b id="sc">0</b></span><span class="g-sep">/</span><span class="g-best">Best: <b id="best">${store.get('best.' + k, '–') ?? '–'}</b></span>${extra}`;
 const livesHTML = (n, of = 3) => Array.from({ length: of }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
 // Start screen for timed games: what to do, which symbols are in play at this level, then Start.
-const startScreen = (how, incl) => `<p class="g-how">${how}</p><button class="btn primary" id="go">Start</button><p class="g-incl"><b>Includes</b> ${incl}</p>`;
+const startScreen = (how, incl) => `<p class="g-how">${how}</p><p class="g-incl"><b>Includes</b> ${incl}</p><button class="btn primary" id="go">Start</button>`;
 
 // ---------- Sign Hunt ----------
 // A building directory in braille only: find the line that says the target. Practises scanning a real sign, not just decoding.
@@ -165,16 +168,26 @@ function signhunt(el, level) {
     busy = false; card.classList.remove('glow-good', 'glow-bad');
     const [t, ls] = lines(); target = t;
     $('#q', el).innerHTML = `Which line says <b>${esc(cap(t))}</b>?`;
-    $('#plate', el).innerHTML = ls.map((x) => `<button class="hunt-line" data-t="${esc(x.name)}">${line(cap(x.text), { grade: cfg.grade })}</button>`).join('');
+    const plate = $('#plate', el);
+    plate.innerHTML = ls.map((x) => `<button class="hunt-line" data-t="${esc(x.name)}">${line(cap(x.text), { grade: cfg.grade })}</button>`).join('');
+    fit(plate);
   }
+  // Braille words never break, so a long Grade 1 word ("Information") can be wider than a narrow phone: shrink the cells until every word fits.
+  function fit(plate) {
+    plate.style.removeProperty('--hs');
+    const over = () => $$('.hunt-line', plate).some((b) => b.scrollWidth > b.clientWidth + 1);
+    for (let s = 5.5; s >= 3.5 && over(); s -= 0.5) plate.style.setProperty('--hs', s + 'px');
+  }
+  // Once the round is settled every line is locked, so a second tap can't look like another answer.
+  const lock = () => $$('.hunt-line', el).forEach((x) => { x.disabled = true; });
   $('#plate', el).onclick = (e) => {
     const b = e.target.closest('.hunt-line'); if (!b || busy) return;
     const ok = b.dataset.t === target;
-    glow(card, ok); b.classList.add(ok ? 'right' : 'wrong');
-    if (ok) { busy = true; sc++; $('#sc', el).textContent = sc; best('hunt.' + level, sc); $('#best', el).textContent = best('hunt.' + level); setTimeout(round, 700); return; }
+    glow(card, ok); b.classList.add(ok ? 'right' : 'wrong'); b.disabled = true;
+    if (ok) { busy = true; lock(); sc++; $('#sc', el).textContent = sc; best('hunt.' + level, sc); $('#best', el).textContent = best('hunt.' + level); setTimeout(round, 700); return; }
     lives--; $('#lives', el).innerHTML = livesHTML(lives);
     if (!lives) {
-      busy = true; $$('.hunt-line', el).forEach((x) => { if (x.dataset.t === target) x.classList.add('right'); });
+      busy = true; lock(); $$('.hunt-line', el).forEach((x) => { if (x.dataset.t === target) x.classList.add('right'); });
       setTimeout(() => {
         $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`;
         $('#plate', el).innerHTML = '<button class="btn primary" id="again">Play again</button>';
@@ -276,7 +289,8 @@ function memory(el, level) {
 }
 
 // ---------- multiple-choice engine (Trivia, Riddles) ----------
-function quiz(el, level, { next, labels = level === 'easy', print = true, choices = 4, onAnswer = null }) {
+// No print under the cells: the print answer appears once you've picked.
+function quiz(el, level, { next, choices = 4, onAnswer = null }) {
   const grade = level === 'hard' ? 2 : 1;
   el.innerHTML = `<div class="g-qstats"><span>Question <b id="qn">1</b> / 10</span><span>Score: <b id="sc">0</b></span><div class="g-qslot" id="qslot"></div></div>
     <div class="card g-card quiz" id="card"></div><div class="q-next"><button class="btn primary" id="nextBtn" hidden>Next</button></div>`;
@@ -287,7 +301,7 @@ function quiz(el, level, { next, labels = level === 'easy', print = true, choice
     item = next(); answered = false;
     const opts = shuffle([item.a, ...item.w.slice(0, choices - 1)]);
     card.classList.remove('glow-good', 'glow-bad');
-    card.innerHTML = `<p class="quiz-q">${esc(item.q)}</p><div class="quiz-opts">${opts.map((o) => `<button class="quiz-opt" data-o="${esc(o)}">${line(o, { grade, labels })}${print ? `<span class="quiz-print">${esc(o)}</span>` : ''}</button>`).join('')}</div>`;
+    card.innerHTML = `<p class="quiz-q">${esc(item.q)}</p><div class="quiz-opts">${opts.map((o) => `<button class="quiz-opt" data-o="${esc(o)}">${line(o, { grade })}<span class="quiz-print">${esc(o)}</span></button>`).join('')}</div>`;
     q$('#qn').textContent = n + 1; $('#nextBtn', el).hidden = true;
   }
   card.onclick = (e) => {
@@ -343,8 +357,7 @@ function riddles(el, level, ctx) {
   const solved = new Set(store.get(key, []));
   el.dataset.k = 'riddles';
   const tally = () => { const s = $('#qslot', el); if (s) s.innerHTML = `<span class="g-solved">Solved <b>${solved.size}</b> of ${items.length}</span>`; };
-  // Easy has three choices instead of four.
-  const stop = quiz(el, level, { choices: level === 'easy' ? 3 : 4,
+  const stop = quiz(el, level, {
     onAnswer: (item, ok) => { if (ok && !solved.has(item.q)) { solved.add(item.q); store.set(key, [...solved]); tally(); } },
     next: () => {
       // Riddles not yet solved at this level come first.
@@ -511,7 +524,7 @@ function agent(el, level, ctx) {
       <div class="card g-card ag">
         <div class="ag-top"><b class="ag-title">${esc(m.title)}</b><button class="btn ghost small-btn" id="hint">Hint</button></div>
         <p class="ag-brief">${esc(m.brief)}</p>
-        <div class="ag-msg" id="msg">${words.map((w, i) => `<span class="ag-w" data-i="${i}">${line(w, { grade: m.grade, labels: true, blank: true })}</span>`).join('')}</div>
+        <div class="ag-msg" id="msg">${words.map((w, i) => `<span class="ag-w" data-i="${i}">${line(w, { grade: m.grade, slots: true })}</span>`).join('')}</div>
         <p class="ag-after" id="after" hidden></p>
       </div>
       <div id="kb"></div>
@@ -529,7 +542,7 @@ function agent(el, level, ctx) {
       onEnter: () => { if (inp.value.trim() && wi < words.length) glow(card, false); } });
     const mark = () => {
       $$('.ag-w', el).forEach((w, i) => { w.classList.toggle('cur', i === wi); w.classList.toggle('done', i < wi); });
-      // The message wraps onto lines; if it ever scrolls (a very long word), keep the current word in view.
+      // The message is one scrolling line, so keep the current word centred in it.
       const msg = $('#msg', el), cur = $('.ag-w.cur', el);
       if (msg && cur) glide(msg, cur.offsetLeft - (msg.clientWidth - cur.offsetWidth) / 2, first ? 0 : 1000);
       first = false;
@@ -836,29 +849,29 @@ export const GAME_GROUPS = [
   ['Puzzles and Quizzes', ['memory', 'maze', 'signhunt', 'trivia', 'riddles']],
 ];
 export const GAMES = {
-  wordle: { name: 'Braidle', icon: 'grid', range: 'Medium', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
+  wordle: { name: 'Braidle', icon: 'grid', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
     help: ['Guess the hidden five-letter word in six tries. Type on the braille keyboard or your own keyboard.', 'After each guess, green means the right letter in the right spot, yellow means it’s in the word somewhere else, and grey means it’s not in the word.', '“With letters” shows print under each cell. “Braille only” makes you read every cell.'] },
-  snowman: { name: 'Snowman', icon: 'snowman', range: 'Easy–Hard', desc: 'Guess the word from a braille keyboard before the snowman is built', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: snowman,
+  snowman: { name: 'Snowman', icon: 'snowman', desc: 'Guess the word from a braille keyboard before the snowman is built', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: snowman,
     help: ['Guess the word one letter at a time. Each correct letter appears as a braille cell. The clue tells you the category.', 'Each wrong guess adds a piece to the snowman. The pale outline shows what’s left; six wrong guesses and it’s finished.', 'Over 1,000 words in 16 categories.', '“Braille only” hides the print letters on the keyboard.'] },
-  anagrams: { name: 'Anagrams', icon: 'shuffle', range: 'Easy–Hard', desc: 'Drag scrambled braille cells into the right order', levels: LV3, run: anagrams,
+  anagrams: { name: 'Anagrams', icon: 'shuffle', desc: 'Drag scrambled braille cells into the right order', levels: LV3, run: anagrams,
     help: ['The letters of a word appear as braille cells, but in the wrong order.', 'Drag the cells to reorder them. When they spell the word, the letters appear.', 'Hint moves the next letter into place.'] },
-  agent: { name: 'Secret Agent', icon: 'key', range: 'Easy–Hard', desc: 'Decode intercepted braille messages to crack ten cases', run: agent,
+  agent: { name: 'Secret Agent', icon: 'key', desc: 'Decode intercepted braille messages to crack ten cases', run: agent,
     help: ['Each mission has a message written in braille. Decode it one word at a time: the highlighted word is the one to type.', 'Pick a case from the menu at the top. Easy cases are lowercase Grade 1, Medium adds capitals, numbers and punctuation, Hard is Grade 2.', 'Your place in each case is saved. Once a case is solved you can play it again.', 'Hint reveals the next letter of the current word.'] },
-  rain: { name: 'Braille Rain', icon: 'rain', range: 'Medium–Hard', desc: 'Type falling letters before they land; later, whole words', levels: LV3, run: rain,
+  rain: { name: 'Braille Rain', icon: 'rain', desc: 'Type falling letters before they land; later, whole words', levels: LV3, run: rain,
     help: ['Braille cells fall from the top. Type the matching letter before each one reaches the bottom.', 'Every ten catches the level goes up and things fall faster. From a later level, whole words start to fall too.', 'Three misses and the game ends.'] },
-  time: { name: 'Time Attack', icon: 'timer', range: 'Easy–Hard', desc: 'Sixty seconds: read as many letters as you can', levels: LV3, run: timeAttack,
+  time: { name: 'Time Attack', icon: 'timer', desc: 'Sixty seconds: read as many letters as you can', levels: LV3, run: timeAttack,
     help: ['You have 60 seconds. A braille cell appears: type its letter, and the next one appears right away.', 'Easy uses a–j, Medium all letters, Hard adds numbers (type the digit).', 'Your best score is saved for each level.'] },
-  mirror: { name: 'Mirror Match', icon: 'mirror', range: 'Medium–Hard', desc: 'Tell look-alike letters like d, f, h and j apart, fast', levels: LV3, run: mirror,
+  mirror: { name: 'Mirror Match', icon: 'mirror', desc: 'Tell look-alike letters like d, f, h and j apart, fast', levels: LV3, run: mirror,
     help: ['Some letters are mirror images of each other, like d and f, or e and i. Pick the right one.', 'Easy gives you two choices, Medium four, and Hard mixes many more look-alikes, including Grade 2 signs.', 'Each round lasts 30 seconds; there is no limit on a single answer.'] },
-  memory: { name: 'Memory', icon: 'cards', range: 'Easy–Hard', desc: 'Flip cards to pair each braille cell with its letter', levels: LV3, run: memory,
+  memory: { name: 'Memory', icon: 'cards', desc: 'Flip cards to pair each braille cell with its letter', levels: LV3, run: memory,
     help: ['Flip two cards at a time. Match each braille cell with its print letter.', 'Easy uses 6 pairs from a–j, Medium 8 pairs, Hard 15 pairs with lots of look-alikes.', 'Try to finish in as few moves as you can.'] },
-  maze: { name: 'Braille Maze', icon: 'maze', range: 'Easy–Hard', desc: 'Step only on the cells that spell the word, in order', levels: LV3, run: maze,
+  maze: { name: 'Braille Maze', icon: 'maze', desc: 'Step only on the cells that spell the word, in order', levels: LV3, run: maze,
     help: ['Start at the flag. Step up, down, left or right onto the next letter of the word.', 'Cells that don’t spell the word are traps. Three traps and the route is revealed.', 'Bigger grids and longer words on harder levels. Hard uses Grade 2, so some steps are contractions.'] },
-  signhunt: { name: 'Sign Hunt', icon: 'sign', range: 'Easy–Hard', desc: 'Find the right line on a building directory, in braille only', levels: LV3, run: signhunt,
+  signhunt: { name: 'Sign Hunt', icon: 'sign', desc: 'Find the right line on a building directory, in braille only', levels: LV3, run: signhunt,
     help: ['A directory sign lists several places, in braille only. Tap the line that says the place you are looking for.', 'Easy has three lines in Grade 1. Medium has four in Grade 2, the way Canadian signs are made. Hard has five, with look-alike lines and room numbers.', 'Three wrong taps and the round ends. Your best score is saved for each level.'] },
-  trivia: { name: 'Trivia', icon: 'help', range: 'Easy–Hard', desc: '1,000 questions on ten topics, with answers in braille', levels: LV3, run: trivia,
-    help: ['Read the question, then pick the answer. The answers are written in braille.', 'Easy shows print under the cells, Medium is braille only, Hard uses Grade 2 contractions.', 'Rounds are ten questions. Choose a topic or play them all.'] },
-  riddles: { name: 'Riddles', icon: 'bulb', range: 'Easy–Hard', desc: 'Over 100 riddles; pick the answer written in braille', levels: LV3, run: riddles,
-    help: ['Read the riddle, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Easy has three choices and shows letters under the cells. Medium has four, and Hard uses Grade 2 contractions.'] },
+  trivia: { name: 'Trivia', icon: 'help', desc: '1,000 questions on ten topics, with answers in braille', levels: GRADES, run: trivia,
+    help: ['Read the question, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Grade 1 spells every answer letter by letter; Grade 2 uses contractions.', 'Rounds are ten questions. Choose a topic or play them all.'] },
+  riddles: { name: 'Riddles', icon: 'bulb', desc: 'Over 100 riddles; pick the answer written in braille', levels: GRADES, run: riddles,
+    help: ['Read the riddle, then pick the answer. The answers are written in braille, and the print appears once you answer.', 'Grade 1 spells every answer letter by letter; Grade 2 uses contractions.'] },
 };
 export { gameStore };
