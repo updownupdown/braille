@@ -59,7 +59,7 @@ views.games = (q, sub) => {
 export let INDEX = null;
 export function buildIndex() {
   const out = [];
-  const nav = (h) => () => { closeSearch(); location.hash = h; };
+  const nav = (h) => () => { closeSearch(false); location.hash = h; };
   DICT.forEach((e, i) => out.push({
     title: e.print, sub: e.group === 'Letters' ? 'Letter' : e.cat + (e.note && e.note.length < 40 ? ' · ' + e.note : ''), cells: e.cells, kind: e.kind,
     sec: SEC_OF_GROUP[e.group] || (Object.entries(G2_LESSONS).find(([, [, cs]]) => cs.includes(e.group)) || ['grade2'])[0], dict: e,
@@ -101,32 +101,84 @@ export function searchResults(raw) {
   }
   return scored.sort((a, b) => b[0] - a[0]).slice(0, 60).map(([, e]) => e);
 }
-export const searchBar = $('#searchBar'), searchPanel = $('#searchPanel');
-export function openSearch() {
-  searchBar.hidden = false; syncHeadH();
-  const q = $('#gq'); q.focus(); if (q.value) renderSearch();
+// ---------- search overlay ----------
+// A dialog over the page on a pale mask. Empty: recent searches (tap to search again). Typing: results.
+// The box grows with its content and scrolls inside once it would reach the screen edge.
+export const searchOv = $('#searchOv'), searchPanel = $('#searchPanel');
+const gq = $('#gq'), HIST = 'searchHist', HIST_MAX = 8;
+let searchOpener = null;
+const history = () => { const h = store.get(HIST, []); return Array.isArray(h) ? h.filter((x) => typeof x === 'string') : []; };
+// Keeps the query someone actually used (picked a result or pressed Enter), newest first, without repeats.
+function remember(raw) {
+  const q = raw.trim().replace(/\s+/g, ' ');
+  if (!q) return;
+  store.set(HIST, [q, ...history().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, HIST_MAX));
 }
-export function closeSearch() { searchBar.hidden = true; searchPanel.hidden = true; $('#gq').value = ''; syncHeadH(); $('#searchBtn').blur(); }
+export function openSearch() {
+  if (!searchOv.hidden) { gq.focus(); return; }
+  searchOpener = document.activeElement;
+  searchOv.hidden = false; document.documentElement.classList.add('so-open');
+  $('#searchBtn').setAttribute('aria-expanded', 'true');
+  renderSearch(); gq.focus();
+}
+// refocus: put focus back where search was opened from (Escape, Close, tapping the mask). Off when a result navigates away.
+export function closeSearch(refocus = true) {
+  if (searchOv.hidden) return;
+  searchOv.hidden = true; document.documentElement.classList.remove('so-open');
+  $('#searchBtn').setAttribute('aria-expanded', 'false');
+  gq.value = ''; searchPanel.innerHTML = '';
+  const o = searchOpener; searchOpener = null;
+  if (refocus && o && o.isConnected && typeof o.focus === 'function') o.focus({ preventScroll: true });
+}
 export let RESULTS = [];
+function renderHistory() {
+  const h = history();
+  searchPanel.innerHTML = h.length
+    ? `<div class="so-hist"><div class="so-hh"><h2 id="soRecent">Recent Searches</h2><button type="button" class="so-clear">Clear</button></div><ul aria-labelledby="soRecent">${h.map((q, i) => `<li><button type="button" class="so-h" data-h="${i}">${icon('restart', 18)}<span>${esc(q)}</span></button></li>`).join('')}</ul></div>`
+    : '<p class="so-hint">Search letters, contractions, signs and games, or type dots like <b>1-2-5</b>.</p>';
+}
 export function renderSearch() {
-  const raw = $('#gq').value;
-  if (!raw.trim()) { searchPanel.hidden = true; return; }
+  const raw = gq.value;
+  if (!raw.trim()) { RESULTS = []; renderHistory(); return; }
   RESULTS = searchResults(raw);
   const secName = Object.fromEntries([...REF_SECTIONS, ['practice', 'Practice'], ['games', 'Games']]);
   const tr = /[a-z]/i.test(raw) && !/^[1-6\s-]+$/.test(raw) ? `<a class="sr tr" href="#/translate?lang=en&text=${encodeURIComponent(raw)}"><span class="sr-cells">${lineHTML(translate(raw, 'en', 2), { labels: false, cls: 'sm' })}</span><span class="sr-text"><b>Translate “${esc(raw)}”</b><small>English Grade 2</small></span></a>` : '';
-  searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr${e.cells && [...e.cells].length > 3 ? ' long' : ''}" data-r="${i}"><span class="sr-cells">${e.cells ? ([...e.cells].length > 3 ? cellsHTML(e.cells, 'sm') : cellsK(e.cells, e.kind || '', 'sm')) : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word or a symbol.</p>'}${tr}</div>`;
-  searchPanel.hidden = false;
+  searchPanel.innerHTML = `${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button type="button" class="sr${e.cells && [...e.cells].length > 3 ? ' long' : ''}" data-r="${i}"><span class="sr-cells">${e.cells ? ([...e.cells].length > 3 ? cellsHTML(e.cells, 'sm') : cellsK(e.cells, e.kind || '', 'sm')) : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="so-hint">Nothing matches. Try a word or a symbol.</p>'}${tr}`;
+  searchPanel.scrollTop = 0;
   const st = $('#srStatus'); if (st) st.textContent = RESULTS.length ? `${RESULTS.length} result${RESULTS.length > 1 ? 's' : ''}` : 'Nothing matches';
 }
-$('#gq').addEventListener('input', renderSearch);
-$('#gq').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSearch(); if (e.key === 'Enter') { const b = $('.sr', searchPanel); if (b) b.click(); } });
-$('#searchClose').onclick = closeSearch;
+gq.addEventListener('input', renderSearch);
+gq.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const b = $('.sr', searchPanel); if (b) b.click(); } }); // preventDefault: else the Enter also presses the sheet's Close button
+$('#searchClose').onclick = () => closeSearch();
 searchPanel.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-r]'); if (b) { const r = RESULTS[Number(b.dataset.r)]; r.act(); return; }
-  if (e.target.closest('a.sr')) { closeSearch(); return; }
-  if (e.target === searchPanel) closeSearch();
+  const b = e.target.closest('[data-r]');
+  if (b) { remember(gq.value); RESULTS[Number(b.dataset.r)].act(); return; }
+  if (e.target.closest('a.sr')) { remember(gq.value); closeSearch(false); return; }
+  const h = e.target.closest('[data-h]');
+  if (h) { gq.value = history()[Number(h.dataset.h)] || ''; renderSearch(); gq.focus(); return; }
+  if (e.target.closest('.so-clear')) { store.remove(HIST); renderHistory(); gq.focus(); announce('Recent searches cleared'); }
 });
-$('#searchBtn').onclick = () => (searchBar.hidden ? openSearch() : closeSearch());
+// Tapping the mask closes; Escape closes; Tab stays inside; up/down arrows walk the input and the rows.
+searchOv.addEventListener('click', (e) => { if (e.target === searchOv) closeSearch(); });
+searchOv.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeSearch(); return; }
+  if (e.key === 'Tab') {
+    const f = $$('input, button, a[href]', searchOv).filter((x) => x.offsetParent !== null);
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    return;
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const items = [gq, ...$$('.sr, .so-h', searchPanel)];
+    const i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    const n = items[Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+    e.preventDefault(); n.focus(); if (n !== gq) n.scrollIntoView({ block: 'nearest' });
+  }
+});
+$('#searchBtn').setAttribute('aria-haspopup', 'dialog'); $('#searchBtn').setAttribute('aria-expanded', 'false');
+$('#searchBtn').onclick = () => (searchOv.hidden ? openSearch() : closeSearch());
 // ---------- on-screen keyboard: size content to the visible area ----------
 // On Android the page itself resizes with the keyboard, so the viewport alone can't tell; on a touch screen,
 // a focused text field means the keyboard is up.
@@ -162,7 +214,7 @@ export function route() {
   const q = new URLSearchParams(qs || '');
   const key = views[name] ? name : '';
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
-  closeSheet(); closeDD(); if (!searchBar.hidden) closeSearch();
+  closeSheet(); closeDD(); closeSearch(false);
   helpBtn.hidden = true;
   document.body.dataset.page = key || 'home';
   const r = views[key](q, sub, sub2);

@@ -13,6 +13,7 @@
 //   cwSrc, cwGrade     Write mode source and grade (the placement check writes into mastery and auto)
 //   refSec, refLang, csGrade, signRegion, mOpen, topic   where each Learn page was left
 //   trText, trMode, trDir, trDots, trView   Translate state
+//   searchHist         recent searches, newest first (up to 8)
 //   g.*                games: best.<game><level>, played, last, agent.p.<case>, maze, snow, riddles…
 //   schema             the storage layout version (below)
 const PREFIX = 'dots.';
