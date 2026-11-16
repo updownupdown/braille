@@ -32,10 +32,18 @@ export function statsHTML() {
   const count = (pre, items) => { let k = 0, l = 0; items.forEach((x) => { const v = level(m[pre + x.key] || 0); if (v >= 4) k++; else if (v > 0) l++; }); return [k, l]; };
   const bar = (pre, items, cat, set, mode) => { const [k, l] = count(pre, items), n = items.length; return `<a class="st-bar" href="#/practice/${mode}?cat=${cat}&set=${set}" aria-label="${k} known, ${l} learning of ${n}"><span class="st-track"><i class="k" style="width:${(k / n) * 100}%"></i><i class="l" style="width:${(l / n) * 100}%"></i></span><span class="st-n"><b>${k}</b>/${n}</span></a>`; };
   const rows = groups.map(([n, items, cat, set]) => `<tr><th scope="row">${n}</th><td>${bar('r:', items, cat, set, 'read')}</td><td>${bar('w:', items, cat, set, 'write')}</td></tr>`).join('');
-  // 12 weeks, Monday first, today last.
-  const today = new Date(); const start = new Date(today); start.setDate(start.getDate() - 83 - ((today.getDay() + 6) % 7));
+  // 12 weeks in columns, Monday at the top, ending with this week (today is the last cell).
+  const today = new Date(); const start = new Date(today); start.setDate(start.getDate() - 77 - ((today.getDay() + 6) % 7)); // the Monday 11 weeks before this week's
   const cellsCal = []; const max = Math.max(1, ...Object.values(days));
-  for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) { const v = days[dayKey(d)] || 0; cellsCal.push(`<i class="${v ? 'on' : ''}" style="${v ? `--a:${(0.35 + 0.65 * v / max).toFixed(2)}` : ''}" title="${dayKey(d)}: ${v} answers"></i>`); }
+  const monthAt = []; // week column -> month name, where a month starts (or the first column)
+  for (const d = new Date(start), w = { i: 0 }; d <= today; d.setDate(d.getDate() + 1), w.i++) {
+    const v = days[dayKey(d)] || 0, col = Math.floor(w.i / 7), isToday = dayKey(d) === dayKey(today);
+    if (w.i === 0 || d.getDate() === 1) monthAt[col] = d.toLocaleString('en', { month: 'short' });
+    cellsCal.push(`<i class="${v ? 'on' : ''}${isToday ? ' today' : ''}" style="${v ? `--a:${(0.35 + 0.65 * v / max).toFixed(2)}` : ''}" title="${dayKey(d)}${isToday ? ' (today)' : ''}: ${v} answers"></i>`);
+  }
+  // The first column's month is dropped when the next month starts within two weeks, so labels never overlap.
+  { const nx = monthAt.findIndex((m, c) => c > 0 && m); if (nx > 0 && nx < 3) monthAt[0] = ''; }
+  const weeks = Math.ceil(cellsCal.length / 7);
   const daysPractised = Object.keys(days).length, streak = dayStreak(days);
   const all = Object.values(store.get('auto', {})).reduce((acc, st) => { Object.values(st.s || {}).forEach(([b]) => { acc[b] = (acc[b] || 0) + 1; }); return acc; }, {});
   const autoBoxes = AUTO_GAP.map((_, b) => all[b] || 0);
@@ -49,7 +57,10 @@ export function statsHTML() {
       <div><b>${Object.values(days).reduce((a, b) => a + b, 0)}</b><span>answers</span></div>
     </div>
     <h2 class="sec-h">Last 12 Weeks</h2>
-    <div class="st-cal" aria-label="Practice calendar, darker means more answers">${cellsCal.join('')}</div>
+    <div class="st-calx"><span></span><div class="st-cal-m" aria-hidden="true" style="grid-template-columns:repeat(${weeks},1fr)">${Array.from({ length: weeks }, (_, c) => `<span>${monthAt[c] || ''}</span>`).join('')}</div>
+      <div class="st-cal-d" aria-hidden="true"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span></div>
+      <div class="st-cal" role="img" aria-label="Practice calendar for the last 12 weeks: ${daysPractised} days practised. Darker means more answers.">${cellsCal.join('')}</div></div>
+    <div class="st-cal-foot"><span>${daysPractised ? 'Today is outlined.' : 'Today is outlined. Practise today to start your streak.'}</span><span class="st-leg" aria-hidden="true">Less <i></i><i style="--a:.4"></i><i style="--a:.7"></i><i style="--a:1"></i> More</span></div>
     <h2 class="sec-h">Known Signs</h2>
     <p class="muted small st-key"><span class="k"></span> known <span class="l"></span> learning. Tap a bar to practise that group.</p>
     <table class="st-table"><thead><tr><th></th><th>Guess</th><th>Draw</th></tr></thead><tbody>${rows}</tbody></table>
@@ -63,6 +74,9 @@ export function statsHTML() {
 }
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
 export const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
+// Each lesson's icon is a braille cell from that lesson: full cell, a, number sign, and, but (b), the, en, one, ab (about).
+export const LESSON_CELLS = { overview: '⠿', alphabet: '⠁', numbers: '⠼', grade2: '⠯', g2words: '⠃', g2strong: '⠮', g2lower: '⠢', g2affix: '⠐⠕', g2short: '⠁⠃' };
+export const secIcon = (k, done = false, size = 24) => (done ? icon('check', size) : LESSON_CELLS[k] ? `<span class="lic">${[...LESSON_CELLS[k]].map((c) => cellHTML(c)).join('')}</span>` : icon(SEC_ICON[k], size));
 export const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
 export const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'chunt', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
