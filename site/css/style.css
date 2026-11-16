@@ -1649,3 +1649,30 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .prompt-cells .cell.dim { opacity: .15; }
 .stage .prompt-cells.in-word { flex-wrap: nowrap; }
 .stage .prompt-cells.in-word .cell { --s: clamp(9px, 2.9vw, 18px); }
+
+/* ---------- Practice: Spot the right brailling ---------- */
+.spot-q { font-size: 1.15rem; text-align: center; margin: 0 0 14px; outline: none; }
+.spot-q b { font-size: 1.5rem; font-weight: 600; display: block; margin-top: 2px; }
+.spot-opts { display: grid; gap: 10px; width: 100%; max-width: 520px; }
+.spot-opt { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); cursor: pointer; text-align: left; }
+.spot-opt:hover { border-color: var(--accent); }
+.spot-n { width: 22px; flex: none; color: var(--muted); font-size: .85rem; font-weight: 500; }
+.spot-cells { display: flex; flex-wrap: wrap; gap: 4px 0; }
+.spot-cells .cell { --s: 8px; }
+.spot-opt.right { background: color-mix(in srgb, var(--good) 18%, var(--surface)); border-color: var(--good); }
+.spot-opt.wrong { background: color-mix(in srgb, var(--bad) 14%, var(--surface)); border-color: var(--bad); animation: shakeSm .2s linear; }
+.spot-opt.dim { opacity: .55; }
+.spot-why { min-height: 2.8em; margin: 12px 0 0; max-width: 520px; font-size: .95rem; color: var(--ink-2, var(--ink)); text-align: center; }
+.spot-next { min-height: var(--ctl-h); }
+
+/* ---------- Learn: Watch Out (common Grade 2 mistakes) ---------- */
+.mk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.mk { display: grid; gap: 8px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.mk .print { font-size: 1.1rem; font-weight: 500; }
+.mk-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; column-gap: 10px; }
+.mk-mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.mk-row.ok .mk-mark { background: var(--good); }
+.mk-row.no .mk-mark { background: var(--bad); }
+.mk-row.no .braille-line { opacity: .85; }
+.mk-row .braille-line { flex-wrap: wrap; }
+.mk-why { margin: 0; font-size: .85rem; color: var(--muted); }

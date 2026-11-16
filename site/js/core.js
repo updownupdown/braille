@@ -193,11 +193,11 @@ sheet.addEventListener('click', (e) => { if (e.target.closest('a[href^="#"]')) c
 export let openDD = null;
 export function closeDD() { if (openDD) { openDD.classList.remove('open'); const b = $('.dd-btn', openDD); if (b) b.setAttribute('aria-expanded', 'false'); openDD = null; } }
 document.addEventListener('click', (e) => { if (openDD && !openDD.contains(e.target)) closeDD(); });
-export function dropdown(el, { label = '', options, value, onChange, plain = false, lead = '' }) {
+export function dropdown(el, { label = '', options, value, onChange, plain = false, lead = '', aria = '' }) {
   const cur = options.find((o) => o.value === value);
   let lastGroup = null;
   el.classList.add('dd');
-  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox" aria-expanded="false"${label && plain ? '' : ` aria-label="${esc([label, cur ? cur.label : ''].filter(Boolean).join(': '))}"`}>${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
+  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox" aria-expanded="false"${label && plain ? '' : ` aria-label="${esc([aria || label, cur ? cur.label : ''].filter(Boolean).join(': '))}"`}>${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
     <div class="dd-menu" role="listbox">${options.map((o) => {
       const g = o.group && o.group !== lastGroup ? `<div class="dd-group">${esc(o.group)}</div>` : '';
       lastGroup = o.group || lastGroup;
@@ -233,7 +233,7 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
     e.stopPropagation(); closeDD();
     const v = options.find((o) => String(o.value) === b.dataset.v).value;
     const kb = e.detail === 0;
-    dropdown(el, { label, options, value: plain ? null : v, onChange, plain, lead });
+    dropdown(el, { label, options, value: plain ? null : v, onChange, plain, lead, aria });
     if (kb) $('.dd-btn', el).focus();
     onChange(v);
   };

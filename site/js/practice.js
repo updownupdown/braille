@@ -12,6 +12,7 @@ import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
 import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
 import { feedback, cellsLabel, say, refocus } from './a11y.js';
+import { spotItems } from './rules.js';
 // ---------- practice data ----------
 export const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
 // The note is only shown in the help sheet's list, never in the quiz.
@@ -37,6 +38,8 @@ export const CATS = {
     start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean)],
     ...Object.fromEntries(Object.keys(CONTRACTIONS).map((cat, i) => ['k' + i, [cat, C(cat)]])),
     all: ['All contractions', () => [...new Map(Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).map((x) => [x.key, x])).values()]],
+    // A word and a few ways to braille it: pick the one that follows the rules (Guess only).
+    spot: ['Spot the right brailling', () => spotItems(), 'Which one follows the rules?', 'read'],
   } },
   // Auto: the set is the signs introduced so far (per mode), drawn from the whole course or one grade of it.
   auto: { name: 'Auto', sets: {
@@ -219,6 +222,7 @@ export const SET_HELP = {
   'symbols.signs': ['Maths & money signs', ['These take two cells: a prefix, then a cell that names the sign.', 'Plus, minus, times, divided by, equals and the asterisk share the same prefix (the middle-right dot), so it is the second cell that tells them apart. Dollar, at and ampersand use the top-right dot instead: dollar is that dot plus s, at is that dot plus a.']],
   'symbols.ind': ['Indicators', ['Indicators are not printed characters. They change how the next cells are read.', 'The capital sign makes the next letter a capital; two make the whole word capitals, and three a whole passage, closed by the terminator. The number sign starts digits. The grade 1 indicator says the next cell is a plain letter, not a contraction. Italic and bold mark emphasis.']],
   'contractions.start': ['Starter signs', ['The 18 signs that turn up most in everyday text: the five strong contractions (and, for, of, the, with), a few one-letter wordsigns (but, can, do, it, that, you) and the commonest letter groups (ing, st, sh, th, ch, er, ed).', 'Knowing these makes most Grade 2 text much easier to read.']],
+  'contractions.spot': ['Spot the right brailling', ['A word in print, and two to four ways to write it in braille. Only one follows the Grade 2 rules; the others use a sign where it isn’t allowed, or skip a sign that should be used.', 'After you answer, the reason appears under the choices. Each Grade 2 lesson in Learn has a Watch Out list with the same kind of mistakes.']],
   'contractions.all': ['All contractions', ['Grade 2 uses about 180 contractions to make braille shorter. Many cells mean different things alone and inside a word, so each sign has rules for where it may go.', 'Learn them group by group; this set mixes every group.']],
   'Alphabetic wordsigns': ['Alphabetic wordsigns', ['When a letter stands alone, with a space or punctuation on each side, it means a whole word: b alone is “but”, c is “can”, d is “do”.', 'Inside a word the letter is just a letter. a, i and o are already words, so they have no wordsign; x is “it”, y is “you” and z is “as”.']],
   'Strong contractions': ['Strong contractions', ['and, for, of, the and with each have their own cell. They are “strong” because they can go anywhere: as a whole word (the) or inside one (them, form, often, without).', 'They fill the cell from the top, so they are easy to tell apart from the lower signs.']],
@@ -285,7 +289,9 @@ export function quizMode(mode, q) {
   if (saved.cat === 'review') saved.cat = 'auto';
   const state = { cat: (q.get('cat') === 'review' ? 'auto' : q.get('cat')) || saved.cat, set: q.get('set') || saved.set, wgrade: store.get('pwgrade', 1), wlen: store.get('pwlen', 'medium'), streak: 0, right: 0, total: 0, last: null, firstTry: true };
   if (!CATS[state.cat]) state.cat = 'letters';
-  if (!CATS[state.cat].sets[state.set]) state.set = Object.keys(CATS[state.cat].sets)[0];
+  // Some sets only work in one mode (Spot the right brailling is Guess only).
+  const setsFor = (cat) => Object.entries(CATS[cat].sets).filter(([, x]) => !x[3] || x[3] === mode);
+  if (!CATS[state.cat].sets[state.set] || !setsFor(state.cat).some(([k]) => k === state.set)) state.set = setsFor(state.cat)[0][0];
   const m = mastery();
   const picker = $('#picker'), body = $('#modeBody');
   if (mode !== 'words') helpBtn.onclick = () => openSheet(practiceHelp(mode, state.cat, state.set), { title: helpTitle(state.cat, state.set) });
@@ -316,14 +322,14 @@ export function quizMode(mode, q) {
       wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[state.wlen][1]));
     } else {
       picker.innerHTML = radios('cat', CAT_ORDER.map((k) => [k, CATS[k].name]), state.cat) + '<div id="setDD"></div>';
-      dropdown($('#setDD'), { options: Object.entries(CATS[state.cat].sets).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
+      dropdown($('#setDD'), { aria: 'Set', options: setsFor(state.cat).map(([k, [n, , hint]]) => ({ value: k, label: n, hint })), value: state.set, onChange: (v) => { state.set = v; saveSel(); restart(); } });
     }
   }
   const saveSel = () => store.set('psel', { cat: state.cat, set: state.set });
   bindRadios(picker, (k, v) => {
     if (k === 'wgrade') { state.wgrade = Number(v); store.set('pwgrade', state.wgrade); wScore(); next(); return; }
     if (k === 'wlen') { state.wlen = v; store.set('pwlen', v); wordDeck = deck(COMMON_WORDS.filter(WORD_LEN[v][1])); next(); return; }
-    state.cat = v; state.set = Object.keys(CATS[v].sets)[0]; saveSel(); renderPicker(); restart();
+    state.cat = v; state.set = setsFor(v)[0][0]; saveSel(); renderPicker(); restart();
   });
   function restart() { state.last = null; renderMastery(); next(); }
   // Pills for every symbol in the set, collapsed to four rows with a fade; the chevron only shows when there is more.
@@ -401,6 +407,7 @@ export function quizMode(mode, q) {
 
   function renderRead() {
     const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true;
+    if (item.spot) return renderSpot(item);
     stage.classList.remove('glow-good', 'glow-bad');
     let pool = items().filter((x) => x.key !== item.key);
     // Early in Auto, top up from the sign's own group so there are always three wrong answers.
@@ -430,6 +437,48 @@ export function quizMode(mode, q) {
       if (/^[1-4]$/.test(e.key) && !opts.some((o) => /^[0-9]$/.test(o.answer))) return choose(btns[Number(e.key) - 1]);
       const o = opts.find((x) => x.answer === e.key.toLowerCase());
       if (o) choose(btns.find((b) => b.dataset.k === o.key));
+    };
+  }
+
+  // Spot the right brailling: a print word and two to four brailled versions; only one follows UEB.
+  // Cells are plain (no colour coding, no print); once answered, the reason for the trap is shown under the choices.
+  function renderSpot(item) {
+    stage.classList.remove('glow-good', 'glow-bad');
+    const sp = item.spot;
+    const opts = shuffle([{ cells: sp.right, ok: true }, ...shuffle(sp.wrongs).slice(0, 3)]);
+    const optHTML = (o, i) => `<button type="button" class="spot-opt" data-i="${i}" aria-label="Option ${i + 1}: ${esc(cellsLabel(o.cells))}"><span class="spot-n" aria-hidden="true">${i + 1}</span><span class="spot-cells">${[...o.cells].map((c) => cellHTML(c)).join('')}</span></button>`;
+    stage.innerHTML = `<p class="spot-q" tabindex="-1">Which is <b>${esc(sp.word)}</b> in Grade 2?</p>
+      <div class="spot-opts" role="group" aria-label="Brailled versions">${opts.map((o, i) => optHTML(o, i)).join('')}</div>
+      <p class="spot-why" id="spotWhy" aria-live="polite"></p>
+      <div class="spot-next"><button class="btn primary" id="spotNext" type="button" hidden>Next</button></div>`;
+    refocus(stage, $('.spot-q', stage));
+    say(`Which is ${sp.word} in Grade 2? ${opts.map((o, i) => `Option ${i + 1}: ${cellsLabel(o.cells)}`).join('. ')}`);
+    let misses = 0, done = false;
+    const why = $('#spotWhy', stage), btns = $$('.spot-opt', stage);
+    const finish = () => {
+      done = true;
+      btns.forEach((b, i) => { if (opts[i].ok) b.classList.add('right'); else if (!b.classList.contains('wrong')) b.classList.add('dim'); });
+      $('#spotNext', stage).hidden = false;
+    };
+    const choose = (b) => {
+      if (!b || done || b.classList.contains('wrong')) return;
+      const o = opts[Number(b.dataset.i)];
+      result(o.ok, item); glow(o.ok);
+      b.classList.add(o.ok ? 'right' : 'wrong');
+      if (o.ok) {
+        // Right: say what the main trap was, so the rule sticks.
+        const trap = opts.find((x) => !x.ok);
+        why.innerHTML = `<b>Right.</b> ${trap ? esc(trap.why) : ''}`;
+        finish();
+      } else {
+        why.innerHTML = `<b>Not this one.</b> ${esc(o.why)}`;
+        if (++misses >= 2 || opts.length - misses <= 1) finish();
+      }
+    };
+    stage.onclick = (e) => { const b = e.target.closest('.spot-opt'); if (b) return choose(b); if (e.target.closest('#spotNext')) next(); };
+    state.key = (e) => {
+      if (/^[1-4]$/.test(e.key)) return choose(btns[Number(e.key) - 1]);
+      if ((e.key === 'Enter' || e.key === 'ArrowRight') && done && !e.target.closest?.('button')) { e.preventDefault(); next(); }
     };
   }
 

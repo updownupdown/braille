@@ -5,6 +5,7 @@ import { SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
 import { feedback, cellsLabel, say, refocus } from './a11y.js';
+import { MISTAKES, mistake } from './rules.js';
 
 import { $, $$, titleCase, DICT, P, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, exBlock, groupBlock, groupsHTML, icon, letterDetail, lineHTML, markMulti, openSheet, pick, practiseLink, radios, setSub, setTitle, shuffle, store, view, views } from './core.js';
 import { SEC_DESC, SEC_ICON } from './home.js';
@@ -141,7 +142,13 @@ export function grade2Section(key = 'grade2') {
   const sWords = sample.split(' ');
   const groupHTML = ([cat, { blurb }]) => `<div class="sg g2-sec" id="g2-${catIndex(cat)}"><div class="group-title"><h3>${esc(titleCase(cat))}<span class="count">${CONTRACTIONS[cat].items.length} signs</span></h3><span>${esc(blurb)}</span></div>
       <div class="ctable">${DICT.map((e, i) => [e, i]).filter(([e]) => e.group === cat).map(([e, i]) => row(e, i)).join('')}</div>${practiseBtn(`#/practice/read?cat=contractions&set=k${catIndex(cat)}`)}</div>`;
-  const html = lesson ? `<p class="lead-p">${esc(lesson[2])}</p>${cats.map(groupHTML).join('')}` : `
+  // Watch Out: the lesson's common mistakes, each word brailled right and then wrong, with the reason.
+  const watchHTML = () => !MISTAKES[key] ? '' : `<div class="sg g2-sec" id="g2-watch"><div class="group-title"><h3>Watch Out</h3><span>Common mistakes with these signs: the right way, then the wrong one.</span></div>
+      <div class="mk-grid">${MISTAKES[key].map(mistake).map((m) => `<div class="mk"><div class="print">${esc(m.word)}</div>
+        <div class="mk-row ok"><span class="mk-mark" role="img" aria-label="Right">${icon('check', 14)}</span>${lineHTML(m.right, { cls: 'sm' })}</div>
+        <div class="mk-row no"><span class="mk-mark" role="img" aria-label="Wrong">${icon('close', 14)}</span>${lineHTML(m.wrong, { cls: 'sm' })}</div>
+        <p class="mk-why">${esc(m.why)}</p></div>`).join('')}</div>${practiseBtn('#/practice/read?cat=contractions&set=spot', 'Spot the right brailling')}</div>`;
+  const html = lesson ? `<p class="lead-p">${esc(lesson[2])}</p>${cats.map(groupHTML).join('')}${watchHTML()}` : `
     <p class="lead-p">Grade 2 uses about 180 contractions to make braille shorter. Most books and public signs in Canada use it. Many cells mean different things alone versus inside a word, so each table notes where a sign may go.</p>
     <div class="g2-compare"><div class="g2c-scroll"><div class="g2c-grid">
       <small class="g2c-k">Grade 1<span>${g1} cells</span></small><small class="g2c-k">Grade 2<span>${g2} cells</span></small>
@@ -163,7 +170,7 @@ export function grade2Section(key = 'grade2') {
     });
     view.dataset.exBound = '1';
   };
-  return { html, bind, jumps: lesson ? cats.map(([cat, { items }]) => ({ value: 'g2-' + catIndex(cat), label: cat, hint: items.length + ' signs' })) : null };
+  return { html, bind, jumps: lesson ? [...cats.map(([cat, { items }]) => ({ value: 'g2-' + catIndex(cat), label: cat, hint: items.length + ' signs' })), ...(MISTAKES[key] ? [{ value: 'g2-watch', label: 'Watch Out', hint: 'Common mistakes' }] : [])] : null };
 }
 // ---------- reference ----------
 export const REF_SECTIONS = [
