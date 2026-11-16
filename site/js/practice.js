@@ -623,10 +623,14 @@ export function quizMode(mode, q) {
     say(`Word: ${cellsLabel(cells.map((c) => c.cell).join(''))}`);
     const lbls = $$('#wcells .lbl');
     const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');
-    // Slot width: as wide as fits, so long words stay on one line on a phone.
+    // Slot width: as wide as fits, so long words stay on one line on a phone. Each slot is exactly one cell wide,
+    // cell padding included (CSS sizes the dots from it), so cells keep their proper spacing at any size.
+    // Real size: the slot is the real cell-to-cell distance, 6.25 mm.
     const wc = $('#wcells', stage);
     wc.classList.add('slots');
-    wc.style.setProperty('--slot', `${Math.max(20, Math.min(40, Math.floor((Math.min(stage.clientWidth, 460) - 36) / cells.length)))}px`);
+    const mmPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm')) || 96 / 25.4;
+    const fit = Math.floor((Math.min(stage.clientWidth, 560) - 36) / cells.length);
+    wc.style.setProperty('--slot', `${S.swSize === 'real' ? +(mmPx * 6.25).toFixed(2) : Math.max(20, Math.min(stage.clientWidth > 600 ? 52 : 40, fit))}px`);
     const paint = (v, solved = false) => { paintTyped(lbls, cells, v, solved); markSlots(lbls, cells, solved); };
     const check = () => {
       if (done) return;

@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { cellSpacingProblems } from './spacing.js';
 
 const ROOT = fileURLToPath(new URL('../site/', import.meta.url));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
@@ -29,9 +30,14 @@ export const ROUTES = ['', 'reference', 'reference/overview', 'reference/alphabe
 const browser = await chromium.launch();
 const failures = [];
 const loaded = new Set(); // every file the app fetched while visiting the routes
-for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true }], ['laptop', { viewport: { width: 1280, height: 800 } }]]) {
+// narrow: a phone with large system text (Android zooms the page, so it is about 316px wide).
+// real: Real size braille (Settings), where cells are sized in calibrated millimetres.
+const SIZES = [['phone', { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true }], ['laptop', { viewport: { width: 1280, height: 800 } }],
+  ['narrow', { viewport: { width: 316, height: 700 }, isMobile: true, hasTouch: true }], ['real', { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true }, { swSize: 'real' }]];
+for (const [tag, opts, settings] of SIZES) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
+  if (settings) { await page.goto(base); await page.evaluate((x) => localStorage.setItem('dots.settings', JSON.stringify(x)), settings); await page.reload(); }
   let errs = [];
   page.on('request', (q) => { if (q.url().startsWith(base)) loaded.add('./' + new URL(q.url()).pathname.slice(1)); });
   page.on('pageerror', (e) => errs.push(e.message));
@@ -45,6 +51,22 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
     if (errs.length) failures.push(`${tag} #/${r}: ${errs.join(' | ')}`);
     if (over > 1) failures.push(`${tag} #/${r}: page scrolls sideways by ${over}px`);
     if (empty) failures.push(`${tag} #/${r}: nothing rendered`);
+    // Braille cells next to each other must keep the gap between cells (wider than the gap between a cell's dots).
+    const spacing = await page.evaluate(cellSpacingProblems);
+    if (spacing.length) failures.push(`${tag} #/${r}: ${spacing.slice(0, 3).join('; ')}`);
+    // Type: long words too, where the answer slots are narrowest.
+    if (r === 'practice/words') {
+      await page.click('[data-seg=wlen] [data-v=long]'); await page.waitForTimeout(250);
+      const sp = await page.evaluate(cellSpacingProblems);
+      if (sp.length) failures.push(`${tag} Type long words: ${sp.slice(0, 3).join('; ')}`);
+      await page.click('[data-seg=wlen] [data-v=medium]');
+    }
+    // Write: after a few cells have gone up into the line.
+    if (r === 'practice/compose') {
+      for (let i = 0; i < 3; i++) { await page.click('#cwHint'); await page.waitForTimeout(1500); }
+      const sp = await page.evaluate(cellSpacingProblems);
+      if (sp.length) failures.push(`${tag} Write after three cells: ${sp.slice(0, 3).join('; ')}`);
+    }
   }
   await ctx.close();
 }
@@ -235,4 +257,4 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
 await browser.close();
 server.close();
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`OK: ${ROUTES.length} routes x 2 sizes`);
+console.log(`OK: ${ROUTES.length} routes x ${SIZES.length} sizes`);
