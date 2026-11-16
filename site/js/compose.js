@@ -1,10 +1,11 @@
 // Practice > Write: a few words or a short sentence to write in braille on the dot pad (or with six-key typing).
-// Every cell is checked as you go: when the dots match the next cell it is added by itself, a dot that isn't in
-// that cell turns red at once, and spaces between words are added for you. The words and what you've written
+// Every cell is checked as you go: the cell being written waits as an empty outline in the line above; when the
+// dots match, the pad flashes green and the cell flies up into its place. A dot that isn't in the cell turns red at
+// once, and spaces between words are added for you. The words and what you've written
 // sit on one line at the top that scrolls sideways for longer text. Each finished line shows its writing speed in
 // words a minute, from the first dot to the last cell; the best is kept per grade and per way of writing (tapping
 // the dots or six-key typing), and only lines written without a hint or a peek count towards it.
-import { translate, unicodeOf, fromDots, toDots } from './braille.js';
+import { translate, unicodeOf, toDots } from './braille.js';
 import { COMMON_WORDS } from './wordlist.js';
 import { PHRASES, formatLine } from './phrases.js';
 import { chord, sixKeyOn } from './sixkey.js';
@@ -50,7 +51,9 @@ export function composeMode(q) {
   });
   // words: [{print, cells}]; wi/ci: the cell being written; pad: dots set so far; bad: a wrong dot shown in red.
   // t0: the first dot or cell of the line; helped: a hint or a peek was used; sixUsed: a cell came from six-key typing.
-  let fresh = null, text = '', words = [], wi = 0, ci = 0, pad = new Set(), bad = 0, slips = 0, done = false, t0 = 0, helped = false, sixUsed = false;
+  // landing: cells ("word:cell") still flying up from the pad, kept hidden in the line until they arrive.
+  const landing = new Set();
+  let text = '', words = [], wi = 0, ci = 0, pad = new Set(), bad = 0, slips = 0, done = false, t0 = 0, helped = false, sixUsed = false;
   const want = () => words[wi]?.cells[ci];
   // Peeking at the cheat sheet mid-line counts like a hint: not right first time, and the speed isn't a best.
   setPeek(() => [grade, src === 'formats' ? 'numbers' : grade === 2 ? null : 'letters'], () => { if (!done) { slips++; helped = true; } });
@@ -60,6 +63,7 @@ export function composeMode(q) {
   };
   function start() {
     text = textFor(src); words = composeWords(text, grade);
+    landing.clear(); $$('.cw-fly').forEach((f) => f.remove());
     wi = 0; ci = 0; pad = new Set(); bad = 0; slips = 0; done = false; t0 = 0; helped = false; sixUsed = false;
     stage.classList.remove('glow-good', 'glow-bad', 'finished');
     stage.innerHTML = `
@@ -74,13 +78,13 @@ export function composeMode(q) {
     paint(true); refocus(stage, $('#cwStrip', stage));
     say(`Write in Grade ${grade}: ${text}`);
   }
-  // The line at the top: every word's cells so far, the current word marked, the cell being built dashed.
+  // The line at the top: every word's cells so far, the current word marked, the cell being written an empty outline.
   function paint(jump) {
     $$('.cw-w', stage).forEach((el, i) => {
       const w = words[i], n = i < wi || done ? w.cells.length : i === wi ? ci : 0;
       el.classList.toggle('cur', i === wi && !done); el.classList.toggle('done', i < wi || done);
-      let h = w.cells.slice(0, n).map((c, k) => `<span class="cw-c${fresh && fresh[0] === i && fresh[1] === k ? ' fresh' : ''}">${cellHTML(c, 'sm')}</span>`).join('');
-      if (i === wi && !done) h += `<span class="cw-c now${bad ? ' bad' : ''}">${cellHTML(fromDots([...pad].sort().join('')) || BLANK, 'sm')}</span>`;
+      let h = w.cells.slice(0, n).map((c, k) => `<span class="cw-c${landing.has(`${i}:${k}`) ? ' landing' : ''}" data-k="${i}:${k}">${cellHTML(c, 'sm')}</span>`).join('');
+      if (i === wi && !done) h += `<span class="cw-c now${bad ? ' bad' : ''}">${cellHTML(BLANK, 'sm')}</span>`;
       el.querySelector('.cw-cells').innerHTML = h;
       el.setAttribute('aria-hidden', 'true');
     });
@@ -96,17 +100,50 @@ export function composeMode(q) {
       strip.scrollTo({ left: Math.max(0, x), behavior: jump || reducedMotion() ? 'auto' : 'smooth' });
     }
   }
+  // A right cell: a green copy of the pad flashes where the pad is, then shrinks and flies into the cell's place in
+  // the line (following it if the line scrolls). The pad itself is clear at once, ready for the next cell.
+  function flyUp(cell, key) {
+    const p = $('#cwPad', stage);
+    if (!p || reducedMotion()) return () => {};
+    const from = p.getBoundingClientRect(), on = toDots(cell);
+    const fly = p.cloneNode(true);
+    fly.removeAttribute('id'); fly.removeAttribute('role'); fly.removeAttribute('aria-label'); fly.setAttribute('aria-hidden', 'true');
+    fly.className = 'dotpad cw-fly';
+    fly.querySelectorAll('button').forEach((b) => { b.className = on.includes(Number(b.dataset.d)) ? 'on' : ''; b.tabIndex = -1; b.removeAttribute('aria-label'); b.removeAttribute('aria-pressed'); });
+    Object.assign(fly.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+    landing.add(key);
+    return () => {
+      document.body.appendChild(fly);
+      const t0f = performance.now(), HOLD = 220, GO = 420;
+      const land = () => {
+        fly.remove(); landing.delete(key);
+        const c = stage.querySelector(`.cw-c[data-k="${key}"]`);
+        if (c) { c.classList.remove('landing'); c.classList.add('fresh'); }
+      };
+      const step = (now) => {
+        const c = stage.isConnected && stage.querySelector(`.cw-c[data-k="${key}"]`);
+        if (!c) { fly.remove(); landing.delete(key); return; }
+        const t = Math.min(1, Math.max(0, (now - t0f - HOLD) / GO)), e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+        const to = c.getBoundingClientRect(), s = to.height / from.height;
+        const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+        fly.style.transform = `translate(${dx * e}px, ${dy * e}px) scale(${1 + (s - 1) * e})`;
+        fly.classList.toggle('go', t > 0);
+        if (t < 1) requestAnimationFrame(step); else land();
+      };
+      requestAnimationFrame(step);
+    };
+  }
   // A cell is right: add it, step past the end of the word (the space is written for you), maybe finish.
   function accept() {
-    const cell = want(); pad = new Set(); bad = 0; fresh = [wi, ci]; ci++;
-    const p = $('#cwPad', stage); p.classList.remove('ok'); void p.offsetWidth; p.classList.add('ok');
+    const cell = want(), go = flyUp(cell, `${wi}:${ci}`);
+    pad = new Set(); bad = 0; ci++;
     let msg = `Right, ${cellLabel(cell)}`;
     if (ci >= words[wi].cells.length) {
       wi++; ci = 0;
-      if (wi >= words.length) return finish();
+      if (wi >= words.length) { finish(); go(); return; }
       msg += `. Next word: ${words[wi].print}`;
     }
-    haptic('right'); paint(); fresh = null; announce(msg);
+    haptic('right'); paint(); go(); announce(msg);
   }
   function slip(what) {
     slips++;
@@ -135,7 +172,6 @@ export function composeMode(q) {
     if (done) return;
     slips++; helped = true; t0 = t0 || performance.now(); pad = new Set(toDots(want()));
     paint(); announce(`Hint: ${cellLabel(want())}`);
-    const c = $('.cw-c.now', stage); if (c) c.classList.add('hinted');
     setTimeout(() => { if (!done && stage.isConnected) accept(); }, 700);
   }
   function finish() {

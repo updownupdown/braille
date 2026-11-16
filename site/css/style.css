@@ -1834,16 +1834,16 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .cw-cells { display: flex; align-items: center; min-height: 46px; }
 .cw-c { display: inline-grid; place-items: center; min-width: 22px; min-height: 34px; border-radius: 8px; }
 .cw-c .cell { --s: 7px; }
-.cw-c.now { min-height: 46px; padding: 0 6px; margin: 0 4px; outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 0; }
+.cw-c.now { min-height: 46px; padding: 0 6px; margin: 0 4px; outline: 1.5px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 0; }
+.cw-c.now .cell { visibility: hidden; }
 .cw-c.now.bad { outline-color: var(--bad); }
-.cw-c.now.hinted { background: var(--accent-soft); }
+.cw-c.landing .cell { visibility: hidden; }
 .cw-edit { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; width: 100%; }
 .cw-edit #cwHint { justify-self: end; }
 .cw-edit #cwSkip { justify-self: start; }
-.cw-pad { grid-template-columns: repeat(2, 64px); grid-template-rows: repeat(3, 64px); gap: 12px; padding: 16px; }
 .cw-pad button.bad { background: var(--bad); border-color: var(--bad); }
 .cw-foot { display: flex; justify-content: center; }
-@media (max-height: 680px) { .cw-pad { grid-template-columns: repeat(2, 50px); grid-template-rows: repeat(3, 50px); gap: 9px; padding: 11px; } .cw-stage { gap: 12px; } }
+@media (max-height: 680px) { .cw-stage { gap: 12px; } }
 
 /* ---------- Practice: placement check ---------- */
 .pl-link { margin: 0; font-size: .9rem; color: var(--muted); }
@@ -1897,11 +1897,14 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .subbar #langDD .dd-btn .ic { flex: none; }
 .below-stage .mastery:empty { display: none; }
 /* Write: a right cell flashes on the pad and in the line; when done the whole text wraps into view */
-.cw-pad.ok { animation: cwOk .35s ease-out; }
-@keyframes cwOk { from { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--bg)); } }
+.cw-fly { position: fixed; z-index: 30; margin: 0; pointer-events: none; transform-origin: 50% 50%; border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--bg)); box-shadow: 0 0 0 2px var(--good), 0 0 18px color-mix(in srgb, var(--good) 40%, transparent); transition: background .3s, border-color .3s, box-shadow .3s; }
+.cw-fly button { border-color: transparent; transition: border-color .2s; }
+.cw-fly:not(.go) button { border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+.cw-fly button.on { background: var(--good); border-color: var(--good); }
+.cw-fly.go { background: transparent; border-color: transparent; box-shadow: none; }
 .cw-c.fresh { animation: cwFresh .6s ease-out; }
 @keyframes cwFresh { from { background: color-mix(in srgb, var(--good) 28%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .cw-pad.ok, .cw-c.fresh { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .cw-c.fresh { animation: none; } }
 /* Games with an on-screen keyboard: the card is centred in the space above, the keyboard sits at the bottom. */
 .game > :is(.wd-keys, #kb) { order: 2; }
 /* Small phones (360px): the Practice level menu, Translate's language menu and long page titles keep their words */
@@ -1947,20 +1950,48 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .mm-cal { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
 .mm-cal[hidden] { display: none; }
 .mm-cal .set-note { margin: 0; }
-.mm-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; min-height: calc(var(--mm, 1mm) * 26.5); }
-.mm-coin { flex: none; width: calc(var(--mm, 1mm) * 26.5); height: calc(var(--mm, 1mm) * 26.5); border-radius: 50%; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mm-row { display: flex; align-items: center; }
+/* Ruler: cm and mm along the top (large), inches along the bottom (small). Ticks are placed in --mm units. */
+.ruler { position: relative; height: 78px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.ruler i { position: absolute; width: 1px; margin-left: 8px; background: currentColor; }
+.ruler .rt-m { top: 0; height: 9px; }
+.ruler .rt-m.half { height: 14px; }
+.ruler .rt-m.cm { height: 20px; width: 1.5px; }
+.ruler .rt-i { bottom: 0; height: 4px; color: var(--muted); }
+.ruler .rt-i.q { height: 6px; }
+.ruler .rt-i.half { height: 9px; }
+.ruler .rt-i.in { height: 13px; width: 1.5px; }
+.ruler b { position: absolute; margin-left: 8px; transform: translateX(-50%); line-height: 1; font-variant-numeric: tabular-nums; }
+.ruler .rl-cm { top: 23px; font-size: 1.05rem; font-weight: 600; }
+.ruler .rl-in { bottom: 16px; font-size: .72rem; font-weight: 500; color: var(--muted); }
+.ruler b.z { transform: none; }
+.ruler .rl-u { position: absolute; right: 0; padding: 0 8px 0 10px; background: linear-gradient(to right, transparent, var(--surface) 8px); line-height: 1; }
+.ruler .rl-u.top { top: 23px; font-size: 1.05rem; font-weight: 600; }
+.ruler .rl-u.bot { bottom: 16px; font-size: .72rem; color: var(--muted); }
 .mm-demo { display: inline-flex; }
 .mm-ctl { display: flex; align-items: center; gap: 10px; }
 .mm-ctl input { flex: 1; min-width: 0; accent-color: var(--accent); }
 .mm-ctl .icon-btn { width: 36px; height: 36px; font-size: 1.2rem; line-height: 1; }
 
-/* ---------- Milestones: one quiet line on Home, a list in Stats ---------- */
-.h-mile { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; color: var(--ink-2); text-decoration: none; font-size: .92rem; }
-.h-mile b { font-weight: 600; color: var(--ink); }
-.h-mile-dot, .ms-mark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
+/* ---------- Milestones: a list in Stats ---------- */
+.ms-mark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
 .ms-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .ms-list li { display: flex; align-items: center; gap: 10px; font-size: .92rem; }
 .ms-list .ms-t { flex: 1; min-width: 0; }
 .ms-list .ms-n { color: var(--muted); font-size: .85rem; white-space: nowrap; }
 .ms-list li:not(.done) .ms-mark { background: none; box-shadow: inset 0 0 0 1.5px var(--dot-off); }
 .ms-list li:not(.done) .ms-t { color: var(--muted); }
+
+/* ===================== round 26: big text, Write cell, ruler ===================== */
+/* Practice progress line: each "Label: n" stays whole when it wraps (large system text), Stats keeps to the right. */
+.mastery-h .m-line { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; row-gap: 2px; }
+.mastery-h .m-line > span:empty { display: none; }
+#pRound, #mLearn { display: contents; }
+.m-part { white-space: nowrap; }
+.m-part::after { content: "·"; margin: 0 6px; color: var(--muted); }
+.m-part.end::after { visibility: hidden; }
+.m-part.last::after { display: none; }
+.mastery-h .m-line { column-gap: 0; }
+.mastery-h .st-link { flex: none; margin-left: auto; }
+/* Draw: a long prompt that can't fit beside Show me moves below it (fitTarget in practice.js). */
+.stage .target.below { margin-top: 30px; }

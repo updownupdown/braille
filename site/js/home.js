@@ -6,7 +6,7 @@ import { GAMES, gameStore } from './games.js';
 import { AUTO_GAP, CATS, MODES } from './practice.js';
 import { $, titleCase, openSheet, cellHTML, crowHTML, icon, level, markMulti, mastery, setSub, setTitle, store, view, views } from './core.js';
 import { LESSONS, REF_SECTIONS, isLesson, lessonsDone } from './learn.js';
-import { checkMilestones, milestoneLine, milestonesHTML } from './milestones.js';
+import { checkMilestones, milestonesHTML } from './milestones.js';
 // 0 untried · 1–3 blues · 4+ known (green)
 
 // ---------- home ----------
@@ -144,7 +144,6 @@ views[''] = () => {
     <div class="home-head">
       <div class="home-brand" role="heading" aria-level="1" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
-    ${isNew ? '' : milestoneLine()}
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>

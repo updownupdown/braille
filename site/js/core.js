@@ -87,11 +87,19 @@ export const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="$
 // ---------- settings ----------
 // speech, sounds and haptics are accessibility aids, off unless turned on in Settings.
 // swSize: braille size, 'large' or 'real' (true size, in Guess, Type, Read and Translate). mmPx: screen pixels in a real
-// millimetre, set by holding a coin to the screen in Settings (0 = not set yet: a guess from the kind of device).
+// millimetre, set by holding a ruler to the on-screen one in Settings (0 = not set yet: a guess from the kind of device).
 export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', mmPx: 0, speech: false, sounds: false, haptics: false };
 // A phone's CSS pixel is smaller than the nominal 1/96 inch, so CSS millimetres come out about 40% too small there.
 export const mmGuess = () => (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600 ? 6.3 : 96 / 25.4);
-export const LOONIE_MM = 26.5; // the Canadian dollar coin's diameter
+// The on-screen ruler in Settings: centimetres with millimetre ticks along the top, inches in eighths along the bottom.
+// Every tick sits at a multiple of --mm, so it follows the slider without being redrawn.
+function rulerHTML() {
+  const at = (mm) => `left:calc(var(--mm, 1mm) * ${+mm.toFixed(3)})`;
+  let h = '';
+  for (let m = 0; m <= 200; m++) h += `<i class="rt-m${m % 10 ? m % 5 ? '' : ' half' : ' cm'}" style="${at(m)}"></i>${m % 10 ? '' : `<b class="rl-cm${m ? "" : " z"}" style="${at(m)}">${m / 10}</b>`}`;
+  for (let e = 0; e <= 64; e++) h += `<i class="rt-i${e % 8 ? e % 4 ? e % 2 ? '' : ' q' : ' half' : ' in'}" style="${at(e * 25.4 / 8)}"></i>${e % 8 ? '' : `<b class="rl-in${e ? "" : " z"}" style="${at(e * 25.4 / 8)}">${e / 8}</b>`}`;
+  return `<div class="ruler" aria-hidden="true">${h}<span class="rl-u top">cm</span><span class="rl-u bot">in</span></div>`;
+}
 export const S = { ...DEFAULTS, ...store.get('settings', {}) };
 export function applySettings() {
   const r = document.documentElement;
@@ -297,10 +305,11 @@ export function openSettings() {
       <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
       <div class="set-row stack"><span>Braille size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
       <div class="mm-cal" id="mmCal" ${S.swSize === 'real' ? '' : 'hidden'}>
-        <p class="set-note">Real size shows braille as big as it is on paper and signs, in Guess, Type, Read and Translate. To get it right on this screen, hold a loonie against the circle and slide until they match.</p>
-        <div class="mm-row"><span class="mm-coin" aria-hidden="true"></span><span class="mm-demo" aria-hidden="true">${['⠠', '⠑', '⠭', '⠊', '⠞'].map((c) => cellHTML(c)).join('')}</span></div>
-        <div class="mm-ctl"><button class="icon-btn small" type="button" id="mmLess" aria-label="Smaller">−</button><input type="range" id="mmRange" min="2.5" max="9" step="0.05" value="${S.mmPx || mmGuess()}" aria-label="Size of the circle"><button class="icon-btn small" type="button" id="mmMore" aria-label="Bigger">+</button></div>
-        <p class="set-note mm-state" id="mmState">${S.mmPx ? 'Matched to a coin on this screen.' : 'Not matched yet: sizes are a guess for this kind of device.'}</p>
+        <p class="set-note">Real size shows braille as big as it is on paper and signs, in Guess, Type, Read and Translate. To get it right on this screen, hold a ruler against this one and slide until the centimetres match.</p>
+        ${rulerHTML()}
+        <div class="mm-row"><span class="mm-demo" aria-hidden="true">${['⠠', '⠑', '⠭', '⠊', '⠞'].map((c) => cellHTML(c)).join('')}</span></div>
+        <div class="mm-ctl"><button class="icon-btn small" type="button" id="mmLess" aria-label="Smaller">−</button><input type="range" id="mmRange" min="2.5" max="9" step="0.05" value="${S.mmPx || mmGuess()}" aria-label="Ruler size"><button class="icon-btn small" type="button" id="mmMore" aria-label="Bigger">+</button></div>
+        <p class="set-note mm-state" id="mmState">${S.mmPx ? 'Matched to a ruler on this screen.' : 'Not matched yet: sizes are a guess for this kind of device.'}</p>
       </div>
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
       <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key']], S.sixKey ? '1' : '0')}</div>
@@ -334,9 +343,9 @@ export function openSettings() {
     if (k === 'haptics') { setS('haptics', v === '1'); if (v === '1') haptic('right', { force: true }); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
-  // Coin calibration: the circle is LOONIE_MM "millimetres" wide at the current scale.
+  // Ruler calibration: the slider sets how many screen pixels make a millimetre.
   const mm = $('#mmRange', sheet);
-  const setMm = (v) => { v = Math.max(2.5, Math.min(9, Math.round(v * 20) / 20)); mm.value = v; setS('mmPx', v); $('#mmState', sheet).textContent = 'Matched to a coin on this screen.'; };
+  const setMm = (v) => { v = Math.max(2.5, Math.min(9, Math.round(v * 20) / 20)); mm.value = v; setS('mmPx', v); $('#mmState', sheet).textContent = 'Matched to a ruler on this screen.'; };
   mm.oninput = () => setMm(Number(mm.value));
   $('#mmLess', sheet).onclick = () => setMm(Number(mm.value) - 0.05);
   $('#mmMore', sheet).onclick = () => setMm(Number(mm.value) + 0.05);
