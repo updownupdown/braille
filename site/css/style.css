@@ -1691,3 +1691,40 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .ch-c.sign .lbl { color: var(--accent); font-weight: 600; }
 .ch-c:disabled { cursor: default; }
 .ch-left { margin: 0; min-height: 1.5em; text-align: center; color: var(--muted); font-size: .9rem; }
+
+/* ---------- Practice: Write ---------- */
+.cw-stage { gap: 14px; }
+.cw-text { font-size: 1.3rem; font-weight: 500; text-align: center; line-height: 1.3; outline: none; max-width: 520px; }
+.cw-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 0; min-height: 40px; max-width: 100%; }
+.cw-c { display: inline-grid; place-items: center; min-width: 22px; min-height: 34px; border-radius: 8px; }
+.cw-c .cell { --s: 7px; }
+.cw-c.space { width: 16px; min-width: 16px; }
+.cw-c.cur { outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
+.cw-c.ok { background: color-mix(in srgb, var(--good) 14%, transparent); }
+.cw-c.sub, .cw-c.extra { background: color-mix(in srgb, var(--bad) 16%, transparent); }
+.cw-c.extra .cell { opacity: .6; }
+.cw-c.miss { outline: 1.5px dashed var(--bad); outline-offset: -3px; }
+.cw-gap { width: 16px; }
+.cw-edit { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.cw-keys { display: grid; gap: 8px; }
+.cw-keys .btn { min-width: 112px; }
+.cw-result { width: 100%; max-width: 560px; display: grid; gap: 12px; }
+.cw-sum { margin: 0; text-align: center; font-weight: 500; }
+.cw-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 10px; }
+.cw-k { font-size: .8rem; color: var(--muted); }
+.cw-row .cw-line { justify-content: flex-start; }
+.cw-foot { display: flex; gap: 10px; justify-content: center; align-items: center; }
+@media (max-width: 420px) { .cw-pad { grid-template-columns: repeat(2, 46px); grid-template-rows: repeat(3, 46px); gap: 8px; padding: 12px; } .cw-edit { gap: 12px; } .cw-keys .btn { min-width: 96px; } }
+
+/* ---------- Practice: placement check ---------- */
+.pl-link { margin: 12px 0 0; font-size: .9rem; color: var(--muted); }
+.pl-intro, .pl-done { display: grid; gap: 12px; justify-items: center; text-align: center; max-width: 460px; }
+.pl-lead { font-size: 1.15rem; margin: 0; outline: none; }
+.pl-where { display: flex; justify-content: space-between; width: 100%; max-width: 520px; margin: 0 0 6px; font-size: .9rem; color: var(--muted); }
+.pl-foot { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+.pl-big { display: grid; justify-items: center; outline: none; }
+.pl-big b { font-size: 2.6rem; font-weight: 600; line-height: 1; }
+.pl-big span { color: var(--muted); }
+.pl-done p { margin: 0; }
+.cw-stage [hidden] { display: none !important; }
+.pl-link a { text-decoration: underline; text-underline-offset: 3px; }

@@ -45,11 +45,18 @@ export function say(text) {
     synth.speak(u);
   } catch {}
 }
-// After a question is redrawn, put focus on its prompt, but only when focus was already inside the question
-// (keyboard and screen-reader users); a tap elsewhere on the page is left alone.
+// After a question is redrawn, put focus on its prompt, but only for someone who was working inside it with the
+// keyboard or a screen reader (focus was in `root` and went away with the old question). A page that has just
+// opened, or a tap somewhere else, is left alone.
 export function refocus(root, target) {
+  if (!root || !target) return;
+  if (!root._rf) {
+    root._rf = true;
+    root.addEventListener('focusin', () => { root.dataset.kf = '1'; });
+    root.addEventListener('focusout', (e) => { if (e.relatedTarget && !root.contains(e.relatedTarget)) delete root.dataset.kf; });
+  }
   const a = document.activeElement;
-  if (!target || (a && a !== document.body && !root.contains(a) && a.isConnected)) return;
+  if (!root.dataset.kf || (a && a !== document.body && !root.contains(a))) return;
   if (!target.hasAttribute('tabindex') && !/^(BUTTON|A|INPUT)$/.test(target.tagName)) target.tabIndex = -1;
   target.focus({ preventScroll: true });
 }
@@ -96,3 +103,5 @@ export function feedback(ok, extra = '') {
   tone(ok);
   announce((ok ? 'Correct' : 'Not quite') + (extra ? '. ' + extra : ''));
 }
+// Enter or Space on a focused button, link or radio does that control's own job; page-wide shortcuts leave it alone.
+export const nativeKey = (e) => (e.key === 'Enter' || e.key === ' ') && !!(e.target && e.target.closest && e.target.closest('button, a[href], [role="radio"], [role="button"], summary, select, textarea'));

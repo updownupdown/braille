@@ -11,8 +11,10 @@ import { G2_EXAMPLES } from './g2examples.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
 import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
-import { feedback, cellsLabel, say, refocus } from './a11y.js';
+import { feedback, cellsLabel, say, refocus, nativeKey } from './a11y.js';
 import { spotItems } from './rules.js';
+import { composeMode } from './compose.js';
+import { placementView } from './placement.js';
 // ---------- practice data ----------
 export const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
 // The note is only shown in the help sheet's list, never in the quiz.
@@ -233,7 +235,7 @@ export const SET_HELP = {
   'Initial-letter contractions': ['Initial-letter contractions', ['A prefix from the right-hand column of the cell, then the first letter (or groupsign) of the word: the middle-right dot plus d is “day”, plus m is “mother”.', 'There are three prefixes, each with its own list: the middle-right dot alone, the top and middle-right dots, and the whole right column. They work as words and inside words: someone, daytime, mother’s.']],
   'Final-letter groupsigns': ['Final-letter groupsigns', ['Common word endings: a prefix, then the last letter of the ending. ound, ance, sion, less and ount use the top-right and bottom-right dots as the prefix; ence, ong, ful, tion, ness, ment and ity use the middle-right and bottom-right dots.', 'They only ever follow letters, never start a word: pound, dance, nation, city.']],
   'Shortforms': ['Shortforms', ['Shortforms are abbreviated spellings of common words: about is ab, could is cd, braille is brl. Each one is listed with its spelling.', 'They are mainly used as whole words, and some take endings (friends, braille’s). Inside longer words only some are allowed, so learn them as words first.']],
-  'auto': ['Auto', ['Auto teaches you braille a few signs at a time, in the order most courses use: letters, numbers and punctuation first, then Grade 2 contractions.', 'Each new sign is shown to you before it is asked. Signs you get right come back less and less often; a miss brings a sign back soon. A new one arrives once the last few are settling in.', 'Use the drop-down to stick to Grade 1 or Grade 2. Guess and Draw keep their own progress, and signs you already know from other practice start as known.']],
+  'auto': ['Auto', ['Auto teaches you braille a few signs at a time, in the order most courses use: letters, numbers and punctuation first, then Grade 2 contractions.', 'Each new sign is shown to you before it is asked. Signs you get right come back less and less often; a miss brings a sign back soon. A new one arrives once the last few are settling in.', 'Use the drop-down to stick to Grade 1 or Grade 2. Guess and Draw keep their own progress, and signs you already know from other practice start as known.', 'Already know some braille? The placement check (Practice > Guess > Auto, below the card) asks a few questions from each part of the course and marks what you know.']],
 };
 export const setHelpKey = (cat, set) => cat === 'auto' ? 'auto' : cat === 'contractions' && /^k\d+$/.test(set) ? Object.keys(CONTRACTIONS)[Number(set.slice(1))] : `${cat}.${set}`;
 export const helpTitle = (cat, set) => (SET_HELP[setHelpKey(cat, set)] || [MODES.read])[0];
@@ -253,7 +255,7 @@ export function practiceHelp(mode, cat, set) {
 }
 export const SWEEP_SRC = { words: 'Words', phrases: 'Phrases', numbers: 'Numbers', signs: 'Signs', passages: 'Passages' };
 // Mode keys stay as they were (URLs, saved progress); only the names changed.
-export const MODES = { read: 'Guess', write: 'Draw', words: 'Type', sweep: 'Read' };
+export const MODES = { read: 'Guess', write: 'Draw', words: 'Type', sweep: 'Read', compose: 'Write' };
 // A shuffled deck: every item comes up once before any repeats.
 export function deck(list) {
   let d = [];
@@ -264,6 +266,7 @@ export const HELP = {
   read: ['A braille cell appears. Pick what it says.', 'Grade 2 signs that sit inside words are shown in a real word, with the rest of the word faded. Where the sign falls in the word tells you what it means.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
+  compose: ['Write the words or sentence in braille, one cell at a time: tap the dots of a cell, then Add cell. Space adds a blank cell between words.', 'Check lines your cells up with the right braille: green cells are right, red ones are wrong or extra, and a dashed gap is a missing cell. The right braille is shown underneath, with each sign labelled.', 'Pick Grade 1 to spell everything out, or Grade 2 to use contractions. Hint removes wrong cells from the end, then adds the next right one.'],
   sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
 export const HELP_KEYS = {
@@ -271,10 +274,12 @@ export const HELP_KEYS = {
   write: 'F, D and S are the left column, top to bottom; J, K and L are the right column, like a Perkins brailler. Backspace clears.',
   words: 'Just type the word; there is no need to press Enter.',
   sweep: 'Move the mouse along the line, or use the arrow keys.',
+  compose: 'F D S J K L are dots 1 to 6. Enter adds the cell (or checks, when the pad is empty), Space adds a space, Backspace deletes. With six-key typing on, press a whole cell at once.',
 };
 export const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_KEYS[k] ? `<p class="help-keys">${icon('keyboard', 18)}<span>${esc(HELP_KEYS[k])}</span></p>` : '');
 views.practice = (q, sub) => {
   if (sub === 'stats') { const r = views.practice(q); openStats(); return r; }
+  if (sub === 'place') return placementView();
   const mode = MODES[sub] ? sub : store.get('pmode', 'read');
   store.set('pmode', mode); store.set('pvisited', true);
   setTitle('Practice');
@@ -282,7 +287,7 @@ views.practice = (q, sub) => {
   helpBtn.hidden = false;
   helpBtn.onclick = () => openSheet(`<div class="help">${helpHTML(mode)}</div>`, { title: MODES[mode] });
   view.innerHTML = `<div class="practice-wrap mode-${mode}"><div class="picker" id="picker"></div><div id="modeBody"></div></div>`;
-  return mode === 'sweep' ? sweepMode(q) : quizMode(mode, q);
+  return mode === 'sweep' ? sweepMode(q) : mode === 'compose' ? composeMode(q) : quizMode(mode, q);
 };
 export function quizMode(mode, q) {
   const saved = store.get('psel', { cat: 'auto', set: 'g1' });
@@ -299,6 +304,7 @@ export function quizMode(mode, q) {
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
       <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery" role="list" aria-label="Signs in this set"></div>
+      <p class="pl-link" id="plLink" hidden>Know some braille already? <a href="#/practice/place">Take the placement check</a></p>
     </div>`}`;
   const stage = $('#stage');
   const pre = mode === 'write' ? 'w:' : 'r:';
@@ -343,6 +349,8 @@ export function quizMode(mode, q) {
     $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length;
     // Signs on their way (one to three right in a row) count too, so progress shows from the first answers.
     const learning = it.filter((x) => { const l = level(score(x.key)); return l > 0 && l < 4; }).length;
+    // Early in Auto, offer the placement check so people who know some braille can skip ahead.
+    const pl = $('#plLink'); if (pl) pl.hidden = !(auto() && it.length < 12);
     $('#mLearn').innerHTML = learning ? ` <span class="m-sep">·</span> Learning: <b>${learning}</b>` : ''; $('#kTotal').textContent = auto() ? autoList(state.set).length : it.length;
     fitMastery(); requestAnimationFrame(fitMastery);
   }
@@ -575,7 +583,7 @@ export function quizMode(mode, q) {
   function next() { if (dead) return; ({ read: renderRead, write: renderWrite, words: renderWords })[mode](); }
   // Six-key input in Guess: a chord spelling one of the answers picks it (Draw already uses F D S J K L for its dots).
   const six = mode === 'read' ? chord((ds, cell, letter) => { if (letter && state.key) state.key({ key: letter, preventDefault() {} }); }) : null;
-  const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden) return; if (six && six.down(e)) return; state.key && state.key(e); };
+  const onKey = (e) => { if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || !sheet.hidden || nativeKey(e)) return; if (six && six.down(e)) return; state.key && state.key(e); };
   const onKeyUp = (e) => { if (six && sheet.hidden) six.up(e); };
   document.addEventListener('keyup', onKeyUp);
   const onSet = (e) => {

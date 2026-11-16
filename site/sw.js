@@ -5,7 +5,7 @@
 const CACHE = 'learn-braille';
 const SHELL = ['./', './index.html', './css/style.css', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './js/app.js', './js/core.js', './js/home.js', './js/practice.js', './js/learn.js', './js/translate.js', './js/braille.js', './js/data.js', './js/games.js', './js/gamedata.js', './js/wordlist.js', './js/phrases.js',
-  './js/snowman.js', './js/agentcases.js', './js/g2examples.js', './js/trivia2.js', './js/langcontractions.js', './js/sixkey.js', './js/storage.js', './js/passages.js'];
+  './js/snowman.js', './js/agentcases.js', './js/g2examples.js', './js/trivia2.js', './js/langcontractions.js', './js/sixkey.js', './js/storage.js', './js/passages.js', './js/a11y.js', './js/rules.js', './js/compose.js', './js/placement.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE)

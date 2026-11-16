@@ -64,6 +64,7 @@ export function buildIndex() {
   }));
   REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Learn section', sec: k, page: true, act: nav('#/reference/' + k) }));
   Object.entries(MODES).forEach(([k, t]) => out.push({ title: t, sub: 'Practice mode', sec: 'practice', page: true, act: nav('#/practice/' + k) }));
+  out.push({ title: 'Placement Check', sub: 'Practice · already know some braille? Find where to start', sec: 'practice', page: true, act: nav('#/practice/place') });
   Object.entries(GAMES).forEach(([k, g]) => out.push({ title: g.name, sub: 'Game · ' + g.desc, sec: 'games', page: true, act: nav('#/games/' + k) }));
   SCIENCE_SYMBOLS.forEach(([c, n]) => out.push({ title: n, sub: 'Maths & science symbol', cells: c, kind: 'math', sec: 'science', act: nav('#/reference/science') }));
   for (const k of ['fr', 'es', 'de', 'ru', 'el']) {

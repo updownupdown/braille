@@ -10,7 +10,7 @@ import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
-import { announce, feedback, cellsLabel, say, reducedMotion } from './a11y.js';
+import { announce, feedback, cellsLabel, say, reducedMotion, nativeKey } from './a11y.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -56,7 +56,7 @@ const bestLow = (k, v) => { const b = store.get('best.' + k, null); if (v != nul
 // Keyboard listener that ignores typing in inputs and open dialogs.
 // With six-key input on (Settings), F D S J K L chords arrive as the letter they spell, so every game takes braille typing.
 function keys(fn) {
-  const skip = (e) => e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT' || !document.getElementById('sheet').hidden;
+  const skip = (e) => e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT' || !document.getElementById('sheet').hidden || nativeKey(e);
   const six = chord((dots, cell, letter) => { if (letter) fn({ key: letter, preventDefault() {}, target: document.body }); });
   const h = (e) => { if (skip(e)) return; if (six && six.down(e)) return; fn(e); };
   const u = (e) => { if (!skip(e) && six) six.up(e); };

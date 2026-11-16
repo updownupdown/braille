@@ -180,7 +180,7 @@ document.addEventListener('keydown', (e) => {
   }
   // Keep Tab inside the open sheet.
   if (e.key === 'Tab' && !sheet.hidden) {
-    const f = $$('a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select, textarea, summary, [tabindex]:not([tabindex="-1"])', sheet).filter((x) => x.offsetParent !== null || x === document.activeElement);
+    const f = $$('a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select, textarea, summary, [tabindex]:not([tabindex="-1"])', sheet).filter((x) => x.tabIndex >= 0 && (x.offsetParent !== null || x === document.activeElement));
     if (!f.length) return;
     const first = f[0], last = f[f.length - 1];
     if (!sheet.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
@@ -240,7 +240,7 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
 }
 // Segmented radio group. Screen readers hear the group's name (RADIO_LABEL) and which option is on;
 // only the chosen button is a Tab stop and the arrow keys move between options (the usual radio pattern).
-export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', wsrc: 'What to write' };
+export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', wsrc: 'What to write', cgrade: 'Grade' };
 export const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}"${RADIO_LABEL[name] ? ` aria-label="${RADIO_LABEL[name]}"` : ''}>${opts.map(([v, l]) => { const on = String(v) === String(value); return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-v="${v}" class="${on ? 'on' : ''}">${l}</button>`; }).join('')}</div>`;
 export function bindRadios(root, fn) {
   root.addEventListener('click', (e) => {
@@ -258,6 +258,8 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault(); e.stopPropagation();
   const n = items[(i + (/Right|Down/.test(e.key) ? 1 : -1) + items.length) % items.length];
   n.focus(); n.click();
+  // Some pickers redraw themselves when the choice changes: focus the same option in the new group.
+  if (!n.isConnected) { const seg = g.dataset.seg, v = n.dataset.v; const m = seg && $(`[data-seg="${seg}"] [data-v="${v}"]`); if (m) m.focus(); }
 }, true);
 // ---------- header + sticky control row ----------
 export const headTitle = $('#headTitle');
