@@ -1,14 +1,14 @@
 // Practice: the sets, Auto (spaced practice), Guess / Draw / Type, and Read (the finger sweep).
-import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, translate, toCells } from './braille.js';
+import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, translate, toCells, unicodeOf } from './braille.js';
 
 import { letterPad, paintTyped, typeHint } from './games.js';
 import { COMMON_WORDS } from './wordlist.js';
 
-import { PHRASES, signLine, numberLine } from './phrases.js';
+import { PHRASES, signLine, numberLine, formatLine, FORMAT_KINDS, FORMAT_NAMES, FORMAT_OK } from './phrases.js';
 import { chord } from './sixkey.js';
 import { PASSAGES } from './passages.js';
 import { G2_EXAMPLES } from './g2examples.js';
-import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
+import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp, setPeek } from './learn.js';
 import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, markMulti, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
 import { feedback, haptic, cellsLabel, say, refocus, nativeKey } from './a11y.js';
@@ -23,6 +23,34 @@ export const C = (cat) => () => CONTRACTIONS[cat].items.map(([w, d, n]) => ({ ke
 // Short everyday words spelled letter by letter (Grade 1), for drawing whole words cell by cell. 40 per session.
 export let SHORT_POOL = null;
 export const SHORT_WORDS = () => { SHORT_POOL = SHORT_POOL || shuffle(COMMON_WORDS.filter((w) => /^[a-z]{3,4}$/.test(w))).slice(0, 40); return SHORT_POOL; };
+// Everyday formats (prices, times, postal codes…): three of each kind per session, in Grade 1.
+// The wrong choices are the same text with one character swapped for one whose cell looks alike
+// (4 and 6 are mirror images, as are 5 and 9, 8 and 0), so every cell has to be read.
+const LOOK = { 1: '2', 2: '1', 3: '4', 4: '6', 5: '9', 6: '4', 7: '8', 8: '0', 9: '5', 0: '8', d: 'f', f: 'd', e: 'i', i: 'e', h: 'j', j: 'h', r: 'w', w: 'r', a: 'b', b: 'a', k: 'l', l: 'k', m: 'n', n: 'm', s: 't', t: 's', x: 'y', y: 'x', v: 'u', u: 'v', p: 'q', c: 'd', g: 'h' };
+export function lookAlts(text, kind, n = 3) {
+  const out = [];
+  for (const i of shuffle([...text].map((_, i) => i))) {
+    const ch = text[i], low = ch.toLowerCase(), sw = LOOK[low]; if (!sw) continue;
+    const alt = text.slice(0, i) + (ch === low ? sw : sw.toUpperCase()) + text.slice(i + 1);
+    if (alt !== text && !out.includes(alt) && (!FORMAT_OK[kind] || FORMAT_OK[kind].test(alt))) out.push(alt);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+export let FORMAT_POOL = null;
+export const FORMATS = () => {
+  if (FORMAT_POOL) return FORMAT_POOL;
+  const out = [];
+  for (const k of Object.keys(FORMAT_KINDS)) {
+    for (let tries = 0, n = 0; tries < 30 && n < 3; tries++) {
+      const [text] = formatLine(k), alts = lookAlts(text, k);
+      if (alts.length < 3 || out.some((y) => y.answer === text)) continue;
+      out.push({ key: 'fx' + text, cells: unicodeOf(translate(text, 'en', 1)).replace(/ /g, '⠀'), answer: text, kind: 'format', note: FORMAT_NAMES[k], alts }); n++;
+    }
+  }
+  FORMAT_POOL = shuffle(out);
+  return FORMAT_POOL;
+};
 export const MATH_SIGNS = ['+', '-', '×', '÷', '=', '$', '%', '@', '&', '#', '*', '°', '/'];
 export const CATS = {
   letters: { name: 'ABC', sets: {
@@ -35,6 +63,8 @@ export const CATS = {
     punct: ['Punctuation', () => [',', ';', ':', '.', '!', '?', "'", '-', '—', '(', ')'].map((p) => ({ key: 'p' + p, cells: UEB_PUNCT[p][0], answer: p, label: UEB_PUNCT[p][1], kind: 'punct' }))],
     signs: ['Maths & money signs', () => MATH_SIGNS.map((p) => ({ key: p === '-' ? 'pminus' : 'p' + p, cells: (p === '-' ? [fromDots('5') + fromDots('36'), 'minus'] : UEB_PUNCT[p])[0], answer: p === '-' ? '−' : p, label: p === '-' ? 'minus' : UEB_PUNCT[p][1], kind: 'math' }))],
     ind: ['Indicators', () => INDICATORS.map(([p, d, n]) => ({ key: 'i' + p, cells: cellsOf(d), answer: p, kind: 'indicator', note: n }))],
+    // Guess only: a whole price or postal code is too many cells for Draw's pads. Write has them as its Everyday text.
+    fmt: ['Everyday formats', FORMATS, 'Prices, times, postal codes…', 'read'],
   } },
   contractions: { name: 'Grade 2', sets: {
     start: ['Starter signs', () => G2_START.map((w) => Object.keys(CONTRACTIONS).flatMap((cat) => C(cat)()).find((x) => x.answer === w)).filter(Boolean)],
@@ -220,7 +250,7 @@ export function wordContext(item) {
 // The word's cells: the asked sign at full strength, every other cell faded.
 // What a screen reader hears for a prompt: the sign's dots, and the whole word when it is shown inside one.
 export const promptLabel = (item, wc) => wc ? `Sign: ${cellsLabel(item.cells)}, shown inside a ${[...wc.parts.map((x) => x.cells).join('')].length}-cell word: ${cellsLabel(wc.parts.map((x) => x.cells).join(''))}` : `Sign: ${cellsLabel(item.cells)}`;
-export const promptHTML = (item, wc) => `<div class="prompt-cells${wc ? ' in-word' : ''}" role="img" tabindex="-1" aria-label="${esc(promptLabel(item, wc))}">${wc ? wordCellsHTML(wc) : [...item.cells].map((c) => cellHTML(c)).join('')}</div>`;
+export const promptHTML = (item, wc) => `<div class="prompt-cells${wc ? ' in-word' : ''}${item.kind === 'format' ? ' fmt' : ''}" role="img" tabindex="-1" aria-label="${esc(promptLabel(item, wc))}">${wc ? wordCellsHTML(wc) : item.kind === 'format' ? item.cells.split(/⠀|(?<=⠤)/).map((w) => `<span class="pc-word">${[...w].map((c) => cellHTML(c)).join('')}</span>`).join('') : [...item.cells].map((c) => cellHTML(c)).join('')}</div>`;
 export const wordCellsHTML = (wc) => [...wc.parts.map((x) => x.cells).join('')].map((c, i) => cellHTML(c, i >= wc.at && i < wc.at + wc.len ? '' : 'dim')).join('');
 // ---------- practice help: what the chosen set is ----------
 export const LOWER_NOTE = 'Lower signs are the shapes of a–j moved down one row, so they never use the top dots.';
@@ -234,6 +264,7 @@ export const SET_HELP = {
   'symbols.num': ['Numbers', ['There are no separate digit cells. A number sign in front turns a–j into digits: a is 1, b is 2 and so on to i for 9 and j for 0.', 'One number sign covers the whole number, so 25 is the number sign, then b, then e. A comma or decimal point inside a number keeps it going; a space ends it.']],
   'symbols.punct': ['Punctuation', ['Most punctuation marks are lower signs. ' + LOWER_NOTE + ' The comma is a moved down, the period is d moved down, the exclamation mark is f.', 'The dash and the brackets take two cells: a prefix, then the sign. In Grade 2 the same lower cells are also contractions; where they sit in the word tells you which it is.']],
   'symbols.signs': ['Maths & money signs', ['These take two cells: a prefix, then a cell that names the sign.', 'Plus, minus, times, divided by, equals and the asterisk share the same prefix (the middle-right dot), so it is the second cell that tells them apart. Dollar, at and ampersand use the top-right dot instead: dollar is that dot plus s, at is that dot plus a.']],
+  'symbols.fmt': ['Everyday formats', ['Prices, times, phone numbers, postal codes, dates, temperatures and room numbers, the way they are brailled on receipts, signs and letters.', 'Watch for where the number sign is needed again: after a colon or a hyphen (3:15, 416-555-0123), and before each digit that follows a letter, as in a postal code (M5V 2T6). A capital letter right after a digit has its own capital sign, which also ends the number.', 'The wrong answers differ from the right one by a single look-alike cell, like 4 and 6 or 5 and 9, so read every cell.']],
   'symbols.ind': ['Indicators', ['Indicators are not printed characters. They change how the next cells are read.', 'The capital sign makes the next letter a capital; two make the whole word capitals, and three a whole passage, closed by the terminator. The number sign starts digits. The grade 1 indicator says the next cell is a plain letter, not a contraction. Italic and bold mark emphasis.']],
   'contractions.start': ['Starter signs', ['The 18 signs that turn up most in everyday text: the five strong contractions (and, for, of, the, with), a few one-letter wordsigns (but, can, do, it, that, you) and the commonest letter groups (ing, st, sh, th, ch, er, ed).', 'Knowing these makes most Grade 2 text much easier to read.']],
   'contractions.spot': ['Spot the right brailling', ['A word in print, and two to four ways to write it in braille. Only one follows the Grade 2 rules; the others use a sign where it isn’t allowed, or skip a sign that should be used.', 'After you answer, the reason appears under the choices. Each Grade 2 lesson in Learn has a Watch Out list with the same kind of mistakes.']],
@@ -326,6 +357,17 @@ export function quizMode(mode, q) {
     </div>`}`;
   const stage = $('#stage');
   const pre = mode === 'write' ? 'w:' : 'r:';
+  // Peek: the cheat sheet at the part this set comes from. Peeking while a question is open counts it as missed,
+  // the same as Show me or Skip (not on a new sign's card or the round summary).
+  setPeek(() => {
+    if (mode === 'words') return [state.wgrade, state.wgrade === 2 ? null : 'letters'];
+    const c = state.cat, s = state.set;
+    if (c === 'letters') return [1, 'letters'];
+    if (c === 'symbols') return [1, s === 'num' || s === 'fmt' ? 'numbers' : 'signs'];
+    if (c === 'contractions') return [2, /^k\d+$/.test(s) ? 'g' + s.slice(1) : null];
+    const g = s === 'g2' ? 2 : s === 'g1' ? 1 : (state.last && state.last.g) || 1;
+    return [g, g === 1 ? 'letters' : null];
+  }, () => { if (state.last && state.firstTry && !$('.intro, .rsum', stage)) result(false, mode === 'words' ? {} : state.last); });
   const auto = () => state.cat === 'auto';
   // Auto never merges: its options already skip anything with the same cells as the answer.
   const items = () => {
@@ -444,7 +486,8 @@ export function quizMode(mode, q) {
     if (auto() && pool.length < 6) pool = [...pool, ...autoList('all').filter((x) => x.src === item.src && x.key !== item.key && !pool.some((o) => o.key === x.key))];
     const wc = state.wc && state.wc[0] === item.key ? state.wc[1] : wordContext(item);
     state.wc = null;
-    const opts = shuffle([item, ...guessOptions(item, pool, wc && wc.pos)]);
+    // Everyday formats bring their own wrong answers: the same text with one look-alike cell changed.
+    const opts = shuffle([item, ...(item.alts ? item.alts.map((a, i) => ({ key: `${item.key}~${i}`, answer: a })) : guessOptions(item, pool, wc && wc.pos))]);
     const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
       ${promptHTML(item, wc)}
@@ -734,8 +777,9 @@ export function sweepMode(q) {
   const loadPass = () => Math.min(passList().length - 1, store.get(passKey(), 0));
   let passIdx = loadPass();
   // Reading speed: timed from the first touch to passing the last cell, in words a minute (best kept per grade).
-  let t0 = 0, tDone = 0;
+  let t0 = 0, tDone = 0, peeked = false;
   const words = () => text.split(/\s+/).filter(Boolean).length;
+  setPeek(() => [S.swGrade, S.swGrade === 2 ? null : src === 'numbers' ? 'numbers' : 'letters'], () => { peeked = true; });
   const info = (extra = '') => {
     const el = $('#swInfo'); if (!el) return;
     const pl = passList(), pass = src === 'passages' ? `Passage ${passIdx + 1} of ${pl.length} · level ${pl[passIdx][0]}${pl[passIdx][2] ? ' · contractions' : ''}` : '';
@@ -749,15 +793,16 @@ export function sweepMode(q) {
       tDone = performance.now(); haptic('done');
       const secs = (tDone - t0) / 1000, wpm = Math.round(words() / (secs / 60));
       const bk = 'swBest' + S.swGrade, b = Math.max(store.get(bk, 0), wpm);
-      if (secs > 2) store.set(bk, b);
-      info(`${words()} words in ${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')} · <b>${wpm} words a minute</b>${b > wpm ? ` (best ${b})` : wpm >= b && secs > 2 ? ' · new best' : ''}`);
+      const counts = secs > 2 && !peeked, best = counts ? b : store.get(bk, 0);
+      if (counts) store.set(bk, b);
+      info(`${words()} words in ${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')} · <b>${wpm} words a minute</b>${peeked ? ' (after a peek, so not counted)' : best > wpm ? ` (best ${best})` : counts ? ' · new best' : ''}`);
     }
   }
   let text = textFor();
   function build() {
     const grade = S.swGrade;
     cells = toCells(translate(text, 'en', grade)).filter((c) => c.kind !== 'newline');
-    t0 = 0; tDone = 0; info();
+    t0 = 0; tDone = 0; peeked = false; info();
     track.innerHTML = cells.map((c, i) => c.kind === 'space'
       ? `<div class="sc space" data-i="${i}"><span class="cell" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`
       : `<div class="sc kind-${c.kind}" data-i="${i}">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1, esc(c.idx === 0 ? (c.print || '·') : ''))}</div>`).join('');
@@ -854,7 +899,7 @@ export function sweepMode(q) {
     const step = (t) => { const k = Math.min(1, (t - t0) / 420); offset = start + (target - start) * (1 - Math.pow(1 - k, 3)); update(); if (k < 1) raf = requestAnimationFrame(step); };
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
   }
-  $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); t0 = 0; tDone = 0; info(); };
+  $('#restart').onclick = () => { headX = homeX(); animateTo(startOffset()); t0 = 0; tDone = 0; peeked = false; info(); };
   $('#shuffleBtn').onclick = () => { if (src === 'passages') { passIdx = (passIdx + 1) % passList().length; store.set(passKey(), passIdx); } text = textFor(); build(); };
   $('.sweep-top', box).addEventListener('pointerdown', (e) => e.stopPropagation());
   const onResize = () => { const p = headX - offset; measure(); headX = Math.min(headX, W); offset = headX - p; update(false); };

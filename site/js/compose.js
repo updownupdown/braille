@@ -1,22 +1,27 @@
 // Practice > Write: a few words or a short sentence to write in braille on the dot pad (or with six-key typing).
 // Every cell is checked as you go: when the dots match the next cell it is added by itself, a dot that isn't in
 // that cell turns red at once, and spaces between words are added for you. The words and what you've written
-// sit on one line at the top that scrolls sideways for longer text.
+// sit on one line at the top that scrolls sideways for longer text. Each finished line shows its writing speed in
+// words a minute, from the first dot to the last cell; the best is kept per grade and per way of writing (tapping
+// the dots or six-key typing), and only lines written without a hint or a peek count towards it.
 import { translate, unicodeOf, fromDots, toDots } from './braille.js';
 import { COMMON_WORDS } from './wordlist.js';
-import { PHRASES } from './phrases.js';
+import { PHRASES, formatLine } from './phrases.js';
 import { chord, sixKeyOn } from './sixkey.js';
 import { $, $$, cellHTML, esc, radios, bindRadios, shuffle, store, sheet } from './core.js';
 import { announce, feedback, cue, haptic, cellLabel, say, refocus, reducedMotion } from './a11y.js';
 import { logDay } from './home.js';
+import { setPeek } from './learn.js';
 
-export const COMPOSE_SRC = { words: 'Words', phrases: 'Sentences' };
+export const COMPOSE_SRC = { words: 'Words', phrases: 'Sentences', formats: 'Everyday' };
 const BLANK = '⠀';
 // Fresh text every time, never the same twice in a row.
 function deckOf(list) { let d = []; return () => { if (!d.length) d = shuffle(list); return d.pop(); }; }
 const nextWords = deckOf(COMMON_WORDS.filter((w) => /^[a-z]{3,5}$/.test(w)).slice(0, 1200));
 const nextPhrase = deckOf(PHRASES.filter((p) => p.length <= 34 && /^[a-z ]+$/i.test(p)));
-const textFor = (src) => (src === 'words' ? [nextWords(), nextWords(), nextWords()].join(' ') : nextPhrase());
+const textFor = (src) => (src === 'words' ? [nextWords(), nextWords(), nextWords()].join(' ') : src === 'formats' ? formatLine()[0] : nextPhrase());
+// Best writing speed: per grade, and per way of writing, since six-key typing is much faster than tapping dots.
+export const speedKey = (grade, six) => `cwBest${grade}${six ? 'k' : ''}`;
 
 // The text split into words, each with its braille cells, in writing order.
 export function composeWords(text, grade) {
@@ -33,22 +38,29 @@ export function composeMode(q) {
   let src = q.get('src') || store.get('cwSrc', 'words');
   if (!COMPOSE_SRC[src]) src = 'words';
   let grade = store.get('cwGrade', 1);
-  const stats = { right: 0, total: 0 };
+  const stats = { right: 0, total: 0, wpm: 0, best: 0, six: false, counts: false };
   $('#picker').innerHTML = `<div class="sw-row cw-pick">${radios('wsrc', Object.entries(COMPOSE_SRC), src)}${radios('cgrade', [[1, 'Grade 1'], [2, 'Grade 2']], grade)}</div>`;
   $('#modeBody').innerHTML = `<div class="card stage cw-stage" id="stage"></div><div class="w-score" id="cwScore"></div>`;
   const stage = $('#stage');
   bindRadios($('#picker'), (k, v) => {
     if (k === 'wsrc') { src = v; store.set('cwSrc', v); }
     if (k === 'cgrade') { grade = Number(v); store.set('cwGrade', grade); }
+    stats.wpm = 0; score();
     start();
   });
   // words: [{print, cells}]; wi/ci: the cell being written; pad: dots set so far; bad: a wrong dot shown in red.
-  let fresh = null, text = '', words = [], wi = 0, ci = 0, pad = new Set(), bad = 0, slips = 0, done = false;
+  // t0: the first dot or cell of the line; helped: a hint or a peek was used; sixUsed: a cell came from six-key typing.
+  let fresh = null, text = '', words = [], wi = 0, ci = 0, pad = new Set(), bad = 0, slips = 0, done = false, t0 = 0, helped = false, sixUsed = false;
   const want = () => words[wi]?.cells[ci];
-  const score = () => { $('#cwScore').innerHTML = `<span>Right first time: <b>${stats.right}</b> of ${stats.total}</span>`; };
+  // Peeking at the cheat sheet mid-line counts like a hint: not right first time, and the speed isn't a best.
+  setPeek(() => [grade, src === 'formats' ? 'numbers' : grade === 2 ? null : 'letters'], () => { if (!done) { slips++; helped = true; } });
+  const score = () => {
+    const b = store.get(speedKey(grade, stats.six), 0);
+    $('#cwScore').innerHTML = `<span>Right first time: <b>${stats.right}</b> of ${stats.total}</span>${stats.wpm ? `<span>Speed: <b>${stats.wpm}</b> words a minute${!stats.counts ? ' (with help, so not a best)' : stats.wpm >= b ? ' · new best' : ''}</span>` : ''}${b ? `<span>Best${stats.six ? ' (six-key)' : ''}: <b>${b}</b></span>` : ''}`;
+  };
   function start() {
     text = textFor(src); words = composeWords(text, grade);
-    wi = 0; ci = 0; pad = new Set(); bad = 0; slips = 0; done = false;
+    wi = 0; ci = 0; pad = new Set(); bad = 0; slips = 0; done = false; t0 = 0; helped = false; sixUsed = false;
     stage.classList.remove('glow-good', 'glow-bad', 'finished');
     stage.innerHTML = `
       <div class="cw-strip" id="cwStrip" tabindex="-1" role="img">${words.map((w, i) => `
@@ -104,6 +116,7 @@ export function composeMode(q) {
   // Tapping a dot: right when the pad now matches the cell; a dot that isn't in the cell is shown red until tapped off.
   function toggle(d) {
     if (done) return;
+    t0 = t0 || performance.now();
     if (pad.has(d)) { pad.delete(d); if (bad === d) bad = 0; paint(); return; }
     pad.add(d);
     const need = toDots(want());
@@ -114,12 +127,13 @@ export function composeMode(q) {
   // Six-key typing: a whole cell at once.
   function whole(cell) {
     if (done) return;
+    t0 = t0 || performance.now(); sixUsed = true;
     if (cell === want()) { pad = new Set(); bad = 0; return accept(); }
     slip(`Not quite, ${cellLabel(cell)} isn't the next cell`);
   }
   function hint() {
     if (done) return;
-    slips++; pad = new Set(toDots(want()));
+    slips++; helped = true; t0 = t0 || performance.now(); pad = new Set(toDots(want()));
     paint(); announce(`Hint: ${cellLabel(want())}`);
     const c = $('.cw-c.now', stage); if (c) c.classList.add('hinted');
     setTimeout(() => { if (!done && stage.isConnected) accept(); }, 700);
@@ -127,11 +141,17 @@ export function composeMode(q) {
   function finish() {
     done = true; pad = new Set(); bad = 0; stage.classList.add('finished');
     const ok = !slips;
-    stats.total++; if (ok) stats.right++; logDay(); score();
+    stats.total++; if (ok) stats.right++; logDay();
+    // Words a minute for this line; a new best only counts without hints or peeks, and after at least two seconds.
+    const secs = (performance.now() - t0) / 1000, n = text.trim().split(/\s+/).length;
+    stats.wpm = Math.max(1, Math.round(n / (secs / 60))); stats.six = sixUsed; stats.counts = !helped && secs >= 2;
+    if (stats.counts) { const k = speedKey(grade, sixUsed); if (stats.wpm > store.get(k, 0)) store.set(k, stats.wpm); }
+    score();
     paint();
     $('#cwEdit', stage).hidden = true; $('#cwFoot', stage).hidden = false;
     stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth; stage.classList.add(ok ? 'glow-good' : 'glow-bad');
-    if (ok) feedback(true, 'All right first time'); else { cue(true); announce(`Done, with ${slips} ${slips === 1 ? 'slip' : 'slips'}`); }
+    const speed = `${stats.wpm} words a minute`;
+    if (ok) feedback(true, `All right first time. ${speed}`); else { cue(true); announce(`Done, with ${slips} ${slips === 1 ? 'slip' : 'slips'}. ${speed}`); }
     refocus(stage, $('#cwNext', stage));
   }
   stage.addEventListener('click', (e) => {

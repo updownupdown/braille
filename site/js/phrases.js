@@ -413,3 +413,29 @@ export function numberLine() {
   if (r < 0.92) return `Call ${rint(200, 999)}-${rint(200, 999)}-${rint(1000, 9999)}.`;
   return `${rint(10, 95)}% of ${rint(2, 9) * 100} is how many?`;
 }
+
+// Everyday formats, one at a time: prices, times, phone numbers, Canadian postal codes, dates, temperatures,
+// percentages, room and gate numbers, measurements. Each comes with what kind of thing it is.
+const ON_FIRST = 'KLMNP', PC_LETTERS = 'ABCEGHJKLMNPRSTVWXYZ', AREA = ['416', '647', '437', '905', '289', '613', '519', '705', '807'];
+const MON_SHORT = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+export const FORMAT_KINDS = {
+  price: () => (Math.random() < 0.6 ? `$${rint(1, 99)}.${pick(['00', '25', '49', '50', '75', '95', '99'])}` : `$${rint(2, 500)}`),
+  time: () => `${rint(1, 12)}:${pick(['00', '05', '10', '15', '20', '30', '40', '45', '50'])}${Math.random() < 0.5 ? ` ${pick(['a.m.', 'p.m.'])}` : ''}`,
+  phone: () => `${pick(AREA)}-555-0${rint(100, 199)}`,
+  postal: () => `${pick(ON_FIRST)}${rint(0, 9)}${pick(PC_LETTERS)} ${rint(0, 9)}${pick(PC_LETTERS)}${rint(0, 9)}`,
+  date: () => `${pick(MON_SHORT)} ${rint(1, 28)}${Math.random() < 0.4 ? `, ${rint(2020, 2030)}` : ''}`,
+  temp: () => `${rint(-25, 35)}°C`,
+  percent: () => `${pick([5, 10, 15, 20, 25, 30, 40, 50, 75, 100])}%`,
+  place: () => pick([`Room ${rint(100, 450)}`, `Gate ${pick('ABCDE')}${rint(1, 40)}`, `Floor ${rint(2, 15)}`, `Bus ${rint(2, 199)}`, `Exit ${rint(1, 30)}`, `Suite ${rint(100, 1500)}`, `Unit ${rint(1, 20)}${pick('ABCD')}`]),
+  measure: () => pick([`${rint(1, 9)}.${rint(1, 9)} km`, `${rint(2, 25)} kg`, `${pick([250, 500, 750])} mL`, `${rint(10, 99)} cm`]),
+};
+export const FORMAT_NAMES = { price: 'Price', time: 'Time', phone: 'Phone number', postal: 'Postal code', date: 'Date', temp: 'Temperature', percent: 'Percentage', place: 'Room, gate or floor', measure: 'Measurement' };
+// What a real one of each kind looks like, so a look-alike wrong answer is never an impossible time or postal code.
+const MONTH_RE = MON_SHORT.map((m) => m.replace('.', '\\.')).join('|');
+export const FORMAT_OK = {
+  price: /^\$[1-9]\d*(\.\d\d)?$/, time: /^(1[0-2]|[1-9]):[0-5]\d( [ap]\.m\.)?$/, phone: /^[2-9]\d\d-555-0\d{3}$/,
+  postal: /^[KLMNP]\d[ABCEGHJKLMNPRSTVWXYZ] \d[ABCEGHJKLMNPRSTVWXYZ]\d$/, date: new RegExp(`^(${MONTH_RE}) ([1-9]|[12]\\d)(, 20[23]\\d)?$`),
+  temp: /^(-?[1-9]\d?|0)°C$/, percent: /^([1-9]\d?|100)%$/, place: /^(Room|Gate|Floor|Bus|Exit|Suite|Unit) [A-E]?[1-9]\d*[A-D]?$/,
+  measure: /^[1-9]\d*(\.[1-9])? (km|kg|mL|cm)$/,
+};
+export const formatLine = (kind = pick(Object.keys(FORMAT_KINDS))) => [FORMAT_KINDS[kind](), kind];

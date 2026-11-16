@@ -249,20 +249,41 @@ export function numbersSection() {
   };
 }
 // Printable cheat sheets: Grade 1 on one page (letters laid out by decade), Grade 2 over a few pages.
-export function cheatSection() {
+// Each block has an id (cs-letters, cs-numbers, cs-signs, cs-g0… for the contraction groups) so a peek can open at it.
+export function cheatHTML(g) {
   const item = (cells, label, kind, cls = '') => `<div class="cs-i ${cls}${cells.length > 1 ? ' wide' : ''}"><span class="cs-c">${[...cells].map((c) => cellHTML(c, '', { kind })).join('')}</span><b>${esc(label)}</b></div>`;
-  const blank = '<div class="cs-i cs-blank" aria-hidden="true"></div>';
-  const block = (title, body, cls = '', note = '') => `<section class="cs-block ${cls}"><h3>${title}${note ? `<span>${note}</span>` : ''}</h3><div class="cs-grid">${body}</div></section>`;
+  const block = (id, title, body, cls = '', note = '') => `<section class="cs-block ${cls}" data-cs="${id}"><h3>${title}${note ? `<span>${note}</span>` : ''}</h3><div class="cs-grid">${body}</div></section>`;
   const L = (str) => [...str].map((l) => item(LETTERS[l], l, 'letter')).join('');
   const P = (ch, label) => item(UEB_PUNCT[ch][0], label || ch, 'punct');
-  const grade1 = () => `<h2 class="cs-title">Braille Cheat Sheet · Grade 1 <small>Unified English Braille</small></h2>
-    ${block('Letters', `${L('abcdefghij')}${L('klmnopqrst')}${L('uvxyz')}<div class="cs-i cs-wnote">w came later: French had no w in 1824, so it isn’t in the pattern →</div>${L('w')}`, 'cs-decades', 'each row adds dots to the one above')}
-    ${block('Numbers', '1234567890'.split('').map((d) => item(LETTERS['jabcdefghi'[Number(d)]], d, 'digit')).join(''), 'cs-decades', `put ${cellHTML(IND.number, 'cs-inline', { kind: 'digit' })} before a number: 1–0 are a–j`)}
-    ${block('Signs', [item(IND.capital, 'capital', 'indicator'), item(IND.capital + IND.capital, 'all caps', 'indicator'), item(IND.number, 'number', 'digit'), P('.'), P(','), P('?'), P('!'), P('’', '’'), P('-'), P(':'), P(';'), P('“'), P('”'), P('('), P(')'), P('/')].join(''), 'cs-decades')}
+  if (String(g) === '2') return `<h2 class="cs-title">Braille Cheat Sheet · Grade 2 <small>Unified English Braille contractions</small></h2>
+    ${Object.entries(CONTRACTIONS).map(([cat, { blurb }], i) => block('g' + i, esc(cat), DICT.filter((e) => e.group === cat).map((e) => item(e.cells, e.print, 'contraction', e.cells.length > 1 ? 'wide' : '')).join(''), 'cs-g2', esc(blurb))).join('')}
     <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>`;
-  const grade2 = () => `<h2 class="cs-title">Braille Cheat Sheet · Grade 2 <small>Unified English Braille contractions</small></h2>
-    ${Object.entries(CONTRACTIONS).map(([cat, { blurb }]) => block(esc(cat), DICT.filter((e) => e.group === cat).map((e) => item(e.cells, e.print, 'contraction', e.cells.length > 1 ? 'wide' : '')).join(''), 'cs-g2', esc(blurb))).join('')}
+  return `<h2 class="cs-title">Braille Cheat Sheet · Grade 1 <small>Unified English Braille</small></h2>
+    ${block('letters', 'Letters', `${L('abcdefghij')}${L('klmnopqrst')}${L('uvxyz')}<div class="cs-i cs-wnote">w came later: French had no w in 1824, so it isn’t in the pattern →</div>${L('w')}`, 'cs-decades', 'each row adds dots to the one above')}
+    ${block('numbers', 'Numbers', '1234567890'.split('').map((d) => item(LETTERS['jabcdefghi'[Number(d)]], d, 'digit')).join(''), 'cs-decades', `put ${cellHTML(IND.number, 'cs-inline', { kind: 'digit' })} before a number: 1–0 are a–j`)}
+    ${block('signs', 'Signs', [item(IND.capital, 'capital', 'indicator'), item(IND.capital + IND.capital, 'all caps', 'indicator'), item(IND.number, 'number', 'digit'), P('.'), P(','), P('?'), P('!'), P('’', '’'), P('-'), P(':'), P(';'), P('“'), P('”'), P('('), P(')'), P('/')].join(''), 'cs-decades')}
     <p class="cs-foot">learn braille · updownupdown.github.io/braille</p>`;
+}
+// Peek: the cheat sheet in the sheet, over a question or a game, opened at the part that matters there.
+// The page says which grade and block (where) and what a peek costs (onPeek, called once per opening:
+// Practice counts the open question as missed). The header's peek button only shows where setPeek was called.
+const peekBtn = $('#peekBtn');
+export function setPeek(where, onPeek = () => {}) {
+  peekBtn.hidden = false;
+  peekBtn.onclick = () => {
+    let [g, at] = where();
+    onPeek();
+    const body = () => `<div class="peek-top">${radios('pkg', [['1', 'Grade 1'], ['2', 'Grade 2']], String(g))}<a class="st-link" href="#/reference/cheatsheet">Full cheat sheet</a></div><div class="cheatsheet peek-cs" data-grade="${g}">${cheatHTML(g)}</div>`;
+    openSheet(body(), { title: 'Cheat Sheet' });
+    const sheetEl = $('#sheet');
+    const jump = () => { const b = at && $(`[data-cs="${at}"]`, sheetEl); if (b) sheetEl.scrollTop = b.offsetTop - $('.sheet-head', sheetEl).offsetHeight - 8; };
+    jump();
+    bindRadios($('.peek-top', sheetEl), (k, v) => { g = v; at = null; $('.peek-cs', sheetEl).dataset.grade = v; $('.peek-cs', sheetEl).innerHTML = cheatHTML(v); markMulti(sheetEl); });
+  };
+}
+export const hidePeek = () => { peekBtn.hidden = true; peekBtn.onclick = null; };
+export function cheatSection() {
+  const grade1 = () => cheatHTML(1), grade2 = () => cheatHTML(2);
   let g = store.get('csGrade', '1');
   return { html: `<div class="cs-head"><p class="lead-p">Print it, or save it as a PDF. Grade 1 fits on one page; Grade 2 takes a few.</p><div class="row">${radios('csg', [['1', 'Grade 1'], ['2', 'Grade 2']], g)}<button class="btn primary" id="csPrint">${icon('print', 18)} Print</button></div></div>
     <div class="cheatsheet" id="cheatsheet"></div>`, bind: () => {

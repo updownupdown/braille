@@ -80,17 +80,25 @@ export const P = {
   compose: '<circle cx="5" cy="6" r="1.5" fill="currentColor"/><circle cx="5" cy="11" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><path d="M3 17h9"/><path d="m14.5 19.5 1-3.6 5-5a1.5 1.5 0 0 1 2.1 2.1l-5 5z"/>',
   hunt: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="12.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="8.5" cy="12.5" r="1.1" fill="currentColor"/>',
   place: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  proof: '<path d="M4 17.5 14.5 7l3 3L7 20.5H4z"/><path d="m12.5 9 3 3"/><path d="M13 20.5c1.3-1.2 2.2 1.2 3.5 0s2.2 1.2 3.5 0"/>',
+  peek: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="12.5" r="1.2" fill="currentColor"/><circle cx="12.5" cy="8.5" r="1.2" fill="currentColor"/><path d="M15 8.5h2.5"/><path d="M15 12.5h2.5"/><path d="M7.5 16.5h10"/>',
 };
 export const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 // ---------- settings ----------
 // speech, sounds and haptics are accessibility aids, off unless turned on in Settings.
-export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', speech: false, sounds: false, haptics: false };
+// swSize: braille size, 'large' or 'real' (true size, in Guess, Type, Read and Translate). mmPx: screen pixels in a real
+// millimetre, set by holding a coin to the screen in Settings (0 = not set yet: a guess from the kind of device).
+export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', mmPx: 0, speech: false, sounds: false, haptics: false };
+// A phone's CSS pixel is smaller than the nominal 1/96 inch, so CSS millimetres come out about 40% too small there.
+export const mmGuess = () => (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600 ? 6.3 : 96 / 25.4);
+export const LOONIE_MM = 26.5; // the Canadian dollar coin's diameter
 export const S = { ...DEFAULTS, ...store.get('settings', {}) };
 export function applySettings() {
   const r = document.documentElement;
   if (S.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = S.theme;
   const b = document.body.classList;
   b.toggle('s-color', S.color); b.toggle('s-dotfill', S.dotFill === 'fill'); b.toggle('s-sw-real', S.swSize === 'real');
+  r.style.setProperty('--mm', (S.mmPx || mmGuess()) + 'px');
 }
 export function setS(k, v) { S[k] = v; store.set('settings', S); applySettings(); window.dispatchEvent(new CustomEvent('settings', { detail: k })); }
 // ---------- cells ----------
@@ -240,7 +248,7 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
 }
 // Segmented radio group. Screen readers hear the group's name (RADIO_LABEL) and which option is on;
 // only the chosen button is a Tab stop and the arrow keys move between options (the usual radio pattern).
-export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', haptics: 'Haptics', wsrc: 'What to write', cgrade: 'Grade' };
+export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', pkg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', haptics: 'Haptics', wsrc: 'What to write', cgrade: 'Grade' };
 export const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}"${RADIO_LABEL[name] ? ` aria-label="${RADIO_LABEL[name]}"` : ''}>${opts.map(([v, l]) => { const on = String(v) === String(value); return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-v="${v}" class="${on ? 'on' : ''}">${l}</button>`; }).join('')}</div>`;
 export function bindRadios(root, fn) {
   root.addEventListener('click', (e) => {
@@ -287,6 +295,13 @@ export function openSettings() {
       <div class="set-row stack"><span>Appearance</span>${radios('theme', [['auto', `${icon('auto', 18)}Auto`], ['light', `${icon('sun', 18)}Light`], ['dark', `${icon('moon', 18)}Dark`]], S.theme)}</div>
       ${settingsPreview()}
       <div class="set-row stack"><span>Unraised dots</span>${radios('dotFill', [['outline', `${pv('outline')}Outline`], ['fill', `${pv('fill')}Filled`]], S.dotFill)}</div>
+      <div class="set-row stack"><span>Braille size</span>${radios('swSize', [['large', 'Large'], ['real', 'Real size']], S.swSize)}</div>
+      <div class="mm-cal" id="mmCal" ${S.swSize === 'real' ? '' : 'hidden'}>
+        <p class="set-note">Real size shows braille as big as it is on paper and signs, in Guess, Type, Read and Translate. To get it right on this screen, hold a loonie against the circle and slide until they match.</p>
+        <div class="mm-row"><span class="mm-coin" aria-hidden="true"></span><span class="mm-demo" aria-hidden="true">${['⠠', '⠑', '⠭', '⠊', '⠞'].map((c) => cellHTML(c)).join('')}</span></div>
+        <div class="mm-ctl"><button class="icon-btn small" type="button" id="mmLess" aria-label="Smaller">−</button><input type="range" id="mmRange" min="2.5" max="9" step="0.05" value="${S.mmPx || mmGuess()}" aria-label="Size of the circle"><button class="icon-btn small" type="button" id="mmMore" aria-label="Bigger">+</button></div>
+        <p class="set-note mm-state" id="mmState">${S.mmPx ? 'Matched to a coin on this screen.' : 'Not matched yet: sizes are a guess for this kind of device.'}</p>
+      </div>
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
       <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key']], S.sixKey ? '1' : '0')}</div>
       <p class="set-note six-note">Six-key types braille like a Perkins brailler with F D S J K L (dots 1 to 6): hold the keys for one cell together, then let go. Works in Guess, Draw, Write, Type, the games and Braille to text.</p>
@@ -315,9 +330,16 @@ export function openSettings() {
     if (k === 'sixKey') { setS('sixKey', v === '1'); return; }
     if (k === 'speech') { setS('speech', v === '1'); if (v === '1') speak('Spoken feedback is on'); else stopSpeech(); return; }
     if (k === 'sounds') { setS('sounds', v === '1'); if (v === '1') tone(true); return; }
+    if (k === 'swSize') $('#mmCal', sheet).hidden = v !== 'real';
     if (k === 'haptics') { setS('haptics', v === '1'); if (v === '1') haptic('right', { force: true }); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
+  // Coin calibration: the circle is LOONIE_MM "millimetres" wide at the current scale.
+  const mm = $('#mmRange', sheet);
+  const setMm = (v) => { v = Math.max(2.5, Math.min(9, Math.round(v * 20) / 20)); mm.value = v; setS('mmPx', v); $('#mmState', sheet).textContent = 'Matched to a coin on this screen.'; };
+  mm.oninput = () => setMm(Number(mm.value));
+  $('#mmLess', sheet).onclick = () => setMm(Number(mm.value) - 0.05);
+  $('#mmMore', sheet).onclick = () => setMm(Number(mm.value) + 0.05);
   // Each reset needs a second tap; it goes back to normal after a few seconds if left alone.
   // Backup: every dots.* key in one JSON file; restoring replaces what is on this device and reloads.
   $('#bkSave', sheet).onclick = () => {

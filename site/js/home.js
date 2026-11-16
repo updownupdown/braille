@@ -6,6 +6,7 @@ import { GAMES, gameStore } from './games.js';
 import { AUTO_GAP, CATS, MODES } from './practice.js';
 import { $, titleCase, openSheet, cellHTML, crowHTML, icon, level, markMulti, mastery, setSub, setTitle, store, view, views } from './core.js';
 import { LESSONS, REF_SECTIONS, isLesson, lessonsDone } from './learn.js';
+import { checkMilestones, milestoneLine, milestonesHTML } from './milestones.js';
 // 0 untried · 1–3 blues · 4+ known (green)
 
 // ---------- home ----------
@@ -16,7 +17,7 @@ export const PROG_GROUPS = () => [
 ];
 // Answers per day (first tries only), kept for the stats page's calendar and streak.
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-export function logDay() { const d = store.get('days', {}), k = dayKey(); d[k] = (d[k] || 0) + 1; store.set('days', d); }
+export function logDay() { const d = store.get('days', {}), k = dayKey(); d[k] = (d[k] || 0) + 1; store.set('days', d); checkMilestones(); }
 export function dayStreak(days) {
   let n = 0; const d = new Date();
   if (!days[dayKey(d)]) d.setDate(d.getDate() - 1); // today not practised yet: the streak still counts up to yesterday
@@ -61,6 +62,8 @@ export function statsHTML() {
       <div class="st-cal-d" aria-hidden="true"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span></div>
       <div class="st-cal" role="img" aria-label="Practice calendar for the last 12 weeks: ${daysPractised} days practised. Darker means more answers.">${cellsCal.join('')}</div></div>
     <div class="st-cal-foot"><span>${daysPractised ? 'Today is outlined.' : 'Today is outlined. Practise today to start your streak.'}</span><span class="st-leg" aria-hidden="true">Less <i></i><i style="--a:.4"></i><i style="--a:.7"></i><i style="--a:1"></i> More</span></div>
+    <h2 class="sec-h">Milestones</h2>
+    ${milestonesHTML()}
     <h2 class="sec-h">Known Signs</h2>
     <p class="muted small st-key"><span class="k"></span> known <span class="l"></span> learning. Tap a bar to practise that group.</p>
     <table class="st-table"><thead><tr><th></th><th>Guess</th><th>Draw</th></tr></thead><tbody>${rows}</tbody></table>
@@ -78,7 +81,7 @@ export const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', 
 export const LESSON_CELLS = { overview: '⠿', alphabet: '⠁', numbers: '⠼', grade2: '⠯', g2words: '⠃', g2strong: '⠮', g2lower: '⠢', g2affix: '⠐⠕', g2short: '⠁⠃' };
 export const secIcon = (k, done = false, size = 24) => (done ? icon('check', size) : LESSON_CELLS[k] ? `<span class="lic">${[...LESSON_CELLS[k]].map((c) => cellHTML(c)).join('')}</span>` : icon(SEC_ICON[k], size));
 export const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
-export const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'chunt', 'agent', 'trivia', 'riddles'];
+export const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'chunt', 'proof', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
   const m = mastery(), misses = store.get('misses', {});
@@ -141,6 +144,7 @@ views[''] = () => {
     <div class="home-head">
       <div class="home-brand" role="heading" aria-level="1" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
+    ${isNew ? '' : milestoneLine()}
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>
