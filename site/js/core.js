@@ -24,8 +24,9 @@ export function titleCase(str) {
 }
 export const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 export const pick = (a) => a[Math.floor(Math.random() * a.length)];
-// Short spoken feedback for screen readers (a polite live region in index.html).
-export function announce(text) { const el = document.getElementById('srLive'); if (!el) return; el.textContent = ''; setTimeout(() => { el.textContent = text; }, 30); }
+// Screen-reader announcements, optional speech and sounds, cells described as dots: see a11y.js.
+export { announce, feedback, cellsLabel, cellLabel, reducedMotion, speak } from './a11y.js';
+import { speak, stopSpeech, tone, speechAvailable } from './a11y.js';
 // ---------- icons ----------
 export const P = {
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
@@ -76,10 +77,14 @@ export const P = {
   github: '<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
   stats: '<path d="M4 20h16"/><rect x="5" y="11" width="3.4" height="6" rx="1"/><rect x="10.3" y="5" width="3.4" height="12" rx="1"/><rect x="15.6" y="8" width="3.4" height="9" rx="1"/>',
   sweep: '<circle cx="5" cy="8" r="1.6" fill="currentColor"/><circle cx="10" cy="8" r="1.6" fill="currentColor"/><circle cx="15" cy="8" r="1.6" fill="currentColor"/><path d="M3 16h15"/><path d="m15 13 3 3-3 3"/>',
+  compose: '<circle cx="5" cy="6" r="1.5" fill="currentColor"/><circle cx="5" cy="11" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><path d="M3 17h9"/><path d="m14.5 19.5 1-3.6 5-5a1.5 1.5 0 0 1 2.1 2.1l-5 5z"/>',
+  hunt: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="12.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="8.5" cy="12.5" r="1.1" fill="currentColor"/>',
+  place: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
 };
 export const icon = (n, size = 22) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 // ---------- settings ----------
-export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large' };
+// speech and sounds are accessibility aids, off unless turned on in Settings.
+export const DEFAULTS = { theme: 'auto', color: true, sixKey: false, dotFill: 'outline', swGrade: 1, swSize: 'large', speech: false, sounds: false };
 export const S = { ...DEFAULTS, ...store.get('settings', {}) };
 export function applySettings() {
   const r = document.documentElement;
@@ -150,30 +155,53 @@ export function groupsHTML(spec, cls = 'md', fixedKind = '') {
 // ---------- modal sheet ----------
 export const sheet = $('#sheet');
 export const backdrop = $('#sheetBackdrop');
+// The sheet is a modal dialog: named by its title, Tab stays inside it, and closing it puts focus back
+// on whatever opened it.
+let sheetOpener = null;
 export function openSheet(html, { title = '' } = {}) {
-  sheet.innerHTML = `<div class="sheet-head"><h2>${esc(titleCase(title))}</h2><button class="icon-btn close" aria-label="Close">${icon('close', 20)}</button></div><div class="sheet-body">${html}</div>`;
+  if (sheet.hidden) sheetOpener = document.activeElement;
+  sheet.innerHTML = `<div class="sheet-head"><h2 id="sheetTitle">${esc(titleCase(title))}</h2><button class="icon-btn close" aria-label="Close">${icon('close', 20)}</button></div><div class="sheet-body">${html}</div>`;
+  sheet.setAttribute('aria-labelledby', 'sheetTitle');
   sheet.hidden = false; backdrop.hidden = false; markMulti(sheet);
   sheet.scrollTop = 0;
   $('.close', sheet).onclick = closeSheet;
   $('.close', sheet).focus({ preventScroll: true });
 }
-export function closeSheet() { if (sheet.hidden) return; sheet.hidden = true; backdrop.hidden = true; }
+export function closeSheet() {
+  if (sheet.hidden) return; sheet.hidden = true; backdrop.hidden = true;
+  const o = sheetOpener; sheetOpener = null;
+  if (o && o.isConnected && typeof o.focus === 'function') o.focus({ preventScroll: true });
+}
 backdrop.onclick = closeSheet;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDD(); closeSheet(); } });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (openDD) { const b = $('.dd-btn', openDD); closeDD(); if (b) b.focus(); return; }
+    closeSheet(); return;
+  }
+  // Keep Tab inside the open sheet.
+  if (e.key === 'Tab' && !sheet.hidden) {
+    const f = $$('a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select, textarea, summary, [tabindex]:not([tabindex="-1"])', sheet).filter((x) => x.tabIndex >= 0 && (x.offsetParent !== null || x === document.activeElement));
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (!sheet.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
 sheet.addEventListener('click', (e) => { if (e.target.closest('a[href^="#"]')) closeSheet(); });
 // ---------- custom drop-down ----------
 export let openDD = null;
-export function closeDD() { if (openDD) { openDD.classList.remove('open'); openDD = null; } }
+export function closeDD() { if (openDD) { openDD.classList.remove('open'); const b = $('.dd-btn', openDD); if (b) b.setAttribute('aria-expanded', 'false'); openDD = null; } }
 document.addEventListener('click', (e) => { if (openDD && !openDD.contains(e.target)) closeDD(); });
-export function dropdown(el, { label = '', options, value, onChange, plain = false, lead = '' }) {
+export function dropdown(el, { label = '', options, value, onChange, plain = false, lead = '', aria = '' }) {
   const cur = options.find((o) => o.value === value);
   let lastGroup = null;
   el.classList.add('dd');
-  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox">${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
+  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="listbox" aria-expanded="false"${label && plain ? '' : ` aria-label="${esc([aria || label, cur ? cur.label : ''].filter(Boolean).join(': '))}"`}>${lead ? `<span class="dd-lead">${icon(lead, 18)}</span>` : ''}${plain ? `<span class="dd-v">${esc(label)}</span>` : `${label ? `<span class="dd-k">${esc(label)}</span>` : ''}<span class="dd-v">${esc(cur ? cur.label : '…')}</span>`}${icon('chevron', 18)}</button>
     <div class="dd-menu" role="listbox">${options.map((o) => {
       const g = o.group && o.group !== lastGroup ? `<div class="dd-group">${esc(o.group)}</div>` : '';
       lastGroup = o.group || lastGroup;
-      return `${g}<button type="button" role="option" class="dd-opt ${o.value === value ? 'on' : ''}" data-v="${esc(o.value)}"><span>${esc(o.label)}${o.hint ? `<small>${esc(o.hint)}</small>` : ''}</span>${o.value === value ? icon('check', 18) : ''}</button>`;
+      return `${g}<button type="button" role="option" aria-selected="${o.value === value}" class="dd-opt ${o.value === value ? 'on' : ''}" data-v="${esc(o.value)}"><span>${esc(o.label)}${o.hint ? `<small>${esc(o.hint)}</small>` : ''}</span>${o.value === value ? icon('check', 18) : ''}</button>`;
     }).join('')}</div>`;
   $('.dd-btn', el).onclick = (e) => {
     e.stopPropagation();
@@ -186,26 +214,53 @@ export function dropdown(el, { label = '', options, value, onChange, plain = fal
       menu.classList.toggle('up', r.top > innerHeight * 0.62);
       menu.classList.toggle('right', r.left > innerWidth * 0.5);
       const on = $('.dd-opt.on', menu); if (on) menu.scrollTop = on.offsetTop - 60;
+      $('.dd-btn', el).setAttribute('aria-expanded', 'true');
+      // Opened from the keyboard: focus the chosen option so the arrow keys work straight away.
+      if (e.detail === 0) (on || $('.dd-opt', menu)).focus();
     }
   };
+  // Arrow keys move through the options; Home and End jump; Tab closes the menu.
+  $('.dd-menu', el).addEventListener('keydown', (e) => {
+    const opts = $$('.dd-opt', el), i = opts.indexOf(document.activeElement);
+    const go = (j) => { e.preventDefault(); opts[(j + opts.length) % opts.length].focus(); };
+    if (e.key === 'ArrowDown') go(i + 1); else if (e.key === 'ArrowUp') go(i - 1);
+    else if (e.key === 'Home') go(0); else if (e.key === 'End') go(opts.length - 1);
+    else if (e.key === 'Tab') closeDD();
+  });
+  $('.dd-btn', el).addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' && !el.classList.contains('open')) { e.preventDefault(); $('.dd-btn', el).click(); (($('.dd-opt.on', el)) || $('.dd-opt', el)).focus(); } });
   $('.dd-menu', el).onclick = (e) => {
     const b = e.target.closest('.dd-opt'); if (!b) return;
     e.stopPropagation(); closeDD();
     const v = options.find((o) => String(o.value) === b.dataset.v).value;
-    dropdown(el, { label, options, value: plain ? null : v, onChange, plain, lead });
+    const kb = e.detail === 0;
+    dropdown(el, { label, options, value: plain ? null : v, onChange, plain, lead, aria });
+    if (kb) $('.dd-btn', el).focus();
     onChange(v);
   };
 }
-// Segmented radio group
-export const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}">${opts.map(([v, l]) => `<button type="button" role="radio" aria-checked="${String(v) === String(value)}" data-v="${v}" class="${String(v) === String(value) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+// Segmented radio group. Screen readers hear the group's name (RADIO_LABEL) and which option is on;
+// only the chosen button is a Tab stop and the arrow keys move between options (the usual radio pattern).
+export const RADIO_LABEL = { cat: 'Category', color: 'Dot colours', csg: 'Grade', dotFill: 'Unraised dots', lvl: 'Level', sixKey: 'Physical keyboard', src: 'What to read', swGrade: 'Grade', swSize: 'Size', theme: 'Appearance', trView: 'Show as', wgrade: 'Grade', wlen: 'Word length', speech: 'Spoken feedback', sounds: 'Sounds', wsrc: 'What to write', cgrade: 'Grade' };
+export const radios = (name, opts, value) => `<div class="seg radios" role="radiogroup" data-seg="${name}"${RADIO_LABEL[name] ? ` aria-label="${RADIO_LABEL[name]}"` : ''}>${opts.map(([v, l]) => { const on = String(v) === String(value); return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-v="${v}" class="${on ? 'on' : ''}">${l}</button>`; }).join('')}</div>`;
 export function bindRadios(root, fn) {
   root.addEventListener('click', (e) => {
     const g = e.target.closest('[data-seg]'), b = e.target.closest('[data-seg] button');
     if (!g || !b || !root.contains(g)) return;
-    $$('button', g).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+    $$('button', g).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); x.tabIndex = x === b ? 0 : -1; });
     fn(g.dataset.seg, b.dataset.v);
   });
 }
+// Arrow keys in any radio group (segmented buttons, the Practice mode links): move to the next option and pick it.
+document.addEventListener('keydown', (e) => {
+  if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key) || e.altKey || e.metaKey || e.ctrlKey) return;
+  const g = e.target.closest && e.target.closest('[role="radiogroup"]'); if (!g) return;
+  const items = $$('[role="radio"]', g).filter((x) => !x.disabled), i = items.indexOf(e.target); if (i < 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const n = items[(i + (/Right|Down/.test(e.key) ? 1 : -1) + items.length) % items.length];
+  n.focus(); n.click();
+  // Some pickers redraw themselves when the choice changes: focus the same option in the new group.
+  if (!n.isConnected) { const seg = g.dataset.seg, v = n.dataset.v; const m = seg && $(`[data-seg="${seg}"] [data-v="${v}"]`); if (m) m.focus(); }
+}, true);
 // ---------- header + sticky control row ----------
 export const headTitle = $('#headTitle');
 export const helpBtn = $('#helpBtn');
@@ -225,7 +280,12 @@ export function openSettings() {
       <div class="set-row stack"><span>Dot colours</span>${radios('color', [['1', 'Colour-coded'], ['0', 'Uniform']], S.color ? '1' : '0')}</div>
       <div class="color-key ${S.color ? '' : 'off'}">${COLOR_KEY.map(([k, l]) => `<span>${cellHTML('⠿', 'sm', { kind: k })}${l}</span>`).join('')}</div>
       <div class="set-row stack"><span>Physical keyboard</span>${radios('sixKey', [['0', 'Letters'], ['1', 'Six-key (F D S J K L)']], S.sixKey ? '1' : '0')}</div>
-      <p class="set-note six-note">Six-key types braille like a Perkins brailler: hold the keys for one cell together, then let go. Works in Guess, Type, the games and Braille to text.</p>
+      <p class="set-note six-note">Six-key types braille like a Perkins brailler: hold the keys for one cell together, then let go. Works in Guess, Draw, Write, Type, the games and Braille to text.</p>
+    </div>
+    <div class="set-group"><h3>Accessibility</h3>
+      <div class="set-row stack"><span>Spoken feedback</span>${radios('speech', [['0', 'Off'], ['1', 'On']], S.speech ? '1' : '0')}</div>
+      <div class="set-row stack"><span>Sounds</span>${radios('sounds', [['0', 'Off'], ['1', 'On']], S.sounds ? '1' : '0')}</div>
+      <p class="set-note">Spoken feedback reads out right and wrong answers, new questions and braille cells as dot numbers${speechAvailable() ? '' : ' (this browser has no speech voices, so only sounds will play)'}. Turn it off if you use a screen reader, which already hears all of this. Sounds play a soft tone for right and wrong answers. Animations follow your device’s reduce-motion setting.</p>
     </div>
     <div class="set-group"><h3>Your data</h3>
       <p class="set-note">Everything is saved on this device only. Save a backup file to keep it safe or move it to another device. Each reset asks you to tap again to confirm.</p>
@@ -243,6 +303,8 @@ export function openSettings() {
   bindRadios($('.settings', sheet), (k, v) => {
     if (k === 'color') { setS('color', v === '1'); $('.color-key', sheet).classList.toggle('off', v !== '1'); return; }
     if (k === 'sixKey') { setS('sixKey', v === '1'); return; }
+    if (k === 'speech') { setS('speech', v === '1'); if (v === '1') speak('Spoken feedback is on'); else stopSpeech(); return; }
+    if (k === 'sounds') { setS('sounds', v === '1'); if (v === '1') tone(true); return; }
     setS(k, typeof DEFAULTS[k] === 'number' ? Number(v) : v);
   });
   // Each reset needs a second tap; it goes back to normal after a few seconds if left alone.

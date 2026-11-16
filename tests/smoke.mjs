@@ -22,9 +22,9 @@ const base = `http://localhost:${server.address().port}/`;
 export const ROUTES = ['', 'reference', 'reference/overview', 'reference/alphabet', 'reference/numbers', 'reference/grade2',
   'reference/g2words', 'reference/g2strong', 'reference/g2lower', 'reference/g2affix', 'reference/g2short',
   'reference/signs', 'reference/science', 'reference/languages', 'reference/systems', 'reference/cheatsheet',
-  'practice', 'practice/read', 'practice/write', 'practice/words', 'practice/sweep', 'practice/read?cat=auto', 'practice/stats',
+  'practice', 'practice/read', 'practice/write', 'practice/words', 'practice/sweep', 'practice/read?cat=auto', 'practice/stats', 'practice/compose', 'practice/compose?src=phrases', 'practice/place', 'practice/read?cat=contractions&set=spot',
   'games', 'games/wordle', 'games/snowman', 'games/anagrams', 'games/agent', 'games/rain', 'games/time', 'games/mirror',
-  'games/memory', 'games/maze', 'games/signhunt', 'games/trivia', 'games/riddles', 'translate', 'translate?text=Exit%20floor%202'];
+  'games/memory', 'games/maze', 'games/signhunt', 'games/chunt', 'games/trivia', 'games/riddles', 'translate', 'translate?text=Exit%20floor%202'];
 
 const browser = await chromium.launch();
 const failures = [];
@@ -75,6 +75,38 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
     return [...new Set(out)];
   });
   if (bad.length) failures.push('Guess choices with two right answers:\n  ' + bad.slice(0, 20).join('\n  '));
+  await page.close();
+}
+// Spot the right brailling and Watch Out: the right braille is the translator's, every wrong one differs from it
+// and from each other. Write: the alignment finds a missing, an extra and a wrong cell.
+{
+  const page = await browser.newPage();
+  await page.goto(base + '#/practice/read');
+  await page.waitForTimeout(400);
+  const bad = await page.evaluate(async () => {
+    const R = await import('./js/rules.js'), B = await import('./js/braille.js'), W = await import('./js/compose.js');
+    const out = [];
+    for (const [k, list] of Object.entries(R.MISTAKES)) for (const m of list) {
+      const x = R.mistake(m);
+      if (!x.wrong) out.push(`${k} ${x.word}: no wrong version`);
+      else if (R.cellsOfParts(x.wrong) === B.unicodeOf(x.right)) out.push(`${k} ${x.word}: wrong equals right`);
+    }
+    const items = R.spotItems();
+    if (items.length < 60) out.push(`only ${items.length} spot items`);
+    for (const it of items) {
+      const sp = it.spot;
+      if (sp.right !== B.unicodeOf(B.translate(sp.word, 'en', 2))) out.push(`spot ${sp.word}: right is not the translator's`);
+      const all = [sp.right, ...sp.wrongs.map((w) => w.cells)];
+      if (new Set(all).size !== all.length) out.push(`spot ${sp.word}: two options are the same`);
+      if (!sp.wrongs.length || sp.wrongs.some((w) => !w.why)) out.push(`spot ${sp.word}: missing a reason`);
+    }
+    const t = (a, b) => W.align([...a], [...b]).map((x) => x.t[0]).join('');
+    if (t('abd', 'abcd') !== 'oomo') out.push('align: missing cell ' + t('abd', 'abcd'));
+    if (t('abxcd', 'abcd') !== 'ooeoo') out.push('align: extra cell ' + t('abxcd', 'abcd'));
+    if (t('abxd', 'abcd') !== 'oos' + 'o') out.push('align: wrong cell ' + t('abxd', 'abcd'));
+    return out;
+  });
+  if (bad.length) failures.push('Grade 2 rules / Write:\n  ' + bad.slice(0, 20).join('\n  '));
   await page.close();
 }
 await browser.close();

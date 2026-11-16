@@ -280,7 +280,32 @@ input[type=range] { accent-color: var(--accent); }
 
 footer.foot { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+/* ---------- accessibility ---------- */
+/* Skip link: off screen until it gets keyboard focus. */
+.skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; transform: translateY(-200%); padding: 10px 16px; border: 0; border-radius: 12px; background: var(--ink); color: var(--bg); font-weight: 600; }
+.skip-link:focus { transform: none; }
+/* Reduced motion (system setting): no movement, shakes, slides or flips. Right/wrong feedback stays,
+   as a still ring instead of the animated glow, so nothing is lost. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .glow-good { box-shadow: 0 0 0 3px var(--good) !important; border-color: var(--good) !important; }
+  .glow-bad { box-shadow: 0 0 0 3px var(--bad) !important; border-color: var(--bad) !important; }
+  .mz-new.filling .fill { transform: scaleX(1); }
+}
+/* More contrast (system setting): darker secondary text, stronger lines, links underlined. */
+@media (prefers-contrast: more) {
+  :root { --muted: #5f564e; --line: #a99d90; }
+  :root[data-theme="dark"] { --muted: #cfc5ba; --line: #8a7f73; }
+  a:not(.btn):not(.hrow):not(.hcard):not(.sr):not([role="radio"]) { text-decoration: underline; text-underline-offset: 3px; }
+  .cell i:not(.on) { box-shadow: inset 0 0 0 2px var(--off); }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --muted: #cfc5ba; --line: #8a7f73; } }
+/* Windows high contrast: raised dots must still look raised. */
+@media (forced-colors: active) {
+  .cell i { forced-color-adjust: none; border: 1px solid CanvasText; background: Canvas; }
+  .cell i.on { background: CanvasText; }
+  .glow-good, .glow-bad { outline: 3px solid Highlight; }
+}
 
 /* ---------- layout v3 ---------- */
 
@@ -1624,3 +1649,82 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .prompt-cells .cell.dim { opacity: .15; }
 .stage .prompt-cells.in-word { flex-wrap: nowrap; }
 .stage .prompt-cells.in-word .cell { --s: clamp(9px, 2.9vw, 18px); }
+
+/* ---------- Practice: Spot the right brailling ---------- */
+.spot-q { font-size: 1.15rem; text-align: center; margin: 0 0 14px; outline: none; }
+.spot-q b { font-size: 1.5rem; font-weight: 600; display: block; margin-top: 2px; }
+.spot-opts { display: grid; gap: 10px; width: 100%; max-width: 520px; }
+.spot-opt { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); cursor: pointer; text-align: left; }
+.spot-opt:hover { border-color: var(--accent); }
+.spot-n { width: 22px; flex: none; color: var(--muted); font-size: .85rem; font-weight: 500; }
+.spot-cells { display: flex; flex-wrap: wrap; gap: 4px 0; }
+.spot-cells .cell { --s: 8px; }
+.spot-opt.right { background: color-mix(in srgb, var(--good) 18%, var(--surface)); border-color: var(--good); }
+.spot-opt.wrong { background: color-mix(in srgb, var(--bad) 14%, var(--surface)); border-color: var(--bad); animation: shakeSm .2s linear; }
+.spot-opt.dim { opacity: .55; }
+.spot-why { min-height: 2.8em; margin: 12px 0 0; max-width: 520px; font-size: .95rem; color: var(--ink-2, var(--ink)); text-align: center; }
+.spot-next { min-height: var(--ctl-h); }
+
+/* ---------- Learn: Watch Out (common Grade 2 mistakes) ---------- */
+.mk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.mk { display: grid; gap: 8px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.mk .print { font-size: 1.1rem; font-weight: 500; }
+.mk-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; column-gap: 10px; }
+.mk-mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.mk-row.ok .mk-mark { background: var(--good); }
+.mk-row.no .mk-mark { background: var(--bad); }
+.mk-row.no .braille-line { opacity: .85; }
+.mk-row .braille-line { flex-wrap: wrap; }
+.mk-why { margin: 0; font-size: .85rem; color: var(--muted); }
+
+/* ---------- Contraction Hunt ---------- */
+:is(.gc-chunt, a[href="#/games/chunt"] .hrow-ic) { --gc: #a0602a; }
+.ch-q { margin: 0; font-size: 1.1rem; text-align: center; }
+.ch-q b { font-weight: 600; }
+.ch-word { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 18px 0 6px; }
+.ch-c { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 7px 5px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); cursor: pointer; }
+.ch-c:hover:not(:disabled) { border-color: var(--accent); }
+.ch-c .cell { --s: clamp(8px, 2.5vw, 12px); padding: 0; }
+.ch-c .lbl { min-height: 1.2em; font-size: .85rem; color: var(--muted); }
+.ch-c.got { border-color: var(--good); background: color-mix(in srgb, var(--good) 16%, var(--surface)); }
+.ch-c.miss { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.ch-c.sign .lbl { color: var(--accent); font-weight: 600; }
+.ch-c:disabled { cursor: default; }
+.ch-left { margin: 0; min-height: 1.5em; text-align: center; color: var(--muted); font-size: .9rem; }
+
+/* ---------- Practice: Write ---------- */
+.cw-stage { gap: 14px; }
+.cw-text { font-size: 1.3rem; font-weight: 500; text-align: center; line-height: 1.3; outline: none; max-width: 520px; }
+.cw-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 0; min-height: 40px; max-width: 100%; }
+.cw-c { display: inline-grid; place-items: center; min-width: 22px; min-height: 34px; border-radius: 8px; }
+.cw-c .cell { --s: 7px; }
+.cw-c.space { width: 16px; min-width: 16px; }
+.cw-c.cur { outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
+.cw-c.ok { background: color-mix(in srgb, var(--good) 14%, transparent); }
+.cw-c.sub, .cw-c.extra { background: color-mix(in srgb, var(--bad) 16%, transparent); }
+.cw-c.extra .cell { opacity: .6; }
+.cw-c.miss { outline: 1.5px dashed var(--bad); outline-offset: -3px; }
+.cw-gap { width: 16px; }
+.cw-edit { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.cw-keys { display: grid; gap: 8px; }
+.cw-keys .btn { min-width: 112px; }
+.cw-result { width: 100%; max-width: 560px; display: grid; gap: 12px; }
+.cw-sum { margin: 0; text-align: center; font-weight: 500; }
+.cw-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 10px; }
+.cw-k { font-size: .8rem; color: var(--muted); }
+.cw-row .cw-line { justify-content: flex-start; }
+.cw-foot { display: flex; gap: 10px; justify-content: center; align-items: center; }
+@media (max-width: 420px) { .cw-pad { grid-template-columns: repeat(2, 46px); grid-template-rows: repeat(3, 46px); gap: 8px; padding: 12px; } .cw-edit { gap: 12px; } .cw-keys .btn { min-width: 96px; } }
+
+/* ---------- Practice: placement check ---------- */
+.pl-link { margin: 12px 0 0; font-size: .9rem; color: var(--muted); }
+.pl-intro, .pl-done { display: grid; gap: 12px; justify-items: center; text-align: center; max-width: 460px; }
+.pl-lead { font-size: 1.15rem; margin: 0; outline: none; }
+.pl-where { display: flex; justify-content: space-between; width: 100%; max-width: 520px; margin: 0 0 6px; font-size: .9rem; color: var(--muted); }
+.pl-foot { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+.pl-big { display: grid; justify-items: center; outline: none; }
+.pl-big b { font-size: 2.6rem; font-weight: 600; line-height: 1; }
+.pl-big span { color: var(--muted); }
+.pl-done p { margin: 0; }
+.cw-stage [hidden] { display: none !important; }
+.pl-link a { text-decoration: underline; text-underline-offset: 3px; }

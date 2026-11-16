@@ -2,7 +2,7 @@
 // This module is the only place that touches localStorage: stores, backup, restore, resets and migrations.
 //
 // Keys (values are JSON):
-//   settings           theme, colour coding, unraised dots, six-key typing…
+//   settings           theme, colour coding, unraised dots, six-key typing, spoken feedback, sounds…
 //   mastery            per-sign scores from Guess / Draw / Type ({ key: 0–5 })
 //   auto               Auto practice boxes ({ r, w })        misses   most-missed signs
 //   days               practice days, for the streak and Stats
@@ -10,6 +10,7 @@
 //   psel, pmode        last practice category/set and mode  pvisited   Practice opened at least once
 //   pwlen, pwgrade, pwbest1, pwbest2   Type mode options and best streaks
 //   swSrc, swPass1, swPass2, swBest1, swBest2   Read source, passage reached and best words a minute, per grade
+//   cwSrc, cwGrade     Write mode source and grade (the placement check writes into mastery and auto)
 //   refSec, refLang, csGrade, signRegion, mOpen, topic   where each Learn page was left
 //   trText, trMode, trDir, trDots, trView   Translate state
 //   g.*                games: best.<game><level>, played, last, agent.p.<case>, maze, snow, riddles…
