@@ -131,7 +131,7 @@ views[''] = () => {
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>
     <section class="hsec">${games}</section>
-    ${isNew ? '' : `<section class="hsec">${homeStats(knownL, doneL.length, played.length)}</section>`}`;
+    ${isNew ? '' : `<section class="hsec hsec-stats">${homeStats(knownL, doneL.length, played.length)}</section>`}`;
 };
 // Home's Stats section: a few progress bars and the streak; See all opens the full Stats modal.
 function homeStats(knownL, lessons, games) {

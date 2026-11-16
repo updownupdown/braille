@@ -272,7 +272,7 @@ input[type=range] { accent-color: var(--accent); }
 .elevator .cell { --s: 6px; --on: #2a2723; --off: transparent; }
 
 /* ---------- translate ---------- */
-.tr-input { width: 100%; min-height: 110px; padding: 16px 18px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); font-size: 1.15rem; resize: vertical; }
+.tr-input { width: 100%; min-height: 92px; max-height: 45vh; padding: 16px 18px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); font-size: 1.15rem; resize: none; field-sizing: content; overflow-y: auto; }
 .tr-out { min-height: 120px; }
 .tr-out .cell { --s: 10px; }
 
@@ -1041,7 +1041,8 @@ body.s-dotfill { --dot-off: var(--dot-fill); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .seg button.on { color: var(--ink); } }
 
 /* header: the page's tab icon beside a paler, lighter title */
-.head-title { display: flex; align-items: center; gap: 10px; font-weight: 500; color: var(--muted); }
+.head-title { display: flex; align-items: center; gap: 10px; font-weight: 500; color: var(--ink); }
+.head-title .ht-game { width: 30px; height: 30px; border-radius: 9px; }
 .head-title .ht-ic { display: grid; place-items: center; color: var(--muted); }
 .head-title .ht-t { overflow: hidden; text-overflow: ellipsis; }
 .brand, body[data-page="home"] .brand { display: none; }
@@ -1061,11 +1062,10 @@ body.s-dotfill { --dot-off: var(--dot-fill); }
 .cs-head .btn { height: var(--ctl-h); padding: 0 16px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 8px; }
 
 /* games list: tiles, more air on top, quieter intro */
-body[data-page="games"] .g-intro { margin-top: 20px; font-size: .95rem; color: var(--muted); }
 .g-tiles { border-top: 0; display: grid; gap: 10px; }
 .g-tiles .hrow, .g-tiles .hrow:last-child { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); padding: 14px 16px; min-height: 0; }
 .g-tiles .hrow:hover { border-color: color-mix(in srgb, var(--ink) 25%, var(--line)); }
-.g-tiles + .sec-h, .g-intro + .sec-h { margin-top: 40px; }
+.g-tiles + .sec-h { margin-top: 40px; }
 
 /* game icon colours */
 .hrow-ic[class*="gc-"], a[href^="#/games/"] .hrow-ic { --gc: var(--accent); color: var(--gc); background: color-mix(in srgb, var(--gc) 13%, var(--surface)); }
@@ -1349,6 +1349,8 @@ body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; b
 body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .li-prog { margin: 0 0 16px; }
 .hrow.li-done .hrow-ic { color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+.g-tiles .hrow.li-next, .g-tiles .hrow.li-next:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.hrow.li-next .hrow-ic { background: var(--accent); color: #fff; }
 .ref-back { flex: none; width: var(--ctl-h); justify-content: center; margin-left: -8px; }
 .lq-wrap { margin-top: 48px; }
 .lq { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 22px 18px 24px; text-align: center; max-width: 560px; transition: box-shadow .3s, border-color .3s; }
@@ -1391,6 +1393,13 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* games list */
 .g-tiles.hrows .hrow:last-child { border-bottom: 1px solid var(--line); }
 .g-tiles .hrow-ic { width: 55px; height: 55px; border-radius: 16px; }
+/* Games page: two columns of tiles (three or four on wider screens). */
+.g-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.g-grid .hrow, .g-grid .hrow:last-child { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px; }
+.g-grid .hrow-ic { width: 40px; height: 40px; border-radius: 12px; }
+.g-grid .hrow-text span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: .82rem; line-height: 1.35; }
+body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
+@media (min-width: 900px) { .g-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
 /* stats row: an empty left slot takes no room */
 .g-bar:has(> .l:empty) { grid-template-columns: 1fr auto; }
 .g-bar > .l:empty { display: none; }
@@ -1545,6 +1554,20 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 /* Type mode score line, between the card and the keyboard */
 .w-score { display: flex; justify-content: center; gap: 18px; font-size: .88rem; color: var(--muted); margin: 12px 0 2px; }
 .w-score b { color: var(--ink); font-weight: 600; }
+/* End-of-round summary in Guess, Draw and Type. */
+.rsum { width: 100%; display: flex; flex-direction: column; gap: 16px; text-align: left; }
+.rsum h3 { margin: 0; font-size: 1.25rem; font-weight: 600; text-align: center; }
+.rs-big { font-size: 3.2rem; font-weight: 600; line-height: 1; text-align: center; letter-spacing: -.02em; }
+.rs-big small { font-size: 1.35rem; font-weight: 400; color: var(--muted); }
+.rs-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rs-facts div { background: var(--surface-2); border-radius: 12px; padding: 10px 6px; text-align: center; font-size: .78rem; color: var(--muted); }
+.rs-facts b { display: block; font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+.rs-k { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 -8px; }
+.rs-clean { text-align: center; margin: 0; text-transform: none; letter-spacing: 0; font-size: .92rem; }
+.ctable.rs-rows { grid-template-columns: 1fr; }
+.rs-rows .crow { cursor: default; }
+.rs-rows .crow:hover { background: none; }
+.rs-acts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 /* Home: one overall progress line under the logo */
 /* Long Learn pages fold by section (Numbers, Signs) */
 .fold .g2-body { padding: 0 0 22px; }
@@ -1624,3 +1647,19 @@ body[data-page="reference"] .lead-p.li-p { margin: 0 0 14px; }
 .prompt-cells .cell.dim { opacity: .15; }
 .stage .prompt-cells.in-word { flex-wrap: nowrap; }
 .stage .prompt-cells.in-word .cell { --s: clamp(9px, 2.9vw, 18px); }
+
+/* Laptop: Home lays Learn, Practice and Games side by side; Guess and Draw put progress in a side panel. */
+.kb-hint { display: none; }
+@media (min-width: 1000px) {
+  body[data-page="home"] #view { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 22px; align-items: start; }
+  body[data-page="home"] #view > :not(.hsec), body[data-page="home"] #view > .hsec-stats { grid-column: 1 / -1; }
+  body[data-page="home"] .hsplit { grid-template-columns: 1fr; }
+  .practice-wrap:is(.mode-read, .mode-write) { max-width: 900px; }
+  .practice-wrap:is(.mode-read, .mode-write) #modeBody { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; flex: none; }
+  .practice-wrap:is(.mode-read, .mode-write) .stage { margin: 0; min-height: 440px; }
+  .practice-wrap:is(.mode-read, .mode-write) .below-stage { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; gap: 14px; }
+  .practice-wrap:is(.mode-read, .mode-write) .mastery-h { flex-wrap: wrap; }
+  .kb-hint { display: block; margin: 0; font-size: .85rem; color: var(--muted); line-height: 1.5; }
+  .kb-hint b { color: var(--ink-2); font-weight: 600; }
+}
+@media (min-width: 1000px) and (hover: none) { .kb-hint { display: none; } }

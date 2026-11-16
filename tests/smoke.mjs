@@ -77,6 +77,26 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   if (bad.length) failures.push('Guess choices with two right answers:\n  ' + bad.slice(0, 20).join('\n  '));
   await page.close();
 }
+// Practice rounds: twenty answers in Guess end on a summary, and its drill is a shorter round of its own.
+{
+  const page = await browser.newPage();
+  const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(base + '#/practice/read?cat=letters&set=aj');
+  await page.waitForTimeout(400);
+  for (let i = 0; i < 300 && !(await page.$('.rsum')); i++) {
+    const c = await page.$$('.choice:not(.wrong)');
+    if (c.length) await c[i % c.length].click();
+    await page.waitForTimeout(i % 3 ? 60 : 720);
+  }
+  if (!(await page.$('.rsum'))) failures.push('Practice: no summary after a round of Guess');
+  else if (await page.$('#rsDrill')) {
+    await page.click('#rsDrill'); await page.waitForTimeout(300);
+    const t = await page.$eval('#pRound', (e) => e.textContent);
+    if (!/Round: 1 \/ ([2-9]|10) /.test(t)) failures.push(`Practice: drill round reads "${t}"`);
+  }
+  if (errs.length) failures.push('Practice rounds: ' + errs.join(' | '));
+  await page.close();
+}
 await browser.close();
 server.close();
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
