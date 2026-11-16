@@ -54,7 +54,7 @@ export function statsHTML() {
     <p class="muted small st-key"><span class="k"></span> known <span class="l"></span> learning. Tap a bar to practise that group.</p>
     <table class="st-table"><thead><tr><th></th><th>Guess</th><th>Draw</th></tr></thead><tbody>${rows}</tbody></table>
     <h2 class="sec-h">Auto</h2>
-    <p class="muted small">Signs move up a box each time you get them right and wait longer before coming back; a miss sends one back to the start.</p>
+    <p class="muted small">Signs move up a box each time you get them right and wait longer before coming back (from Box 4, whole days); a miss sends one back to the start.</p>
     <div class="st-boxes">${autoBoxes.map((n, b) => `<div><b>${n}</b><span>${BOX[b]}</span></div>`).join('')}</div>
     <h2 class="sec-h">Most Missed</h2>
     ${missed.length ? `<div class="ctable narrow">${missed.map(([k, pre, n]) => crowHTML(DICT_BY_KEY[k].cells, DICT_BY_KEY[k].answer, { note: `${n} miss${n > 1 ? 'es' : ''} in ${pre === 'w' ? 'Draw' : 'Guess'}` })).join('')}</div>

@@ -1,16 +1,24 @@
 // Games: each game renders into a container and returns a cleanup function.
 import { LETTERS, IND, translate, toCells, toDots } from './braille.js';
-import { TRIVIA as TRIVIA_1, RIDDLES, RIDDLE_CLASH, WORDLE, MISSIONS, ANAGRAM_WORDS } from './gamedata.js';
-import { TRIVIA_MORE } from './trivia2.js';
-const TRIVIA = Object.fromEntries(Object.entries(TRIVIA_1).map(([k, v]) => [k, [...v, ...(TRIVIA_MORE[k] || [])]]));
 import { WORDS } from './data.js';
-import { SNOWMAN_WORDS } from './snowman.js';
-import { AGENT_CASES } from './agentcases.js';
 import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
 import { announce, feedback, cellsLabel, say, reducedMotion, nativeKey } from './a11y.js';
+// Game content (trivia, riddles, word lists, Secret Agent cases) is about 110 KB, so it loads the first time a game
+// opens instead of with the app. loadGameData() is safe to call again; gameDataReady() says whether it's in.
+let TRIVIA, RIDDLES, RIDDLE_CLASH, WORDLE, ANAGRAM_WORDS, SNOWMAN_WORDS, CASES, dataP = null;
+export const gameDataReady = () => !!CASES;
+export function loadGameData() {
+  dataP = dataP || Promise.all([import('./gamedata.js'), import('./trivia2.js'), import('./snowman.js'), import('./agentcases.js')]).then(([g, t, sn, ag]) => {
+    TRIVIA = Object.fromEntries(Object.entries(g.TRIVIA).map(([k, v]) => [k, [...v, ...(t.TRIVIA_MORE[k] || [])]]));
+    ({ RIDDLES, RIDDLE_CLASH, WORDLE, ANAGRAM_WORDS } = g);
+    SNOWMAN_WORDS = sn.SNOWMAN_WORDS;
+    CASES = [...ag.AGENT_CASES, { name: 'The Blue Maple', level: 'Mixed', missions: g.MISSIONS }];
+  }).catch((e) => { dataP = null; throw e; });
+  return dataP;
+}
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -244,7 +252,7 @@ function signhunt(el, level) {
     const [t, ls] = lines(); target = t;
     $('#q', el).innerHTML = `Which line says <b>${esc(cap(t))}</b>?`;
     const plate = $('#plate', el);
-    plate.innerHTML = ls.map((x) => `<button class="hunt-line" data-t="${esc(x.name)}">${line(cap(x.text), { grade: cfg.grade })}</button>`).join('');
+    plate.innerHTML = ls.map((x, i) => `<button class="hunt-line" data-t="${esc(x.name)}"><span class="visually-hidden">Line ${i + 1} of ${ls.length}: </span>${line(cap(x.text), { grade: cfg.grade })}</button>`).join('');
     fit(plate);
   }
   // Braille words never break, so a long Grade 1 word ("Information") can be wider than a narrow phone: shrink the cells until every word fits.
@@ -575,7 +583,6 @@ function glide(box, to, ms) {
 
 // ---------- Secret Agent ----------
 // Cases in rising difficulty, picked from a dropdown in the header. Progress is kept per case; no going back.
-const CASES = [...AGENT_CASES, { name: 'The Blue Maple', level: 'Mixed', missions: MISSIONS }];
 function agent(el, level, ctx) {
   // Carry over progress from the old single case.
   const old = store.get('agent', null);

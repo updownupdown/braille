@@ -6,7 +6,7 @@ import './learn.js';
 import './translate.js';
 import { toDots, translate, unicodeOf, LANGS } from './braille.js';
 import { SCIENCE_SYMBOLS, LANG_INFO, SYSTEMS, HISTORY, SIGN_REGIONS } from './data.js';
-import { GAMES, GAME_GROUPS, gameStore } from './games.js';
+import { GAMES, GAME_GROUPS, gameStore, gameDataReady, loadGameData } from './games.js';
 
 import { announce } from './a11y.js';
 import { $, $$, titleCase, DICT, SEC_OF_GROUP, applySettings, bindRadios, cellsHTML, cellsK, closeDD, closeSheet, dropdown, esc, helpBtn, icon, letterDetail, lineHTML, openSettings, openSheet, radios, setSub, setTitle, store, symbolDetail, syncHeadH, view, views } from './core.js';
@@ -20,6 +20,7 @@ views.games = (q, sub) => {
     // Two-column grid of tiles: icon, name, then a two-line description.
     const row = (k) => { const x = GAMES[k]; return `<a class="hrow g-tile" href="#/games/${k}"><span class="hrow-ic gc-${k}">${icon(x.icon, 22)}</span><div class="hrow-text"><b>${titleCase(x.name)}</b><span>${x.desc}</span></div></a>`; };
     view.innerHTML = GAME_GROUPS.map(([t, ks]) => `<h2 class="sec-h">${titleCase(t)}</h2><div class="hrows g-tiles g-grid">${ks.map(row).join('')}</div>`).join('');
+    loadGameData().catch(() => {}); // warm up: a game picked from here opens straight away
     return;
   }
   setTitle(g.name, [sub, g.icon]);
@@ -46,10 +47,13 @@ views.games = (q, sub) => {
   const mo = new MutationObserver(arrange); mo.observe(gameEl, { childList: true });
   const lvlClass = () => { gameEl.className = `game lv-${lvl}`; };
   lvlClass();
-  let stop = g.run(gameEl, lvl, ctx); arrange();
+  let stop = null, gone = false;
+  const start = () => { if (gone) return; stop = g.run(gameEl, lvl, ctx); arrange(); };
+  if (gameDataReady()) start();
+  else loadGameData().then(start, () => { if (!gone) gameEl.innerHTML = '<p class="muted">This game couldn’t load. Check your connection and try again.</p>'; });
   // Display-only toggles (With letters / Braille only) keep the current puzzle.
-  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); lvlClass(); if (g.display) return; if (stop) stop(); stop = g.run(gameEl, lvl, ctx); });
-  return () => { mo.disconnect(); if (stop) stop(); };
+  if (g.levels) bindRadios(top ? $('.g-sub .picker') : $('.picker', view), (k, v) => { lvl = v; gameStore.set('lvl.' + sub, v); lvlClass(); if (g.display || !gameDataReady()) return; if (stop) stop(); stop = g.run(gameEl, lvl, ctx); });
+  return () => { gone = true; mo.disconnect(); if (stop) stop(); };
 };
 // ---------- global search ----------
 export let INDEX = null;

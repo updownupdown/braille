@@ -1,3 +1,9 @@
+/* Outfit (SIL Open Font License), self-hosted so the first offline start and slow connections use it too.
+   One variable file per subset covers weights 300-700. */
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 300 700; font-display: swap; src: url(../fonts/outfit-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 300 700; font-display: swap; src: url(../fonts/outfit-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 :root {
   --ink: #1d1a17;
   --accent: #2f68a8;
@@ -1799,3 +1805,29 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 @media (prefers-reduced-motion: reduce) { .cw-pad.ok, .cw-c.fresh { animation: none; } }
 /* Games with an on-screen keyboard: the card is centred in the space above, the keyboard sits at the bottom. */
 .game > :is(.wd-keys, #kb) { order: 2; }
+/* Small phones (360px): the Practice level menu, Translate's language menu and long page titles keep their words */
+@media (max-width: 380px) {
+  .practice-wrap .picker > .seg button { padding: 0 10px; }
+  .practice-wrap .picker { gap: 6px; }
+  #setDD .dd-btn { padding: 0 8px 0 12px; gap: 4px; }
+  .subbar #langDD .dd-lead { display: none; }
+  .subbar #langDD .dd-btn { padding: 0 10px 0 14px; gap: 4px; }
+  .head-title { font-size: 1.12rem; gap: 8px; }
+}
+@media (max-width: 350px) {
+  .practice-wrap .picker > .seg button { padding: 0 8px; }
+  .head-title { font-size: 1.04rem; }
+}
+/* Main view takes focus for screen readers after a route change; it isn't a control, so no ring around the whole page */
+#view:focus, #view:focus-visible { outline: none; }
+/* Translate, Line view: a clear gap between wrapped rows so each row's letters sit with their own cells */
+.tr-out .braille-line:has(.lbl) { row-gap: 14px; }
+/* Laptop: Braidle and Snowman's braille keys grow to match the QWERTY keys in the other games */
+@media (min-width: 900px) {
+  .wd-keys { gap: 6px; }
+  .wd-krow { gap: 6px; }
+  .wd-k { max-width: 58px; height: 60px; gap: 4px; border-radius: 10px; }
+  .wd-k .cell { --s: 7px; --gap: 3px; }
+  .wd-k b { font-size: .85rem; }
+  .wd-k.wide { max-width: 84px; font-size: .88rem; }
+}
