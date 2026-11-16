@@ -1726,10 +1726,10 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .cw-p { font-size: 1.25rem; font-weight: 500; line-height: 1.2; color: var(--muted); white-space: nowrap; transition: color .2s; }
 .cw-w.cur .cw-p, .cw-w.done .cw-p { color: var(--ink); }
 .cw-w.cur .cw-p { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 5px; }
-.cw-cells { display: flex; min-height: 34px; }
+.cw-cells { display: flex; align-items: center; min-height: 46px; }
 .cw-c { display: inline-grid; place-items: center; min-width: 22px; min-height: 34px; border-radius: 8px; }
 .cw-c .cell { --s: 7px; }
-.cw-c.now { outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
+.cw-c.now { min-height: 46px; padding: 0 6px; margin: 0 4px; outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 0; }
 .cw-c.now.bad { outline-color: var(--bad); }
 .cw-c.now.hinted { background: var(--accent-soft); }
 .cw-edit { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; width: 100%; }
@@ -1775,7 +1775,9 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .practice-wrap:not(.mode-sweep) #modeBody { gap: 12px; }
 .practice-wrap.mode-sweep .picker { margin-bottom: 0; }
 .practice-wrap.mode-sweep .sweep-box { margin-top: 0; }
-.practice-wrap.mode-words .stage, .practice-wrap.mode-compose .stage { margin: 0; }
+/* Type: the card is centred in the space above; score and keyboard sit at the bottom. */
+.practice-wrap.mode-words .stage { margin: auto 0; }
+.practice-wrap.mode-compose .stage { margin: 0; }
 .practice-wrap.mode-words .stage { padding-top: 50px; padding-bottom: 20px; gap: 14px; }
 .mode-words .w-score, .mode-compose .w-score { margin: 0; }
 .mode-words #wkb, .mode-words #wkb .g-kb { margin-top: 0; }
@@ -1795,3 +1797,5 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .cw-c.fresh { animation: cwFresh .6s ease-out; }
 @keyframes cwFresh { from { background: color-mix(in srgb, var(--good) 28%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .cw-pad.ok, .cw-c.fresh { animation: none; } }
+/* Games with an on-screen keyboard: the card is centred in the space above, the keyboard sits at the bottom. */
+.game > :is(.wd-keys, #kb) { order: 2; }
