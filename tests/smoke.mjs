@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = fileURLToPath(new URL('../site/', import.meta.url));
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer(async (req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');
   try {
@@ -28,10 +28,12 @@ export const ROUTES = ['', 'reference', 'reference/overview', 'reference/alphabe
 
 const browser = await chromium.launch();
 const failures = [];
+const loaded = new Set(); // every file the app fetched while visiting the routes
 for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true }], ['laptop', { viewport: { width: 1280, height: 800 } }]]) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   let errs = [];
+  page.on('request', (q) => { if (q.url().startsWith(base)) loaded.add('./' + new URL(q.url()).pathname.slice(1)); });
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/version\.json|favicon|fonts\.g/.test(m.text() + (m.location().url || ''))) errs.push(m.text()); });
   for (const r of ROUTES) {
@@ -129,6 +131,41 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   });
   if (bad.length) failures.push('Grade 2 rules / Write:\n  ' + bad.slice(0, 20).join('\n  '));
   await page.close();
+}
+// Auto: from box 4 a right answer schedules the sign whole days ahead; until that day it waits behind every
+// other sign, and on the day it is due straight away.
+{
+  const page = await browser.newPage();
+  await page.goto(base + '#/practice');
+  await page.waitForTimeout(300);
+  const bad = await page.evaluate(async () => {
+    const P = await import('./js/practice.js');
+    const out = [], st = { turn: 10, s: { a: [3, 5], b: [3, 12, 0], c: [1, 14] } };
+    const today = P.dayNum();
+    st.s.b[2] = today + 1;
+    if (P.autoDue(st, 'a', today) !== 5) out.push('a sign saved without a day should go by turns');
+    if (P.autoDue(st, 'b', today) <= P.autoDue(st, 'c', today)) out.push('a sign due tomorrow should wait behind one due by turns');
+    if (P.autoDue(st, 'b', today + 1) > st.turn) out.push('a sign whose day has come should be due now');
+    localStorage.removeItem('dots.auto');
+    for (let i = 0; i < 4; i++) P.autoResult('r:', 'la', true);
+    const e = P.autoState('r:').s.la;
+    if (e[0] !== 4 || e[2] !== today + P.AUTO_DAYS[4]) out.push('four right answers should give box 5 and a day ' + P.AUTO_DAYS[4] + ' ahead, got ' + JSON.stringify(e));
+    P.autoResult('r:', 'la', false);
+    if (P.autoState('r:').s.la.length !== 2) out.push('a miss should drop the day');
+    localStorage.removeItem('dots.auto');
+    return out;
+  });
+  if (bad.length) failures.push('Auto days:\n  ' + bad.join('\n  '));
+  await page.close();
+}
+// Offline: every file the app loads must be in the service worker's SHELL, or that page breaks offline
+// until it has been visited online once.
+{
+  const sw = await readFile(join(ROOT, 'sw.js'), 'utf8');
+  const shell = new Set(JSON.parse(sw.match(/const SHELL = (\[[^\]]*\])/)[1].replace(/'/g, '"')));
+  const missing = [...loaded].filter((u) => u !== './version.json' && u !== './sw.js' && !shell.has(u === './' ? './' : u));
+  if (missing.length) failures.push('Missing from SHELL in sw.js: ' + missing.join(', '));
+  if (!loaded.has('./fonts/outfit-latin.woff2')) failures.push('The Outfit font was never loaded');
 }
 await browser.close();
 server.close();

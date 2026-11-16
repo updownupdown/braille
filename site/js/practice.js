@@ -70,8 +70,19 @@ export function autoCourse() {
 }
 export const autoList = (scope) => autoCourse().filter((x) => scope === 'g1' ? x.g === 1 : scope === 'g2' ? x.g === 2 : true);
 // Each sign sits in a box; a right answer moves it up a box and it comes back after that many more turns.
-// A miss sends it back to the first box.
+// A miss sends it back to the first box. From box 4 (index 3) on, a sign also waits whole days (AUTO_DAYS) before it
+// is due again, so well-known signs come back tomorrow, in three days, a week, three weeks, not just later today.
 export const AUTO_GAP = [1, 3, 6, 12, 25, 50, 100];
+export const AUTO_DAYS = [0, 0, 0, 1, 3, 7, 21];
+// Local calendar day as a whole number (days since 1970 in this time zone), for the day-based boxes.
+export const dayNum = (d = new Date()) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+// st.s[key] = [box, dueTurn, dueDay?]. A sign with a dueDay still in the future waits behind every other sign;
+// once its day comes, it's due now. Signs saved before dueDay existed simply go by turns.
+export function autoDue(st, key, today = dayNum()) {
+  const [, t, d] = st.s[key];
+  if (d == null) return t;
+  return d <= today ? Math.min(t, st.turn) : st.turn + 1000 * (d - today);
+}
 export const AUTO_NEW_AT_ONCE = 3; // signs still in the first two boxes before another new one arrives
 export function autoState(pre) {
   const all = store.get('auto', {}), k = pre[0];
@@ -110,7 +121,7 @@ export function autoPick(pre, scope, lastKey) {
   const pool = met.filter((x) => x.key !== lastKey);
   if (!pool.length) return met[0] || (fresh && { ...fresh, isNew: true });
   // Most overdue first; among signs due on the same turn, a random one.
-  const due = (x) => st.s[x.key][1];
+  const today = dayNum(), due = (x) => autoDue(st, x.key, today);
   const best = Math.min(...pool.map(due));
   const tied = pool.filter((x) => due(x) === best);
   return tied[Math.floor(Math.random() * tied.length)];
@@ -121,6 +132,7 @@ export function autoResult(pre, key, ok) {
   st.turn++;
   const box = ok ? Math.min(AUTO_GAP.length - 1, ((st.s[key] || [0])[0]) + 1) : 0;
   st.s[key] = [box, st.turn + (ok ? AUTO_GAP[box] : 2)];
+  if (ok && AUTO_DAYS[box]) st.s[key].push(dayNum() + AUTO_DAYS[box]);
   autoSave(pre, st);
 }
 // ---------- Guess: confusable answers ----------
@@ -235,7 +247,7 @@ export const SET_HELP = {
   'Initial-letter contractions': ['Initial-letter contractions', ['A prefix from the right-hand column of the cell, then the first letter (or groupsign) of the word: the middle-right dot plus d is “day”, plus m is “mother”.', 'There are three prefixes, each with its own list: the middle-right dot alone, the top and middle-right dots, and the whole right column. They work as words and inside words: someone, daytime, mother’s.']],
   'Final-letter groupsigns': ['Final-letter groupsigns', ['Common word endings: a prefix, then the last letter of the ending. ound, ance, sion, less and ount use the top-right and bottom-right dots as the prefix; ence, ong, ful, tion, ness, ment and ity use the middle-right and bottom-right dots.', 'They only ever follow letters, never start a word: pound, dance, nation, city.']],
   'Shortforms': ['Shortforms', ['Shortforms are abbreviated spellings of common words: about is ab, could is cd, braille is brl. Each one is listed with its spelling.', 'They are mainly used as whole words, and some take endings (friends, braille’s). Inside longer words only some are allowed, so learn them as words first.']],
-  'auto': ['Auto', ['Auto teaches you braille a few signs at a time, in the order most courses use: letters, numbers and punctuation first, then Grade 2 contractions.', 'Each new sign is shown to you before it is asked. Signs you get right come back less and less often; a miss brings a sign back soon. A new one arrives once the last few are settling in.', 'Use the drop-down to stick to Grade 1 or Grade 2. Guess and Draw keep their own progress, and signs you already know from other practice start as known.', 'Already know some braille? The placement check (Practice > Guess > Auto, below the card) asks a few questions from each part of the course and marks what you know.']],
+  'auto': ['Auto', ['Auto teaches you braille a few signs at a time, in the order most courses use: letters, numbers and punctuation first, then Grade 2 contractions.', 'Each new sign is shown to you before it is asked. Signs you get right come back less and less often: soon at first, then the next day, in three days, a week and three weeks. A miss brings a sign back soon. A new one arrives once the last few are settling in.', 'Use the drop-down to stick to Grade 1 or Grade 2. Guess and Draw keep their own progress, and signs you already know from other practice start as known.', 'Already know some braille? The placement check (Practice > Guess > Auto, below the card) asks a few questions from each part of the course and marks what you know.']],
 };
 export const setHelpKey = (cat, set) => cat === 'auto' ? 'auto' : cat === 'contractions' && /^k\d+$/.test(set) ? Object.keys(CONTRACTIONS)[Number(set.slice(1))] : `${cat}.${set}`;
 export const helpTitle = (cat, set) => (SET_HELP[setHelpKey(cat, set)] || [MODES.read])[0];
