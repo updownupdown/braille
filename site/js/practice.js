@@ -575,10 +575,15 @@ export function quizMode(mode, q) {
     say(`Word: ${cellsLabel(cells.map((c) => c.cell).join(''))}`);
     const lbls = $$('#wcells .lbl');
     const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Slot width: as wide as fits, so long words stay on one line on a phone.
+    const wc = $('#wcells', stage);
+    wc.classList.add('slots');
+    wc.style.setProperty('--slot', `${Math.max(20, Math.min(40, Math.floor((Math.min(stage.clientWidth, 460) - 36) / cells.length)))}px`);
+    const paint = (v, solved = false) => { paintTyped(lbls, cells, v, solved); markSlots(lbls, cells, solved); };
     const check = () => {
       if (done) return;
-      if (wpad.value === target) { done = true; result(true, {}); glow(true); paintTyped(lbls, cells, '', true); setTimeout(next, 900); }
-      else paintTyped(lbls, cells, wpad.value);
+      if (wpad.value === target) { done = true; result(true, {}); glow(true); paint('', true); setTimeout(next, 900); }
+      else paint(wpad.value);
     };
     wOnInput = () => { if (!hinting) check(); };
     wOnEnter = () => { if (!done && wpad.value) { result(false, {}); glow(false); } };
@@ -586,10 +591,26 @@ export function quizMode(mode, q) {
     $('#hint').onclick = () => {
       if (done || hinting) return;
       state.firstTry = false; hinting = true;
-      typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paintTyped(lbls, cells, wpad.value); }, () => done || state.last !== word);
+      typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paint(wpad.value); }, () => done || state.last !== word);
     };
-    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paintTyped(lbls, cells, '', true); announce(`The word was ${word}`); setTimeout(next, 1300); };
+    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paint('', true); announce(`The word was ${word}`); setTimeout(next, 1300); };
     state.key = null;
+  }
+  // Type mode slots: each cell that takes letters gets a slot; the first unfilled (or wrong) one is the current one.
+  function markSlots(lbls, cells, solved) {
+    let cur = false;
+    cells.forEach((c, i) => {
+      const l = lbls[i]; if (!l) return;
+      const k = c.idx === 0 ? (c.print || '').toLowerCase().replace(/[^a-z0-9]/g, '').length : 0;
+      l.classList.remove('slot', 'cur', 'done', 'miss', 'multi');
+      if (!k) return;
+      const bad = !!l.querySelector('.bad'), got = l.textContent.length;
+      l.classList.add('slot');
+      if (k > 2) l.classList.add('multi');
+      if (bad) l.classList.add('miss');
+      else if (solved || got >= k) l.classList.add('done');
+      if (!cur && !solved && (bad || got < k)) { l.classList.add('cur'); cur = true; }
+    });
   }
   // Type mode score: words right first time this session, the current streak and the best streak ever (per grade).
   function wScore() {
@@ -686,7 +707,7 @@ export function sweepMode(q) {
       <div class="finger" id="finger"></div>
       <div class="sweep-top"><button class="link-btn pillish" id="restart">${icon('restart', 16)} Restart</button>
         <span class="sw-prog" aria-hidden="true"><i id="swProg"></i></span><button class="link-btn pillish" id="shuffleBtn">Next ${icon('right', 16)}</button></div>
-      <div class="sweep-hint" id="hint">put your finger on the line and slide right</div>
+      <div class="sweep-hint" id="hint">Put your finger on the line and slide right.</div>
     </div>
     <p class="sw-info" id="swInfo" aria-live="polite"></p>
 `;
