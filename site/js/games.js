@@ -1,11 +1,12 @@
 // Games: each game renders into a container and returns a cleanup function.
-import { LETTERS, IND, translate, toCells, toDots } from './braille.js';
+import { LETTERS, IND, translate, toCells, toDots, unicodeOf } from './braille.js';
+import { wrongWays } from './rules.js';
 import { WORDS } from './data.js';
 import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
-import { SIGNS } from './phrases.js';
+import { SIGNS, PHRASES } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
-import { announce, feedback, cellsLabel, say, reducedMotion, nativeKey } from './a11y.js';
+import { announce, feedback, cellsLabel, say, reducedMotion, nativeKey, refocus } from './a11y.js';
 // Game content (trivia, riddles, word lists, Secret Agent cases) is about 110 KB, so it loads the first time a game
 // opens instead of with the app. loadGameData() is safe to call again; gameDataReady() says whether it's in.
 let TRIVIA, RIDDLES, RIDDLE_CLASH, WORDLE, ANAGRAM_WORDS, SNOWMAN_WORDS, CASES, dataP = null;
@@ -223,6 +224,88 @@ function chunt(el, level) {
   $('#lives', el).innerHTML = livesHTML(lives);
   round();
   return () => {};
+}
+
+// ---------- Proofreader ----------
+// A sentence in braille with one word brailled wrong: tap that word. Easy is Grade 1 with a look-alike letter swapped
+// in, and the sentence in print above; Medium is Grade 2 with a rule broken (a sign where UEB doesn't allow one, or a
+// sign left out), print shown; Hard is the same with no print. The reason shows once the word is found.
+const PROOF_CFG = { easy: { grade: 1, print: true }, medium: { grade: 2, print: true }, hard: { grade: 2, print: false } };
+let PROOF_PHRASES = null;
+const proofWrongs = new Map();
+function proofWrong(word, grade) {
+  const k = grade + word;
+  if (!proofWrongs.has(k)) proofWrongs.set(k, word.length < 2 ? [] : wrongWays(word, grade));
+  return proofWrongs.get(k);
+}
+function proof(el, level) {
+  const cfg = PROOF_CFG[level];
+  PROOF_PHRASES = PROOF_PHRASES || PHRASES.filter((p) => /^[a-z ]+$/.test(p) && p.length <= 44 && p.split(' ').length >= 4);
+  el.innerHTML = `${statBar('', '<span class="lives" id="lives"></span>', scoreBest('proof.' + level))}
+    <div class="card g-card proof" id="card"><p class="pr-q" id="q"></p><div class="pr-line" id="line" role="group"></div>
+    <p class="pr-why" id="why" aria-live="polite"></p><button class="btn primary" id="prNext" type="button" hidden>Next</button></div>`;
+  const card = $('#card', el), box = $('#line', el), why = $('#why', el), nextBtn = $('#prNext', el);
+  let sc = 0, lives = 3, words = [], bad = -1, wrong = null, done = false, over = false, deckP = [];
+  const right = (w) => unicodeOf(translate(w, 'en', cfg.grade));
+  const cellsOfWord = (cells) => [...cells].map((c) => cell(c)).join('');
+  function round() {
+    done = false; card.classList.remove('glow-good', 'glow-bad'); why.textContent = ''; nextBtn.hidden = true;
+    let text = '', cands = [];
+    for (let tries = 0; tries < 40 && !cands.length; tries++) {
+      if (!deckP.length) deckP = shuffle(PROOF_PHRASES);
+      text = deckP.pop();
+      cands = text.split(' ').map((w, i) => [i, proofWrong(w, cfg.grade)]).filter(([, ws]) => ws.length);
+    }
+    words = text.split(' ');
+    const [i, ws] = pick(cands); bad = i; wrong = pick(ws);
+    $('#q', el).innerHTML = cfg.print ? `One word is brailled wrong:<br><b>${esc(text)}</b>` : 'One word is brailled wrong. Tap it.';
+    box.setAttribute('aria-label', `Sentence in Grade ${cfg.grade} braille, ${words.length} words`);
+    box.innerHTML = words.map((w, k) => {
+      const cells = k === bad ? wrong.cells : right(w);
+      return `<button type="button" class="pr-w" data-i="${k}" aria-label="Word ${k + 1} of ${words.length}: ${esc(cellsLabel(cells))}"><span class="pr-cells">${cellsOfWord(cells)}</span><span class="lbl"></span></button>`;
+    }).join('');
+    say(cfg.print ? `One word is brailled wrong: ${text}` : 'One word is brailled wrong.');
+  }
+  // Every word gets its print; the wrong one is rewritten correctly, and the reason appears.
+  function reveal(found) {
+    done = true;
+    $$('.pr-w', box).forEach((b, k) => {
+      b.disabled = true; $('.lbl', b).textContent = words[k];
+      if (k !== bad) return;
+      b.classList.add(found ? 'got' : 'missed');
+      $('.pr-cells', b).innerHTML = cellsOfWord(right(words[k]));
+      b.setAttribute('aria-label', `${words[k]}, now brailled right: ${cellsLabel(right(words[k]))}`);
+    });
+    why.innerHTML = `<b>${esc(words[bad])}:</b> ${esc(wrong.why)}`;
+    nextBtn.hidden = false; refocus(card, nextBtn);
+  }
+  function again() { nextBtn.textContent = 'Next'; sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); }
+  function next() {
+    if (nextBtn.textContent === 'Play again') return again();
+    if (!done) return;
+    if (!over) return round();
+    over = false; done = false;
+    $('#q', el).innerHTML = `<b class="g-big">${sc}</b> fixed`; box.innerHTML = ''; why.textContent = '';
+    nextBtn.textContent = 'Play again'; nextBtn.hidden = false; refocus(card, nextBtn);
+    announce(`Game over. ${sc} fixed.`);
+  }
+  nextBtn.onclick = next;
+  box.onclick = (e) => {
+    const b = e.target.closest('.pr-w'); if (!b || done || b.disabled) return;
+    const k = Number(b.dataset.i);
+    if (k === bad) {
+      sc++; $('#sc', el).textContent = sc; best('proof.' + level, sc); $('#best', el).textContent = best('proof.' + level);
+      glow(card, true, wrong.why); reveal(true); return;
+    }
+    b.classList.add('fine'); b.disabled = true; lives--; $('#lives', el).innerHTML = livesHTML(lives);
+    glow(card, false, 'That word is right');
+    if (!lives) { over = true; reveal(false); }
+  };
+  const onKey = (e) => { if (e.key === 'Enter' && !nextBtn.hidden && !nativeKey(e)) { e.preventDefault(); next(); } };
+  document.addEventListener('keydown', onKey);
+  $('#lives', el).innerHTML = livesHTML(lives);
+  round();
+  return () => document.removeEventListener('keydown', onKey);
 }
 
 // ---------- Sign Hunt ----------
@@ -947,7 +1030,7 @@ function maze(el, level) {
 export const GAME_GROUPS = [
   ['Word Games', ['wordle', 'snowman', 'anagrams', 'agent']],
   ['Quick Fire', ['rain', 'time', 'mirror']],
-  ['Puzzles and Quizzes', ['memory', 'maze', 'signhunt', 'chunt', 'trivia', 'riddles']],
+  ['Puzzles and Quizzes', ['memory', 'maze', 'signhunt', 'chunt', 'proof', 'trivia', 'riddles']],
 ];
 export const GAMES = {
   wordle: { name: 'Braidle', icon: 'grid', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
@@ -970,6 +1053,8 @@ export const GAMES = {
     help: ['Start at the flag. Step up, down, left or right onto the next letter of the word.', 'Cells that don’t spell the word are traps. Three traps and the route is revealed.', 'Bigger grids and longer words on harder levels. Hard uses Grade 2, so some steps are contractions.'] },
   chunt: { name: 'Contraction Hunt', icon: 'hunt', desc: 'Spot the Grade 2 signs hiding inside braille words', levels: LV3, run: chunt,
     help: ['A word appears in Grade 2 braille. Tap every cell that is part of a contraction; a sign that takes two cells is found with either of its cells.', 'Letters are traps: three wrong taps and the round ends.', 'Easy shows the word in print and has one sign to find. Medium hides the print. Hard has two or more signs in every word.', 'When a word is done, the print appears under each cell.'] },
+  proof: { name: 'Proofreader', icon: 'proof', desc: 'Find the one word in a sentence that is brailled wrong', levels: LV3, run: proof,
+    help: ['A sentence appears in braille. One word in it is brailled wrong: tap that word.', 'Easy is Grade 1 with the sentence in print above; the wrong word has one letter swapped for a look-alike. Medium is Grade 2, also with print: the wrong word breaks a contraction rule, using a sign where it isn’t allowed or leaving one out. Hard is Grade 2 with no print.', 'Once you find it, the word is brailled correctly and the reason appears. Three wrong taps and the game ends.'] },
   signhunt: { name: 'Sign Hunt', icon: 'sign', desc: 'Find the right line on a building directory, in braille only', levels: LV3, run: signhunt,
     help: ['A directory sign lists several places, in braille only. Tap the line that says the place you are looking for.', 'Easy has three lines in Grade 1. Medium has four in Grade 2, the way Canadian signs are made. Hard has five, with look-alike lines and room numbers.', 'Three wrong taps and the round ends. Your best score is saved for each level.'] },
   trivia: { name: 'Trivia', icon: 'help', desc: '1,000 questions on ten topics, with answers in braille', levels: GRADES, run: trivia,

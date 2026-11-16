@@ -10,9 +10,11 @@ import { GAMES, GAME_GROUPS, gameStore, gameDataReady, loadGameData } from './ga
 
 import { announce } from './a11y.js';
 import { $, $$, titleCase, DICT, SEC_OF_GROUP, applySettings, bindRadios, cellsHTML, cellsK, closeDD, closeSheet, dropdown, esc, helpBtn, icon, letterDetail, lineHTML, openSettings, openSheet, radios, setSub, setTitle, store, symbolDetail, syncHeadH, view, views } from './core.js';
-import { G2_LESSONS, LANG_NAMES, REF_SECTIONS, charsTable } from './learn.js';
+import { G2_LESSONS, LANG_NAMES, REF_SECTIONS, charsTable, setPeek, hidePeek } from './learn.js';
 import { MODES } from './practice.js';
 // ---------- games ----------
+// Which grade each game uses at a level, for the cheat sheet peek (games not listed are Grade 1).
+const GAME_GRADE = { chunt: () => 2, proof: (l) => (l === 'easy' ? 1 : 2), maze: (l) => (l === 'hard' ? 2 : 1), signhunt: (l) => (l === 'easy' ? 1 : 2), trivia: (l) => (l === 'hard' ? 2 : 1), riddles: (l) => (l === 'hard' ? 2 : 1) };
 views.games = (q, sub) => {
   const g = GAMES[sub];
   if (!g) {
@@ -30,6 +32,8 @@ views.games = (q, sub) => {
   helpBtn.onclick = () => openSheet(`<div class="help">${g.help.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`, { title: g.name });
   let lvl = gameStore.get('lvl.' + sub, g.levels ? g.levels[0][0] : null);
   if (g.levels && !g.levels.some(([k]) => k === lvl)) lvl = g.levels[0][0];
+  // Peek opens the cheat sheet at the grade the game is played in; a game just carries on underneath.
+  setPeek(() => [GAME_GRADE[sub] ? GAME_GRADE[sub](lvl) : 1, 'letters']);
   // Trivia and Riddles keep their level in the page, next to the question count and score.
   const top = g.levels && !g.inline;
   setSub(`<div class="g-sub"><a class="back-link" href="#/games">${icon('right', 18)} Games</a><div class="g-slot" id="gSlot"></div>${top ? `<div class="picker">${radios('lvl', g.levels, lvl)}</div>` : ''}</div>`);
@@ -163,7 +167,7 @@ export function route() {
   const key = views[name] ? name : '';
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
   closeSheet(); closeDD(); if (!searchBar.hidden) closeSearch();
-  helpBtn.hidden = true;
+  helpBtn.hidden = true; hidePeek();
   document.body.dataset.page = key || 'home';
   const r = views[key](q, sub, sub2);
   cleanup = typeof r === 'function' ? r : null;

@@ -141,3 +141,37 @@ export function spotItems() {
   SPOT = [...byWord.values()].filter((it) => it.wrongs.length >= (it.curated ? 1 : 2)).map((it) => ({ key: 'sp' + it.word, cells: it.right, answer: it.word, kind: 'contraction', spot: it }));
   return SPOT;
 }
+
+// ---------- Proofreader ----------
+// Ways to braille one word wrongly, each with the reason it is wrong. Grade 1: one letter swapped for a look-alike
+// (the reason names what it then reads as). Grade 2: a sign used where UEB doesn't allow it, or a sign left out.
+const LOOK_ALIKE = { d: 'f', f: 'd', e: 'i', i: 'e', h: 'j', j: 'h', r: 'w', w: 'r', a: 'b', b: 'a', k: 'l', l: 'k', m: 'n', n: 'm', s: 't', t: 's', o: 'e', u: 'v', v: 'u', x: 'y', y: 'x' };
+export function wrongWays(word, grade) {
+  const out = [], right = unicodeOf(translate(word, 'en', grade));
+  const add = (cells, why) => { if (cells && cells !== right && !out.some((w) => w.cells === cells)) out.push({ cells, why }); };
+  if (grade === 1) {
+    [...word].forEach((l, i) => {
+      const s = LOOK_ALIKE[l]; if (!s) return;
+      const reads = word.slice(0, i) + s + word.slice(i + 1);
+      add(unicodeOf(translate(reads, 'en', 1)), `Cell ${i + 1} is ${s}, not ${l}, so this reads “${reads}”.`);
+    });
+    return out;
+  }
+  const parts = partsAt(word);
+  for (const m of Object.values(MISTAKES).flat()) if (m[0] === word) { const x = mistake(m); add(cellsOfParts(x.wrong), x.why); }
+  for (const [g, { items }] of Object.entries(CONTRACTIONS)) for (const [p] of items) {
+    if (p.length < 2 || p === word || g === 'Alphabetic wordsigns') continue;
+    for (let at = word.indexOf(p); at >= 0; at = word.indexOf(p, at + 1)) {
+      const w = misuseParts(word, p, g, at); if (!w) continue;
+      // A bigger sign already covers these letters: say so, rather than the general rule.
+      const big = parts.find((q) => q.kind === 'contraction' && q.from <= at && q.to >= at + p.length && q.print.length > p.length);
+      add(cellsOfParts(w), big ? `“${big.print}” has its own sign, so “${p}” isn’t used.` : whyNot(p, g, at, word));
+    }
+  }
+  const cons = translate(word, 'en', 2).filter((p) => p.kind === 'contraction');
+  cons.forEach((p, k) => {
+    const g = Object.entries(CONTRACTIONS).find(([, x]) => x.items.some(([q]) => q === p.print))?.[0];
+    add(cellsOfParts(spellParts(word, k)), p.print === word ? `“${word}” is written with its ${GROUP_NAME(g)}.` : `“${p.print}” has its own sign here, so it is used.`);
+  });
+  return out;
+}

@@ -1201,7 +1201,10 @@ body.kb-open .mode-words .stage { min-height: 0; padding-top: 18px; padding-bott
 /* Real size */
 body.s-sw-real .sweep-box { height: 275px; }
 body.s-sw-real .sweep-track { top: 92px; }
-body.s-sw-real .sweep-track .cell { --s: 1.5mm; --gap: 1mm; padding: 0 1.125mm; }
+/* Real size: a dot 1.5 mm across, 2.5 mm between dot centres, 6.25 mm from cell to cell (--mm is a calibrated millimetre) */
+body.s-sw-real .sweep-track .cell { --s: calc(var(--mm, 1mm) * 1.5); --gap: var(--mm, 1mm); padding: 0 calc(var(--mm, 1mm) * 1.125); }
+body.s-sw-real .stage .prompt-cells .cell, body.s-sw-real .stage .prompt-cells.many .cell, body.s-sw-real .stage .prompt-cells.fmt .cell, body.s-sw-real .stage .prompt-cells.in-word .cell,
+body.s-sw-real .spot-cells .cell, body.s-sw-real .tr-out .cell, .mm-demo .cell { --s: calc(var(--mm, 1mm) * 1.5); --gap: var(--mm, 1mm); padding-inline: calc(var(--mm, 1mm) * 1.125); }
 body.s-sw-real .sweep-track .sc .lbl { font-size: .875rem; }
 body.s-sw-real .reader { top: 66px; height: 119px; }
 body.s-sw-real .finger { top: 185px; }
@@ -1582,7 +1585,7 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 }
 /* Games list: best score or Played, beside the chevron */
 /* Type mode score line, between the card and the keyboard */
-.w-score { display: flex; justify-content: center; gap: 18px; font-size: .88rem; color: var(--muted); margin: 12px 0 2px; }
+.w-score { display: flex; justify-content: center; gap: 18px; font-size: .88rem; color: var(--muted); margin: 12px 0 2px; flex-wrap: wrap; row-gap: 4px; }
 .w-score b { color: var(--ink); font-weight: 600; }
 /* End-of-round summary in Guess, Draw and Type. */
 .rsum { width: 100%; display: flex; flex-direction: column; gap: 16px; text-align: left; }
@@ -1676,6 +1679,10 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 /* Guess: a sign inside a real word; the other cells of the word are faded */
 .prompt-cells .cell.dim { opacity: .15; }
 .stage .prompt-cells.in-word { flex-wrap: nowrap; }
+/* Everyday formats: words stay whole and wrap between each other */
+.stage .prompt-cells.fmt { column-gap: clamp(14px, 4vw, 26px); row-gap: 12px; }
+.prompt-cells.fmt .pc-word { display: inline-flex; }
+.stage .prompt-cells.fmt .cell { --s: clamp(7px, 2.3vw, 14px); }
 .stage .prompt-cells.in-word .cell { --s: clamp(9px, 2.9vw, 18px); }
 
 /* ---------- Practice: Spot the right brailling ---------- */
@@ -1719,6 +1726,24 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .ch-c.sign .lbl { color: var(--accent); font-weight: 600; }
 .ch-c:disabled { cursor: default; }
 .ch-left { margin: 0; min-height: 1.5em; text-align: center; color: var(--muted); font-size: .9rem; }
+
+/* ---------- Proofreader ---------- */
+:is(.gc-proof, a[href="#/games/proof"] .hrow-ic) { --gc: #8a5a2f; }
+.pr-q { margin: 0; font-size: 1.05rem; text-align: center; line-height: 1.5; }
+.pr-q b { font-weight: 600; }
+.pr-line { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 6px; margin: 6px 0 0; }
+.pr-w { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px 5px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); cursor: pointer; color: inherit; font: inherit; }
+.pr-w:hover:not(:disabled) { border-color: var(--accent); }
+.pr-cells { display: flex; }
+.pr-w .cell { --s: clamp(6px, 1.9vw, 9px); }
+.pr-w .lbl { min-height: 1.2em; font-size: .85rem; color: var(--muted); }
+.pr-w.got { border-color: var(--good); background: color-mix(in srgb, var(--good) 16%, var(--surface)); }
+.pr-w.missed { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.pr-w.fine { opacity: .55; }
+.pr-w.got .lbl, .pr-w.missed .lbl { color: var(--ink); font-weight: 600; }
+.pr-w:disabled { cursor: default; }
+.pr-why { margin: 0; min-height: 1.5em; text-align: center; max-width: 34em; font-size: .95rem; }
+.pr-why:empty { display: none; }
 
 /* ---------- Practice: Write ---------- */
 .cw-stage { gap: 16px; padding-top: 18px; padding-bottom: 20px; }
@@ -1831,3 +1856,37 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
   .wd-k b { font-size: .85rem; }
   .wd-k.wide { max-width: 84px; font-size: .88rem; }
 }
+
+/* ---------- Peek: the cheat sheet in a sheet over Practice and the games ---------- */
+.peek-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.cheatsheet.peek-cs { border: 0; padding: 0; background: none; border-radius: 0; }
+.peek-cs .cs-title, .peek-cs .cs-foot { display: none; }
+.peek-cs .cs-block:first-of-type { margin-top: 14px; }
+/* Four header buttons on a small phone: a little narrower, so long game names still fit */
+@media (max-width: 380px) {
+  .top-row:has(#peekBtn:not([hidden])) { gap: 4px; }
+  .top-row:has(#peekBtn:not([hidden])) .head-title { gap: 6px; }
+  .top-row:has(#peekBtn:not([hidden])) .icon-btn.plain { width: 34px; }
+}
+
+/* ---------- Settings: real size calibration ---------- */
+.mm-cal { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
+.mm-cal[hidden] { display: none; }
+.mm-cal .set-note { margin: 0; }
+.mm-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; min-height: calc(var(--mm, 1mm) * 26.5); }
+.mm-coin { flex: none; width: calc(var(--mm, 1mm) * 26.5); height: calc(var(--mm, 1mm) * 26.5); border-radius: 50%; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mm-demo { display: inline-flex; }
+.mm-ctl { display: flex; align-items: center; gap: 10px; }
+.mm-ctl input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.mm-ctl .icon-btn { width: 36px; height: 36px; font-size: 1.2rem; line-height: 1; }
+
+/* ---------- Milestones: one quiet line on Home, a list in Stats ---------- */
+.h-mile { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; color: var(--ink-2); text-decoration: none; font-size: .92rem; }
+.h-mile b { font-weight: 600; color: var(--ink); }
+.h-mile-dot, .ms-mark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
+.ms-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ms-list li { display: flex; align-items: center; gap: 10px; font-size: .92rem; }
+.ms-list .ms-t { flex: 1; min-width: 0; }
+.ms-list .ms-n { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.ms-list li:not(.done) .ms-mark { background: none; box-shadow: inset 0 0 0 1.5px var(--dot-off); }
+.ms-list li:not(.done) .ms-t { color: var(--muted); }

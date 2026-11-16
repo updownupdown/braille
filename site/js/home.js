@@ -6,6 +6,7 @@ import { GAMES, gameStore } from './games.js';
 import { AUTO_GAP, CATS, MODES } from './practice.js';
 import { $, titleCase, openSheet, cellHTML, crowHTML, icon, level, markMulti, mastery, setSub, setTitle, store, view, views } from './core.js';
 import { LESSONS, REF_SECTIONS, isLesson, lessonsDone } from './learn.js';
+import { checkMilestones, milestoneLine, milestonesHTML } from './milestones.js';
 // 0 untried · 1–3 blues · 4+ known (green)
 
 // ---------- home ----------
@@ -16,7 +17,7 @@ export const PROG_GROUPS = () => [
 ];
 // Answers per day (first tries only), kept for the stats page's calendar and streak.
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-export function logDay() { const d = store.get('days', {}), k = dayKey(); d[k] = (d[k] || 0) + 1; store.set('days', d); }
+export function logDay() { const d = store.get('days', {}), k = dayKey(); d[k] = (d[k] || 0) + 1; store.set('days', d); checkMilestones(); }
 export function dayStreak(days) {
   let n = 0; const d = new Date();
   if (!days[dayKey(d)]) d.setDate(d.getDate() - 1); // today not practised yet: the streak still counts up to yesterday
@@ -50,6 +51,8 @@ export function statsHTML() {
     </div>
     <h2 class="sec-h">Last 12 Weeks</h2>
     <div class="st-cal" aria-label="Practice calendar, darker means more answers">${cellsCal.join('')}</div>
+    <h2 class="sec-h">Milestones</h2>
+    ${milestonesHTML()}
     <h2 class="sec-h">Known Signs</h2>
     <p class="muted small st-key"><span class="k"></span> known <span class="l"></span> learning. Tap a bar to practise that group.</p>
     <table class="st-table"><thead><tr><th></th><th>Guess</th><th>Draw</th></tr></thead><tbody>${rows}</tbody></table>
@@ -64,7 +67,7 @@ export function statsHTML() {
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
 export const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
 export const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
-export const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'chunt', 'agent', 'trivia', 'riddles'];
+export const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'chunt', 'proof', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
   const m = mastery(), misses = store.get('misses', {});
@@ -127,6 +130,7 @@ views[''] = () => {
     <div class="home-head">
       <div class="home-brand" role="heading" aria-level="1" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
+    ${isNew ? '' : milestoneLine()}
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
     <section class="hsec">${practice}</section>

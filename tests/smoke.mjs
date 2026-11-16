@@ -22,9 +22,9 @@ const base = `http://localhost:${server.address().port}/`;
 export const ROUTES = ['', 'reference', 'reference/overview', 'reference/alphabet', 'reference/numbers', 'reference/grade2',
   'reference/g2words', 'reference/g2strong', 'reference/g2lower', 'reference/g2affix', 'reference/g2short',
   'reference/signs', 'reference/science', 'reference/languages', 'reference/systems', 'reference/cheatsheet',
-  'practice', 'practice/read', 'practice/write', 'practice/words', 'practice/sweep', 'practice/read?cat=auto', 'practice/stats', 'practice/compose', 'practice/compose?src=phrases', 'practice/place', 'practice/read?cat=contractions&set=spot',
+  'practice', 'practice/read', 'practice/write', 'practice/words', 'practice/sweep', 'practice/read?cat=auto', 'practice/stats', 'practice/compose', 'practice/compose?src=phrases', 'practice/place', 'practice/read?cat=contractions&set=spot', 'practice/read?cat=symbols&set=fmt', 'practice/compose?src=formats',
   'games', 'games/wordle', 'games/snowman', 'games/anagrams', 'games/agent', 'games/rain', 'games/time', 'games/mirror',
-  'games/memory', 'games/maze', 'games/signhunt', 'games/chunt', 'games/trivia', 'games/riddles', 'translate', 'translate?text=Exit%20floor%202'];
+  'games/memory', 'games/maze', 'games/signhunt', 'games/chunt', 'games/proof', 'games/trivia', 'games/riddles', 'translate', 'translate?text=Exit%20floor%202'];
 
 const browser = await chromium.launch();
 const failures = [];
@@ -156,6 +156,47 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
     return out;
   });
   if (bad.length) failures.push('Auto days:\n  ' + bad.join('\n  '));
+  await page.close();
+}
+// Proofreader: every wrong brailling differs from the translator's and has a reason. Everyday formats: every
+// generated line looks like a real one, and each wrong choice is a real-looking line one look-alike cell away.
+// Milestones: reached ones are dated today, and ones reached before tracking began are only 'earlier'.
+{
+  const page = await browser.newPage();
+  await page.goto(base + '#/practice/read');
+  await page.waitForTimeout(400);
+  const bad = await page.evaluate(async () => {
+    const R = await import('./js/rules.js'), B = await import('./js/braille.js'), Ph = await import('./js/phrases.js'), P = await import('./js/practice.js'), M = await import('./js/milestones.js');
+    const out = [];
+    const words = [...new Set(Ph.PHRASES.filter((p) => /^[a-z ]+$/.test(p)).flatMap((p) => p.split(' ')))].filter((w) => w.length > 1);
+    let withG2 = 0;
+    for (const g of [1, 2]) for (const w of words) {
+      const right = B.unicodeOf(B.translate(w, 'en', g)), ws = R.wrongWays(w, g);
+      if (g === 2 && ws.length) withG2++;
+      for (const x of ws) {
+        if (x.cells === right) out.push(`proof g${g} ${w}: wrong equals right`);
+        if (!x.why) out.push(`proof g${g} ${w}: no reason`);
+      }
+    }
+    if (withG2 < 150) out.push(`only ${withG2} sentence words have a Grade 2 mistake`);
+    for (const k of Object.keys(Ph.FORMAT_KINDS)) for (let i = 0; i < 40; i++) {
+      const [t] = Ph.formatLine(k);
+      if (!Ph.FORMAT_OK[k].test(t)) out.push(`format ${k}: ${t} doesn't look like one`);
+      for (const a of P.lookAlts(t, k)) {
+        if (!Ph.FORMAT_OK[k].test(a)) out.push(`format ${k}: wrong choice ${a} for ${t} doesn't look like one`);
+        if ([...a].filter((c, j) => c !== t[j]).length !== 1) out.push(`format ${k}: ${a} is more than one cell from ${t}`);
+        if (B.unicodeOf(B.translate(a, 'en', 1)) === B.unicodeOf(B.translate(t, 'en', 1))) out.push(`format ${k}: ${a} brailles the same as ${t}`);
+      }
+    }
+    if (P.FORMATS().length < 20) out.push(`only ${P.FORMATS().length} everyday format items`);
+    localStorage.removeItem('dots.miles'); localStorage.setItem('dots.days', JSON.stringify({ '2026-01-01': 150 }));
+    if (M.checkMilestones().ans100 !== 'earlier') out.push('a milestone reached before tracking should be "earlier"');
+    localStorage.setItem('dots.days', JSON.stringify({ '2026-01-01': 1500 }));
+    if (!/^\d{4}-\d\d-\d\d$/.test(M.checkMilestones().ans1000 || '')) out.push('a new milestone should be dated');
+    localStorage.removeItem('dots.miles'); localStorage.removeItem('dots.days');
+    return out;
+  });
+  if (bad.length) failures.push('Proofreader / formats / milestones:\n  ' + bad.slice(0, 20).join('\n  '));
   await page.close();
 }
 // Offline: every file the app loads must be in the service worker's SHELL, or that page breaks offline
