@@ -144,6 +144,79 @@ const livesHTML = (n, of = 3) => Array.from({ length: of }, (_, i) => `<i class=
 // Start screen for timed games: what to do, which symbols are in play at this level, then Start.
 const startScreen = (how, incl) => `<p class="g-how">${how}</p><p class="g-incl"><b>Includes</b> ${incl}</p><button class="btn primary" id="go">Start</button>`;
 
+// ---------- Contraction Hunt ----------
+// A Grade 2 word in braille: tap every cell that belongs to a contraction. Letters are traps.
+// Easy shows the word in print and has one sign to find; Medium hides the print; Hard has two or more signs.
+let HUNT_WORDS = null;
+function huntWords() {
+  if (HUNT_WORDS) return HUNT_WORDS;
+  const out = { easy: [], medium: [], hard: [] };
+  for (const w of COMMON_WORDS) {
+    if (!/^[a-z]{3,10}$/.test(w)) continue;
+    const ps = translate(w, 'en', 2);
+    // Whole-word signs (the, about) are one sign standing alone: nothing to hunt for inside them.
+    if (ps.length < 2 || ps.some((p) => p.kind !== 'letter' && p.kind !== 'contraction')) continue;
+    const n = ps.filter((p) => p.kind === 'contraction').length, cells = ps.reduce((a, p) => a + [...p.cells].length, 0);
+    if (!n || cells > 8) continue;
+    if (n === 1 && cells <= 6) out.easy.push(w);
+    if (n <= 2) out.medium.push(w);
+    if (n >= 2) out.hard.push(w);
+  }
+  return (HUNT_WORDS = out);
+}
+function chunt(el, level) {
+  const pool = huntWords()[level];
+  el.innerHTML = `${statBar('', '<span class="lives" id="lives"></span>', scoreBest('chunt.' + level))}
+    <div class="card g-card chunt" id="card"><p class="ch-q" id="q"></p><div class="ch-word" id="word" role="group"></div><p class="ch-left" id="left" aria-live="polite"></p></div>`;
+  const card = $('#card', el), box = $('#word', el);
+  let sc = 0, lives = 3, list = [], found = new Set(), busy = false, word = '';
+  const total = () => list.filter((c) => c.kind === 'contraction' && c.idx === 0).length;
+  const left = () => { const n = total() - found.size; $('#left', el).textContent = n ? `${n} to find` : ''; };
+  function round() {
+    busy = false; found = new Set(); card.classList.remove('glow-good', 'glow-bad');
+    word = pick(pool);
+    list = toCells(translate(word, 'en', 2));
+    // Each cell knows which print piece it belongs to (g), so a two-cell sign is found with either cell.
+    let g = -1; list.forEach((c) => { if (c.idx === 0) g++; c.g = g; });
+    $('#q', el).innerHTML = level === 'easy' ? `Find the contraction in <b>${esc(word)}</b>` : `Tap every contraction`;
+    box.setAttribute('aria-label', level === 'easy' ? `The word ${word} in braille, ${list.length} cells` : `A word in braille, ${list.length} cells`);
+    box.innerHTML = list.map((c, i) => `<button type="button" class="ch-c" data-i="${i}" aria-label="Cell ${i + 1} of ${list.length}: ${esc(cellsLabel(c.cell))}">${cell(c.cell)}<span class="lbl"></span></button>`).join('');
+    left();
+    say(`${level === 'easy' ? 'Find the contraction in ' + word : 'Tap every contraction'}. ${cellsLabel(list.map((c) => c.cell).join(''))}`);
+  }
+  // Show the print under every cell once the word is done (signs in blue).
+  const reveal = () => $$('.ch-c', box).forEach((b, i) => { const c = list[i]; b.disabled = true; const l = $('.lbl', b); l.textContent = c.idx === 0 ? c.print : ''; if (c.kind === 'contraction') b.classList.add('sign'); });
+  box.onclick = (e) => {
+    const b = e.target.closest('.ch-c'); if (!b || busy || b.disabled) return;
+    const c = list[Number(b.dataset.i)];
+    if (c.kind === 'contraction') {
+      if (found.has(c.g)) return;
+      found.add(c.g);
+      $$('.ch-c', box).forEach((x, i) => { if (list[i].g === c.g) { x.classList.add('got'); x.setAttribute('aria-label', `${x.getAttribute('aria-label')}, found: ${list.find((y) => y.g === c.g && y.idx === 0).print}`); } });
+      left();
+      if (found.size === total()) {
+        busy = true; sc++; $('#sc', el).textContent = sc; best('chunt.' + level, sc); $('#best', el).textContent = best('chunt.' + level);
+        reveal(); glow(card, true, `${word}`); setTimeout(round, 1400);
+      } else announce(`Found ${list.find((y) => y.g === c.g && y.idx === 0).print}`);
+      return;
+    }
+    b.classList.add('miss'); b.disabled = true; lives--; $('#lives', el).innerHTML = livesHTML(lives);
+    glow(card, false, `That is the letter ${c.print}`);
+    if (!lives) {
+      busy = true; reveal();
+      setTimeout(() => {
+        $('#q', el).innerHTML = `<b class="g-big">${sc}</b> found`; $('#left', el).textContent = '';
+        box.innerHTML = '<button class="btn primary" id="again">Play again</button>';
+        announce(`Game over. ${sc} words.`);
+        $('#again', el).onclick = () => { sc = 0; lives = 3; $('#sc', el).textContent = 0; $('#lives', el).innerHTML = livesHTML(lives); round(); };
+      }, 1600);
+    }
+  };
+  $('#lives', el).innerHTML = livesHTML(lives);
+  round();
+  return () => {};
+}
+
 // ---------- Sign Hunt ----------
 // A building directory in braille only: find the line that says the target. Practises scanning a real sign, not just decoding.
 const HUNT_ROOMS = ['office', 'library', 'cafeteria', 'gym', 'reception', 'kitchen', 'lounge', 'pharmacy', 'clinic', 'lobby', 'parking', 'stairs', 'elevator', 'washroom', 'information', 'auditorium', 'classroom', 'laboratory', 'storage', 'mailroom'];
@@ -867,7 +940,7 @@ function maze(el, level) {
 export const GAME_GROUPS = [
   ['Word Games', ['wordle', 'snowman', 'anagrams', 'agent']],
   ['Quick Fire', ['rain', 'time', 'mirror']],
-  ['Puzzles and Quizzes', ['memory', 'maze', 'signhunt', 'trivia', 'riddles']],
+  ['Puzzles and Quizzes', ['memory', 'maze', 'signhunt', 'chunt', 'trivia', 'riddles']],
 ];
 export const GAMES = {
   wordle: { name: 'Braidle', icon: 'grid', desc: 'Guess the five-letter word in six tries, in braille', levels: [['easy', 'With letters'], ['hard', 'Braille only']], display: true, run: wordle,
@@ -888,6 +961,8 @@ export const GAMES = {
     help: ['Flip two cards at a time. Match each braille cell with its print letter.', 'Easy uses 6 pairs from a–j, Medium 8 pairs, Hard 15 pairs with lots of look-alikes.', 'Try to finish in as few moves as you can.'] },
   maze: { name: 'Braille Maze', icon: 'maze', desc: 'Step only on the cells that spell the word, in order', levels: LV3, run: maze,
     help: ['Start at the flag. Step up, down, left or right onto the next letter of the word.', 'Cells that don’t spell the word are traps. Three traps and the route is revealed.', 'Bigger grids and longer words on harder levels. Hard uses Grade 2, so some steps are contractions.'] },
+  chunt: { name: 'Contraction Hunt', icon: 'hunt', desc: 'Spot the Grade 2 signs hiding inside braille words', levels: LV3, run: chunt,
+    help: ['A word appears in Grade 2 braille. Tap every cell that is part of a contraction; a sign that takes two cells is found with either of its cells.', 'Letters are traps: three wrong taps and the round ends.', 'Easy shows the word in print and has one sign to find. Medium hides the print. Hard has two or more signs in every word.', 'When a word is done, the print appears under each cell.'] },
   signhunt: { name: 'Sign Hunt', icon: 'sign', desc: 'Find the right line on a building directory, in braille only', levels: LV3, run: signhunt,
     help: ['A directory sign lists several places, in braille only. Tap the line that says the place you are looking for.', 'Easy has three lines in Grade 1. Medium has four in Grade 2, the way Canadian signs are made. Hard has five, with look-alike lines and room numbers.', 'Three wrong taps and the round ends. Your best score is saved for each level.'] },
   trivia: { name: 'Trivia', icon: 'help', desc: '1,000 questions on ten topics, with answers in braille', levels: GRADES, run: trivia,
