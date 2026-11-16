@@ -280,7 +280,32 @@ input[type=range] { accent-color: var(--accent); }
 
 footer.foot { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+/* ---------- accessibility ---------- */
+/* Skip link: off screen until it gets keyboard focus. */
+.skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; transform: translateY(-200%); padding: 10px 16px; border: 0; border-radius: 12px; background: var(--ink); color: var(--bg); font-weight: 600; }
+.skip-link:focus { transform: none; }
+/* Reduced motion (system setting): no movement, shakes, slides or flips. Right/wrong feedback stays,
+   as a still ring instead of the animated glow, so nothing is lost. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .glow-good { box-shadow: 0 0 0 3px var(--good) !important; border-color: var(--good) !important; }
+  .glow-bad { box-shadow: 0 0 0 3px var(--bad) !important; border-color: var(--bad) !important; }
+  .mz-new.filling .fill { transform: scaleX(1); }
+}
+/* More contrast (system setting): darker secondary text, stronger lines, links underlined. */
+@media (prefers-contrast: more) {
+  :root { --muted: #5f564e; --line: #a99d90; }
+  :root[data-theme="dark"] { --muted: #cfc5ba; --line: #8a7f73; }
+  a:not(.btn):not(.hrow):not(.hcard):not(.sr):not([role="radio"]) { text-decoration: underline; text-underline-offset: 3px; }
+  .cell i:not(.on) { box-shadow: inset 0 0 0 2px var(--off); }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --muted: #cfc5ba; --line: #8a7f73; } }
+/* Windows high contrast: raised dots must still look raised. */
+@media (forced-colors: active) {
+  .cell i { forced-color-adjust: none; border: 1px solid CanvasText; background: Canvas; }
+  .cell i.on { background: CanvasText; }
+  .glow-good, .glow-bad { outline: 3px solid Highlight; }
+}
 
 /* ---------- layout v3 ---------- */
 

@@ -20,13 +20,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
+  <button type="button" class="skip-link" id="skipLink">Skip to content</button>
   <header class="top">
     <div class="top-row">
       <a class="brand" href="#/" aria-label="Learn Braille home">
         <svg class="logo-svg" viewBox="0 0 100 66" width="40" height="26" aria-hidden="true"><g class="lb-l"><circle cx="11" cy="11" r="8.5"/><circle cx="11" cy="33" r="8.5"/><circle cx="11" cy="55" r="8.5"/></g><g class="lb-off"><circle cx="33" cy="11" r="8.5"/><circle cx="33" cy="33" r="8.5"/><circle cx="33" cy="55" r="8.5"/><circle cx="89" cy="11" r="8.5"/><circle cx="67" cy="55" r="8.5"/><circle cx="89" cy="33" r="8.5"/><circle cx="89" cy="55" r="8.5"/></g><g class="lb-b"><circle cx="67" cy="11" r="8.5"/><circle cx="67" cy="33" r="8.5"/></g></svg>
         <span class="brand-wm"><span class="wm-l">L</span>earn <span class="wm-b">B</span>raille</span>
       </a>
-      <span class="head-title" id="headTitle"></span>
+      <span class="head-title" id="headTitle" role="heading" aria-level="1"></span>
       <nav class="nav" aria-label="Main">
         <a href="#/" data-route="">Home</a>
         <a href="#/reference" data-route="reference">Learn</a>
@@ -39,12 +40,13 @@
       <button class="icon-btn plain" id="settingsBtn" aria-label="Settings" title="Settings" data-icon="settings"></button>
     </div>
     <div class="search-bar" id="searchBar" hidden>
-      <input id="gq" type="search" placeholder="Search letters, contractions, signs, games…" autocomplete="off" spellcheck="false">
+      <input id="gq" type="search" aria-label="Search" aria-controls="searchPanel" placeholder="Search letters, contractions, signs, games…" autocomplete="off" spellcheck="false">
       <button class="icon-btn plain" id="searchClose" aria-label="Close search" data-icon="close"></button>
     </div>
     <div class="subbar" id="subbar" hidden></div>
   </header>
-  <div class="search-panel" id="searchPanel" hidden></div>
+  <div class="search-panel" id="searchPanel" role="region" aria-label="Search results" hidden></div>
+  <div id="srStatus" class="visually-hidden" role="status" aria-live="polite"></div>
 
   <main id="view" tabindex="-1"></main>
   <div id="srLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>

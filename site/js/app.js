@@ -8,6 +8,7 @@ import { toDots, translate, unicodeOf, LANGS } from './braille.js';
 import { SCIENCE_SYMBOLS, LANG_INFO, SYSTEMS, HISTORY, SIGN_REGIONS } from './data.js';
 import { GAMES, GAME_GROUPS, gameStore } from './games.js';
 
+import { announce } from './a11y.js';
 import { $, $$, titleCase, DICT, SEC_OF_GROUP, applySettings, bindRadios, cellsHTML, cellsK, closeDD, closeSheet, dropdown, esc, helpBtn, icon, letterDetail, lineHTML, openSettings, openSheet, radios, setSub, setTitle, store, symbolDetail, syncHeadH, view, views } from './core.js';
 import { G2_LESSONS, LANG_NAMES, REF_SECTIONS, charsTable } from './learn.js';
 import { MODES } from './practice.js';
@@ -111,6 +112,7 @@ export function renderSearch() {
   const tr = /[a-z]/i.test(raw) && !/^[1-6\s-]+$/.test(raw) ? `<a class="sr tr" href="#/translate?lang=en&text=${encodeURIComponent(raw)}"><span class="sr-cells">${lineHTML(translate(raw, 'en', 2), { labels: false, cls: 'sm' })}</span><span class="sr-text"><b>Translate “${esc(raw)}”</b><small>English Grade 2</small></span></a>` : '';
   searchPanel.innerHTML = `<div class="sp-inner">${RESULTS.length ? `<div class="sr-list">${RESULTS.map((e, i) => `<button class="sr${e.cells && [...e.cells].length > 3 ? ' long' : ''}" data-r="${i}"><span class="sr-cells">${e.cells ? ([...e.cells].length > 3 ? cellsHTML(e.cells, 'sm') : cellsK(e.cells, e.kind || '', 'sm')) : icon(e.page ? 'book' : 'right', 18)}</span><span class="sr-text"><b>${esc(e.title)}</b><small>${esc(e.sub.length > 90 ? e.sub.slice(0, 88) + '…' : e.sub)}</small></span><span class="sr-sec">${esc(secName[e.sec] || '')}</span></button>`).join('')}</div>` : '<p class="muted">Nothing matches. Try a word or a symbol.</p>'}${tr}</div>`;
   searchPanel.hidden = false;
+  const st = $('#srStatus'); if (st) st.textContent = RESULTS.length ? `${RESULTS.length} result${RESULTS.length > 1 ? 's' : ''}` : 'Nothing matches';
 }
 $('#gq').addEventListener('input', renderSearch);
 $('#gq').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSearch(); if (e.key === 'Enter') { const b = $('.sr', searchPanel); if (b) b.click(); } });
@@ -141,7 +143,11 @@ document.addEventListener('click', (e) => { if (e.target.closest('[data-stats]')
 // ---------- router ----------
 export let cleanup = null;
 export const TITLES = { '': 'Learn Braille', practice: 'Practice · Learn Braille', reference: 'Learn · Learn Braille', translate: 'Translate · Learn Braille', games: 'Games · Learn Braille' };
+let routed = false;
 export function route() {
+  // Where keyboard focus was, so it can be put back somewhere sensible once the new page is drawn.
+  const was = document.activeElement, wasHref = was && was.getAttribute && was.getAttribute('href');
+  const fromNav = !!(was && was.closest && was.closest('.tabbar, .nav'));
   const raw = location.hash.replace(/^#\/?/, '');
   let [path, qs] = raw.split('?');
   path = path || '';
@@ -157,10 +163,19 @@ export function route() {
   document.body.dataset.page = key || 'home';
   const r = views[key](q, sub, sub2);
   cleanup = typeof r === 'function' ? r : null;
-  $$('[data-route]').forEach((a) => a.classList.toggle('active', a.dataset.route === key));
+  $$('[data-route]').forEach((a) => { const on = a.dataset.route === key; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
   document.title = TITLES[key];
+  // Screen readers: say which page this is, and move focus into it when the old focus is gone or was a main tab.
+  if (routed) {
+    const same = wasHref && !(was && was.isConnected) ? $$('#subbar [href]').find((x) => x.getAttribute('href') === wasHref) : null;
+    if (same) same.focus({ preventScroll: true });
+    else if (fromNav || !(was && was.isConnected) || was === document.body) view.focus({ preventScroll: true });
+    announce($('#headTitle').textContent.trim() || 'Learn Braille');
+  }
+  routed = true;
 }
+$('#skipLink').onclick = () => { view.focus(); };
 window.addEventListener('hashchange', route);
 window.addEventListener('scroll', () => $('.top').classList.toggle('scrolled', scrollY > 4), { passive: true });
 $$('[data-icon]').forEach((el) => { el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)); });

@@ -67,13 +67,13 @@ views.translate = (q) => {
   const initial = q.get('text') || store.get('trText', 'Welcome to Canada. The washroom is on floor 2.');
   setTitle('Translate');
   let dir = q.get('text') ? 'text' : store.get('trDir', 'text');
-  setSub(`<div class="seg radios tr-dir" role="radiogroup" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${dirIcon(v)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div><button type="button" class="btn small-btn tr-clear" id="trClear" hidden>Clear all</button>`);
+  setSub(`<div class="seg radios tr-dir" role="radiogroup" aria-label="Direction" data-seg="trDir">${[['text', 't2b', 'Text to braille'], ['dots', 'b2t', 'Braille to text']].map(([v, ic, l]) => `<button type="button" role="radio" aria-checked="${v === dir}" tabindex="${v === dir ? 0 : -1}" data-v="${v}" class="${v === dir ? 'on' : ''}" aria-label="${l}" title="${l}">${dirIcon(v)}</button>`).join('')}</div><div id="langDD" class="dd-strong"></div><button type="button" class="btn small-btn tr-clear" id="trClear" hidden>Clear all</button>`);
   view.innerHTML = `
     <div id="trText">
       <div class="tr-ex" id="exDD"></div>
-      <textarea class="tr-input" id="trIn" spellcheck="false">${esc(initial)}</textarea>
+      <textarea class="tr-input" id="trIn" spellcheck="false" aria-label="Text to translate">${esc(initial)}</textarea>
       <div class="tr-view">${radios('trView', [['line', 'Line'], ['sign', 'As a sign']], store.get('trView', 'line'))}</div>
-      <div class="card tr-out" id="trOut"></div>
+      <div class="card tr-out" id="trOut" role="region" aria-label="Braille"></div>
       <div class="tr-tools">
         <button class="btn" id="trCopy">Copy braille</button>
         <button class="btn" id="trShare">Share</button>
@@ -131,10 +131,13 @@ export function dotsEditor(root) {
   const POS = [1, 4, 2, 5, 3, 6];
   dotsClear = () => { cells = [[]]; cur = 0; save(); draw(); };
   function draw() {
+    // Redrawing replaces the buttons: put keyboard focus back on the same one.
+    const a = document.activeElement, keep = a && root.contains(a) ? (a.dataset.n ? `.tb-cell[data-c="${a.closest('.tb-cell').dataset.c}"] [data-n="${a.dataset.n}"]` : a.id ? '#' + a.id : null) : null;
     root.innerHTML = `
       <div class="tb-row" id="tbRow">${cells.map((d, i) => `<div class="tb-col"><div class="tb-cell" data-c="${i}">${POS.map((n) => `<button type="button" class="tb-dot ${d.includes(n) ? 'on' : ''}" data-n="${n}" aria-label="Cell ${i + 1}, dot ${n}" aria-pressed="${d.includes(n)}"></button>`).join('')}</div><button type="button" class="tb-del" data-del="${i}" aria-label="Remove cell ${i + 1}">${icon('trash', 18)}</button></div>`).join('')}
         <button type="button" class="tb-add" id="tbAdd"><span>+</span>Add cell</button></div>
-      <div id="tbOut" class="tb-out"></div>`;
+      <div id="tbOut" class="tb-out" aria-live="polite"></div>`;
+    if (keep) { const k = $(keep, root); if (k) k.focus(); }
     $('#tbRow', root).onclick = (e) => {
       const add = e.target.closest('#tbAdd');
       if (add) { cells.push([]); cur = cells.length - 1; save(); draw(); return; }

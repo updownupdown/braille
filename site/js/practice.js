@@ -9,8 +9,9 @@ import { chord } from './sixkey.js';
 import { PASSAGES } from './passages.js';
 import { G2_EXAMPLES } from './g2examples.js';
 import { G2_EXAMPLE, G2_START, SHORT_SPELL, grp } from './learn.js';
-import { $, $$, INDICATORS, S, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
+import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, helpBtn, icon, kindOf, lblTag, level, mastery, mirror, openSheet, radios, setS, setSub, setTitle, sheet, shuffle, spanOf, store, view, views } from './core.js';
 import { logDay, openStats } from './home.js';
+import { feedback, cellsLabel, say, refocus } from './a11y.js';
 // ---------- practice data ----------
 export const L = (letters) => () => letters.split('').map((l) => ({ key: l, cells: LETTERS[l], answer: l, kind: 'letter' }));
 // The note is only shown in the help sheet's list, never in the quiz.
@@ -200,6 +201,9 @@ export function wordContext(item) {
   return list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 // The word's cells: the asked sign at full strength, every other cell faded.
+// What a screen reader hears for a prompt: the sign's dots, and the whole word when it is shown inside one.
+export const promptLabel = (item, wc) => wc ? `Sign: ${cellsLabel(item.cells)}, shown inside a ${[...wc.parts.map((x) => x.cells).join('')].length}-cell word: ${cellsLabel(wc.parts.map((x) => x.cells).join(''))}` : `Sign: ${cellsLabel(item.cells)}`;
+export const promptHTML = (item, wc) => `<div class="prompt-cells${wc ? ' in-word' : ''}" role="img" tabindex="-1" aria-label="${esc(promptLabel(item, wc))}">${wc ? wordCellsHTML(wc) : [...item.cells].map((c) => cellHTML(c)).join('')}</div>`;
 export const wordCellsHTML = (wc) => [...wc.parts.map((x) => x.cells).join('')].map((c, i) => cellHTML(c, i >= wc.at && i < wc.at + wc.len ? '' : 'dim')).join('');
 // ---------- practice help: what the chosen set is ----------
 export const LOWER_NOTE = 'Lower signs are the shapes of a–j moved down one row, so they never use the top dots.';
@@ -288,7 +292,7 @@ export function quizMode(mode, q) {
   body.innerHTML = `<div class="card stage" id="stage"></div>
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
       <div class="mastery-h"><span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
-      <div class="mastery" id="mastery"></div>
+      <div class="mastery" id="mastery" role="list" aria-label="Signs in this set"></div>
     </div>`}`;
   const stage = $('#stage');
   const pre = mode === 'write' ? 'w:' : 'r:';
@@ -327,7 +331,8 @@ export function quizMode(mode, q) {
   function renderMastery() {
     if (mode === 'words') return;
     const it = items(), box = $('#mastery');
-    box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}">${esc(x.answer)}</span>`).join('');
+    const LV = ['new', 'learning', 'learning', 'learning', 'known'];
+    box.innerHTML = it.map((x) => `<span data-l="${level(score(x.key))}" role="listitem">${esc(x.answer)}<span class="visually-hidden">, ${LV[level(score(x.key))]}</span></span>`).join('');
     // Auto lists only the signs met so far, but counts against the whole course.
     $('#known').textContent = it.filter((x) => level(score(x.key)) >= 4).length;
     // Signs on their way (one to three right in a row) count too, so progress shows from the first answers.
@@ -372,7 +377,7 @@ export function quizMode(mode, q) {
   const glow = (ok) => {
     stage.classList.remove('glow-good', 'glow-bad'); void stage.offsetWidth;
     stage.classList.add(ok ? 'glow-good' : 'glow-bad');
-    announce(ok ? 'Correct' : 'Not quite');
+    feedback(ok);
   };
 
   // Auto: a new sign is shown with its answer before it is asked.
@@ -382,13 +387,15 @@ export function quizMode(mode, q) {
     const wc = mode === 'read' ? wordContext(item) : null;
     stage.innerHTML = `<div class="intro">
       <span class="intro-tag">New sign</span>
-      <div class="prompt-cells${wc ? ' in-word' : ''}">${wc ? wordCellsHTML(wc) : [...item.cells].map((c) => cellHTML(c)).join('')}</div>
+      ${promptHTML(item, wc)}
       <div class="intro-ans">${esc(item.answer)}</div>
       ${wc ? `<p class="intro-note">as in “${esc(wc.word)}”</p>` : ''}
       ${item.label || item.note || item.grp ? `<p class="intro-note">${esc([item.label, item.grp, item.note].filter(Boolean).join(' · '))}</p>` : ''}
       <button class="btn primary" id="gotIt" type="button">Got it</button></div>`;
     const go = () => { autoMeet(pre, item.key); state.forced = item; state.wc = wc ? [item.key, wc] : null; next(); };
     $('#gotIt').onclick = go;
+    refocus(stage, $('#gotIt'));
+    say(`New sign: ${item.answer}. ${promptLabel(item, wc)}`);
     state.key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   }
 
@@ -403,8 +410,10 @@ export function quizMode(mode, q) {
     const opts = shuffle([item, ...guessOptions(item, pool, wc && wc.pos)]);
     const long = opts.some((o) => o.answer.length > 2);
     stage.innerHTML = `
-      <div class="prompt-cells${wc ? ' in-word' : ''}">${wc ? wordCellsHTML(wc) : [...item.cells].map((c) => cellHTML(c)).join('')}</div>
-      <div class="choices ${long ? 'words' : ''}">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
+      ${promptHTML(item, wc)}
+      <div class="choices ${long ? 'words' : ''}" role="group" aria-label="Answers">${opts.map((o) => `<button class="choice" data-k="${esc(o.key)}">${esc(o.answer)}${o.label ? `<small>${esc(o.label)}</small>` : ''}</button>`).join('')}</div>`;
+    refocus(stage, $('.prompt-cells', stage));
+    say(`${promptLabel(item, wc)}. Choices: ${opts.map((o) => o.answer).join(', ')}`);
     let misses = 0;
     const choose = (btn) => {
       if (!btn || btn.classList.contains('right') || btn.classList.contains('wrong') || $('.choice.right', stage)) return;
@@ -413,7 +422,7 @@ export function quizMode(mode, q) {
       btn.classList.add(ok ? 'right' : 'wrong');
       if (ok) setTimeout(next, 650);
       // After a second miss, outline the right answer; it still has to be tapped to move on.
-      else if (++misses >= 2) { const r = $$('.choice', stage).find((b) => b.dataset.k === item.key); if (r) r.classList.add('reveal'); }
+      else if (++misses >= 2) { const r = $$('.choice', stage).find((b) => b.dataset.k === item.key); if (r) { r.classList.add('reveal'); announce(`The answer is ${item.answer}`); } }
     };
     stage.onclick = (e) => choose(e.target.closest('.choice'));
     state.key = (e) => {
@@ -432,16 +441,20 @@ export function quizMode(mode, q) {
     const on = targets.map(() => new Set()), ok = targets.map(() => false);
     // Several cells sit side by side at full size; each one turns faintly green when it's right.
     stage.innerHTML = `
-      <div class="target">${esc(item.answer)}</div>
-      <div class="pads" style="--n:${targets.length}">${targets.map((_, ci) => `<div class="dotpad" data-c="${ci}">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-label="${targets.length > 1 ? `Cell ${ci + 1}, ` : ''}dot ${d}">${d}</button>`).join('')}</div>`).join('')}</div>
+      <div class="target" tabindex="-1" aria-label="Draw ${esc(item.answer)}${item.label ? ', ' + esc(item.label) : ''}${targets.length > 1 ? `, ${targets.length} cells` : ''}">${esc(item.answer)}</div>
+      <div class="pads" style="--n:${targets.length}">${targets.map((_, ci) => `<div class="dotpad" data-c="${ci}">${[1, 2, 3, 4, 5, 6].map((d) => `<button data-d="${d}" aria-pressed="false" aria-label="${targets.length > 1 ? `Cell ${ci + 1}, ` : ''}dot ${d}">${d}</button>`).join('')}</div>`).join('')}</div>
       <button class="link-btn corner" id="skip">Show me</button>`;
     const pads = $$('.dotpad', stage);
-    const paint = (ci) => { [1, 2, 3, 4, 5, 6].forEach((d) => $(`[data-d="${d}"]`, pads[ci]).classList.toggle('on', on[ci].has(d))); pads[ci].classList.toggle('ok', ok[ci]); };
+    const paint = (ci) => { [1, 2, 3, 4, 5, 6].forEach((d) => { const b = $(`[data-d="${d}"]`, pads[ci]); b.classList.toggle('on', on[ci].has(d)); b.setAttribute('aria-pressed', String(on[ci].has(d))); }); pads[ci].classList.toggle('ok', ok[ci]); };
+    refocus(stage, $('.target', stage));
+    say(`Draw ${item.answer}${item.label ? ', ' + item.label : ''}`);
     const evaluate = (ci, added) => {
       if (done) return;
       const w = new Set(toDots(targets[ci]));
       if (added && !w.has(added)) { result(false, item); glow(false); pads[ci].classList.remove('bad'); void pads[ci].offsetWidth; pads[ci].classList.add('bad'); }
+      const was = ok[ci];
       ok[ci] = on[ci].size === w.size && [...w].every((d) => on[ci].has(d)); paint(ci);
+      if (ok[ci] && !was && targets.length > 1 && !ok.every(Boolean)) announce(`Cell ${ci + 1} done`);
       // After "Show me", stay three times as long so the answer can sink in.
       if (ok.every(Boolean)) { done = true; result(true, item); glow(true); setTimeout(next, shown ? 2250 : 750); }
     };
@@ -456,6 +469,7 @@ export function quizMode(mode, q) {
       shown = true;
       targets.forEach((t, ci) => { on[ci] = new Set(toDots(t)); });
       targets.forEach((t, ci) => evaluate(ci, 0));
+      announce(`${item.answer} is ${cellsLabel(item.cells)}`);
     };
     const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
     state.key = (e) => { const d = KEYS[e.key.toLowerCase()]; if (!d) return; const ci = Math.max(0, ok.indexOf(false)); tog(ci, d); };
@@ -471,7 +485,9 @@ export function quizMode(mode, q) {
     const cellsHTML = cells.map((c, i) => `<span class="bw">${cellHTML(c.cell, '', { kind: kindOf(c) })}${lblTag(c.idx === 0 ? spanOf(cells, i) : 1)}</span>`).join('');
     stage.innerHTML = `
       <div class="w-top"><button class="link-btn pillish" id="hint">Hint</button><button class="link-btn pillish" id="skip">Skip</button></div>
-      <div class="prompt-cells words many" id="wcells">${cellsHTML}</div>`;
+      <div class="prompt-cells words many" id="wcells" role="img" tabindex="-1" aria-label="Word: ${esc(cellsLabel(cells.map((c) => c.cell).join('')))}">${cellsHTML}</div>`;
+    refocus(stage, $('#wcells', stage));
+    say(`Word: ${cellsLabel(cells.map((c) => c.cell).join(''))}`);
     const lbls = $$('#wcells .lbl');
     const target = word.toLowerCase().replace(/[^a-z0-9]/g, '');
     const check = () => {
@@ -487,7 +503,7 @@ export function quizMode(mode, q) {
       state.firstTry = false; hinting = true;
       typeHint(wpad, target, (fin) => { if (fin) { hinting = false; check(); } else paintTyped(lbls, cells, wpad.value); }, () => done || state.last !== word);
     };
-    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paintTyped(lbls, cells, '', true); setTimeout(next, 1300); };
+    $('#skip').onclick = () => { if (done) return; done = true; if (state.firstTry) result(false, {}); paintTyped(lbls, cells, '', true); announce(`The word was ${word}`); setTimeout(next, 1300); };
     state.key = null;
   }
   // Type mode score: words right first time this session, the current streak and the best streak ever (per grade).
@@ -676,9 +692,10 @@ export function sweepMode(q) {
     const dir = e.key === 'ArrowRight' ? 1 : -1;
     let i = Math.max(0, curIdx) + dir;
     while (cells[i] && cells[i].kind === 'space') i += dir;
-    if (cells[i]) animateTo(headX - (lefts[i] + widths[i] * 0.3));
+    if (cells[i]) { animateTo(headX - (lefts[i] + widths[i] * 0.3)); const c = cells[i]; announce(`${cellsLabel(c.cell)}${c.idx === 0 && c.print ? ': ' + c.print : ''}`); }
   });
   function animateTo(target) {
+    if (reducedMotion()) { offset = target; update(); return; }
     const start = offset, t0 = performance.now();
     const step = (t) => { const k = Math.min(1, (t - t0) / 420); offset = start + (target - start) * (1 - Math.pow(1 - k, 3)); update(); if (k < 1) raf = requestAnimationFrame(step); };
     cancelAnimationFrame(raf); raf = requestAnimationFrame(step);

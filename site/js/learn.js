@@ -4,6 +4,7 @@ import { SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY
 
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
+import { feedback, cellsLabel, say, refocus } from './a11y.js';
 
 import { $, $$, titleCase, DICT, P, announce, bindRadios, cellHTML, cellsHTML, crowHTML, dropdown, esc, exBlock, groupBlock, groupsHTML, icon, letterDetail, lineHTML, markMulti, openSheet, pick, practiseLink, radios, setSub, setTitle, shuffle, store, view, views } from './core.js';
 import { SEC_DESC, SEC_ICON } from './home.js';
@@ -403,13 +404,15 @@ export function bindQuiz(key) {
   const box = $('#lq'); if (!box) return;
   let qs, n, right, first;
   const start = () => { qs = quizQuestions(key); n = 0; right = 0; show(); };
-  const pips = () => `<div class="lq-pips" aria-label="Question ${Math.min(n + 1, QUIZ_LEN)} of ${QUIZ_LEN}">${qs.map((_, i) => `<i class="${i < n ? 'past' : i === n ? 'now' : ''}"></i>`).join('')}</div>`;
+  const pips = () => `<div class="lq-pips" role="img" aria-label="Question ${Math.min(n + 1, QUIZ_LEN)} of ${QUIZ_LEN}">${qs.map((_, i) => `<i class="${i < n ? 'past' : i === n ? 'now' : ''}"></i>`).join('')}</div>`;
   function show() {
     box.classList.remove('glow-good', 'glow-bad');
     const Q = qs[n]; first = true;
     const long = Q.choices.some((c) => c.t.length > 2 || c.small);
-    box.innerHTML = `${pips()}${Q.q ? `<p class="lq-q">${esc(Q.q)}</p>` : ''}${Q.cells ? `<div class="prompt-cells">${[...Q.cells].map((c) => cellHTML(c)).join('')}</div>` : ''}
-      <div class="choices ${long ? 'words' : ''}">${Q.choices.map((c) => `<button class="choice" data-t="${esc(c.t)}">${esc(c.t)}${c.small ? `<small>${esc(c.small)}</small>` : ''}</button>`).join('')}</div>`;
+    box.innerHTML = `${pips()}${Q.q ? `<p class="lq-q">${esc(Q.q)}</p>` : ''}${Q.cells ? `<div class="prompt-cells" role="img" tabindex="-1" aria-label="Sign: ${esc(cellsLabel(Q.cells))}">${[...Q.cells].map((c) => cellHTML(c)).join('')}</div>` : ''}
+      <div class="choices ${long ? 'words' : ''}" role="group" aria-label="Answers">${Q.choices.map((c) => `<button class="choice" data-t="${esc(c.t)}">${esc(c.t)}${c.small ? `<small>${esc(c.small)}</small>` : ''}</button>`).join('')}</div>`;
+    if (n > 0) refocus(box, $('.prompt-cells', box) || $('.lq-q', box));
+    say([`Question ${n + 1}`, Q.q, Q.cells ? cellsLabel(Q.cells) : '', 'Choices: ' + Q.choices.map((c) => c.t).join(', ')].filter(Boolean).join('. '));
   }
   function finish() {
     const pass = right >= QUIZ_PASS;
@@ -421,6 +424,8 @@ export function bindQuiz(key) {
       <div class="row lq-row">${pass && nx ? `<a class="btn primary" href="#/reference/${nx[0]}">Next: ${nx[1]}</a>` : ''}<button class="btn ${pass ? '' : 'primary'}" id="lqAgain">Try again</button></div>`;
     if (pass) { const h = $('#check h3'); if (h && !$('.lq-done', h)) h.insertAdjacentHTML('beforeend', '<span class="count lq-done">Done</span>'); }
     $('#lqAgain').onclick = start;
+    announce(`${right} of ${QUIZ_LEN}. ${pass ? 'Lesson complete.' : `Get ${QUIZ_PASS} right to complete this lesson.`}`);
+    refocus(box, $('.lq-score', box));
   }
   box.onclick = (e) => {
     const b = e.target.closest('.choice');
@@ -430,9 +435,9 @@ export function bindQuiz(key) {
     first = false;
     box.classList.remove('glow-good', 'glow-bad'); void box.offsetWidth;
     box.classList.add(ok ? 'glow-good' : 'glow-bad');
-    announce(ok ? 'Correct' : 'Not quite');
+    feedback(ok);
     b.classList.add(ok ? 'right' : 'wrong');
-    if (!ok && $$('.choice.wrong', box).length >= 2) { const r = $$('.choice', box).find((x) => x.dataset.t === qs[n].answer); if (r) r.classList.add('reveal'); }
+    if (!ok && $$('.choice.wrong', box).length >= 2) { const r = $$('.choice', box).find((x) => x.dataset.t === qs[n].answer); if (r) { r.classList.add('reveal'); announce(`The answer is ${qs[n].answer}`); } }
     if (ok) setTimeout(() => { if (!box.isConnected) return; n++; if (n < QUIZ_LEN) show(); else finish(); }, 650);
   };
   start();

@@ -10,6 +10,7 @@ import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS } from './phrases.js';
 import { COMMON_WORDS } from './wordlist.js';
+import { announce, feedback, cellsLabel, say, reducedMotion } from './a11y.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -42,13 +43,14 @@ function line(text, { grade = 1, slots = false, cls = '' } = {}) {
     word += `<span class="bw">${cell(c.cell, cls)}${slots ? `<span class="lbl${n > 1 ? ' span" style="--n:' + n : ''}"></span>` : ''}</span>`;
   }
   flush();
-  return `<span class="braille-line" role="img" aria-label="${esc(text)} in braille">${out}</span>`;
+  return `<span class="braille-line" role="img" aria-label="Braille: ${esc(cellsLabel(list.filter((c) => c.kind !== 'newline').map((c) => c.kind === 'space' ? ' ' : c.cell).join('')))}">${out}</span>`;
 }
 const letterCell = (l, cls = '') => cell(LETTERS[l], cls);
 const fromDotsLocal = (d) => String.fromCharCode(0x2800 + [...d].reduce((m, n) => m | (1 << (Number(n) - 1)), 0));
-// Spoken feedback for screen readers (live region in index.html); the visible cue is the glow.
-const announce = (t) => { const el = document.getElementById('srLive'); if (!el) return; el.textContent = ''; setTimeout(() => { el.textContent = t; }, 30); };
-const glow = (el, ok) => { el.classList.remove('glow-good', 'glow-bad'); void el.offsetWidth; el.classList.add(ok ? 'glow-good' : 'glow-bad'); announce(ok ? 'Correct' : 'Not quite'); };
+// Right/wrong: the glow is the visible cue; feedback() adds the sound (if on) and tells screen readers and speech.
+const glow = (el, ok, extra = '') => { el.classList.remove('glow-good', 'glow-bad'); void el.offsetWidth; el.classList.add(ok ? 'glow-good' : 'glow-bad'); feedback(ok, extra); };
+// A prompt made of cells: screen readers hear the dots (never the answer).
+const cellsAria = (cells, what = 'Braille') => `role="img" aria-label="${what}: ${esc(cellsLabel(cells))}"`;
 const best = (k, v) => { const b = store.get('best.' + k, null); if (v != null && (b == null || v > b)) { store.set('best.' + k, v); return v; } return b; };
 const bestLow = (k, v) => { const b = store.get('best.' + k, null); if (v != null && (b == null || v < b)) { store.set('best.' + k, v); return v; } return b; };
 // Keyboard listener that ignores typing in inputs and open dialogs.
@@ -124,7 +126,7 @@ export function typeHint(pad, target, onStep, stale = () => false) {
 function brailleKeys({ state = {}, disabled = () => false, actions = false } = {}) {
   return KB_ROWS.map((row, ri) => {
     const last = actions && ri === KB_ROWS.length - 1;
-    return `<div class="wd-krow">${last ? '<button class="wd-k wide" data-k="enter">Enter</button>' : ''}${[...row].map((k) => `<button class="wd-k ${state[k] || ''}" data-k="${k}" aria-label="${k}" ${disabled(k) ? 'disabled' : ''}>${letterCell(k)}<b>${k}</b></button>`).join('')}${last ? '<button class="wd-k wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`;
+    return `<div class="wd-krow">${last ? '<button class="wd-k wide" data-k="enter">Enter</button>' : ''}${[...row].map((k) => `<button class="wd-k ${state[k] || ''}" data-k="${k}" aria-label="${k}${state[k] ? ', ' + ({ hit: 'in the word', near: 'in the word, wrong spot', miss: 'not in the word' })[state[k]] : ''}" ${disabled(k) ? 'disabled' : ''}>${letterCell(k)}<b>${k}</b></button>`).join('')}${last ? '<button class="wd-k wide" data-k="back" aria-label="Delete">⌫</button>' : ''}</div>`;
   }).join('');
 }
 // Countdown bar with the seconds written inside it. The blue part is clipped, so the text stays put.
@@ -213,7 +215,8 @@ function wordle(el) {
     for (let i = 0; i < 5; i++) if (res[i] !== 'hit' && left[g[i]]) { res[i] = 'near'; left[g[i]]--; }
     return res;
   };
-  const tile = (l, st = '') => `<span class="wd-tile ${st}">${l ? letterCell(l) + `<b>${l}</b>` : ''}</span>`;
+  const ST = { hit: 'right spot', near: 'in the word, wrong spot', miss: 'not in the word' };
+  const tile = (l, st = '') => `<span class="wd-tile ${st}">${l ? letterCell(l) + `<b>${l}</b>${st ? `<span class="visually-hidden">, ${ST[st]}.</span>` : ''}` : ''}</span>`;
   function render() {
     let h = '';
     for (let r = 0; r < 6; r++) {
@@ -262,26 +265,31 @@ function memory(el, level) {
   function start() {
     const letters = pickLetters();
     const cards = shuffle(letters.flatMap((l) => [{ l, t: 'b' }, { l, t: 'p' }]));
-    grid.innerHTML = cards.map((c, i) => `<button class="mem-card" data-i="${i}" data-l="${c.l}"><span class="mem-back"></span><span class="mem-face">${c.t === 'b' ? letterCell(c.l) : `<b>${c.l}</b>`}</span></button>`).join('');
+    grid.innerHTML = cards.map((c, i) => `<button class="mem-card" data-i="${i}" data-l="${c.l}" data-say="${c.t === 'b' ? esc(cellsLabel(LETTERS[c.l])) : 'letter ' + c.l}" aria-label="Card ${i + 1}, face down"><span class="mem-back" aria-hidden="true"></span><span class="mem-face" aria-hidden="true">${c.t === 'b' ? letterCell(c.l) : `<b>${c.l}</b>`}</span></button>`).join('');
     open = []; moves = 0; matched = 0; lock = false; clearTimeout(timer);
     $('#moves', el).textContent = 0; $('#pairs', el).textContent = 0; $('#msg', el).textContent = '';
     const b = store.get('best.mem.' + level, null); $('#best', el).textContent = b == null ? '–' : b;
   }
+  const x0 = (c) => c.dataset.say;
   grid.onclick = (e) => {
     const c = e.target.closest('.mem-card');
     if (!c || c.classList.contains('up') || c.classList.contains('done')) return;
     // Tapping another card while a wrong pair is showing turns the pair back over straight away.
-    if (lock) { clearTimeout(timer); open.forEach((x) => x.classList.remove('up')); open = []; lock = false; }
+    if (lock) { clearTimeout(timer); open.forEach((x) => { x.classList.remove('up'); x.setAttribute('aria-label', `Card ${Number(x.dataset.i) + 1}, face down`); }); open = []; lock = false; }
     c.classList.add('up'); open.push(c);
+    const label = (x, st) => x.setAttribute('aria-label', `Card ${Number(x.dataset.i) + 1}, ${st}`);
+    label(c, x0(c)); announce(c.dataset.say);
     if (open.length < 2) return;
     moves++; $('#moves', el).textContent = moves;
     const [a, b] = open;
     if (a.dataset.l === b.dataset.l) {
       a.classList.add('done'); b.classList.add('done'); open = []; matched++; $('#pairs', el).textContent = matched;
+      label(a, x0(a) + ', matched'); label(b, x0(b) + ', matched'); announce(`Pair ${matched} of ${n}`);
       if (matched === n) { const bb = bestLow('mem.' + level, moves); $('#best', el).textContent = bb; $('#msg', el).textContent = `All ${n} pairs in ${moves} moves.`; }
     } else {
       lock = true;
-      timer = setTimeout(() => { a.classList.remove('up'); b.classList.remove('up'); open = []; lock = false; }, 1800);
+      announce('No match');
+      timer = setTimeout(() => { a.classList.remove('up'); b.classList.remove('up'); label(a, 'face down'); label(b, 'face down'); open = []; lock = false; }, 1800);
     }
   };
   start();
@@ -393,6 +401,7 @@ function rain(el, level) {
     const d = document.createElement('div');
     d.className = 'drop';
     d.innerHTML = line(text);
+    say(cellsLabel(toCells(translate(text, 'en', 1)).map((c) => c.cell).join('')));
     field.appendChild(d);
     const x = 6 + Math.random() * 70;
     d.style.left = x + '%';
@@ -451,7 +460,7 @@ function timeAttack(el, level) {
   const card = $('#card', el);
   const inp = letterPad({ mount: $('#kb', el), digits: level === 'hard', only: level === 'easy' ? AJ : null, onInput: () => check() });
   let cur, sc = 0, end = 0, raf = 0, running = false;
-  const nextItem = () => { let x; do { x = pick(pool); } while (x === cur && pool.length > 1); cur = x; $('#cells', el).innerHTML = [...cellsOf(x)].map((c) => cell(c)).join(''); };
+  const nextItem = () => { let x; do { x = pick(pool); } while (x === cur && pool.length > 1); cur = x; const cs = $('#cells', el); cs.innerHTML = [...cellsOf(x)].map((c) => cell(c)).join(''); cs.setAttribute('role', 'img'); cs.setAttribute('aria-label', cellsLabel(cellsOf(x))); say(cellsLabel(cellsOf(x))); };
   function tick() {
     const left = Math.max(0, end - performance.now());
     setTimer(el, left / 60000, Math.ceil(left / 1000));
@@ -481,7 +490,7 @@ function timeAttack(el, level) {
 function glide(box, to, ms) {
   to = Math.max(0, Math.min(to, box.scrollWidth - box.clientWidth));
   cancelAnimationFrame(box._glide);
-  if (!ms) { box.scrollLeft = to; return; }
+  if (!ms || reducedMotion()) { box.scrollLeft = to; return; }
   const from = box.scrollLeft, d = to - from, t0 = performance.now();
   const f = (t) => {
     const p = Math.min(1, (t - t0) / ms), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
@@ -524,7 +533,7 @@ function agent(el, level, ctx) {
       <div class="card g-card ag">
         <div class="ag-top"><b class="ag-title">${esc(m.title)}</b><button class="btn ghost small-btn" id="hint">Hint</button></div>
         <p class="ag-brief">${esc(m.brief)}</p>
-        <div class="ag-msg" id="msg">${words.map((w, i) => `<span class="ag-w" data-i="${i}">${line(w, { grade: m.grade, slots: true })}</span>`).join('')}</div>
+        <div class="ag-msg" id="msg" tabindex="0" role="group" aria-label="Message">${words.map((w, i) => `<span class="ag-w" data-i="${i}">${line(w, { grade: m.grade, slots: true })}</span>`).join('')}</div>
         <p class="ag-after" id="after" hidden></p>
       </div>
       <div id="kb"></div>
@@ -597,18 +606,29 @@ function anagrams(el, level) {
     do { mixed = shuffle([...word]); } while (mixed.join('') === word && word.length > 1);
     used = false; solved = false;
     card.classList.remove('glow-good', 'glow-bad', 'solved');
-    box.innerHTML = mixed.map((l) => `<div class="an-t" data-l="${l}">${letterCell(l)}<span class="lbl"></span></div>`).join('');
+    box.innerHTML = mixed.map((l) => `<div class="an-t" data-l="${l}" tabindex="0" role="button" aria-roledescription="movable cell" aria-label="${esc(cellsLabel(LETTERS[l]))}">${letterCell(l)}<span class="lbl"></span></div>`).join('');
     $('#msg', el).textContent = 'Drag the cells into the right order.';
   }
   function check() {
     if (order() !== word) return;
     solved = true;
-    $$('.an-t', box).forEach((t) => { $('.lbl', t).textContent = t.dataset.l; });
-    card.classList.add('solved'); glow(card, true);
+    $$('.an-t', box).forEach((t) => { $('.lbl', t).textContent = t.dataset.l; t.setAttribute('aria-label', t.dataset.l); });
+    card.classList.add('solved'); glow(card, true, `The word is ${word}`);
     sc++; st = used ? 0 : st + 1; $('#sc', el).textContent = sc; $('#st', el).textContent = st;
     $('#msg', el).textContent = 'Solved!';
     timer = setTimeout(next, 1500);
   }
+  box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Cells. Use the left and right arrow keys to move the selected cell.');
+  box.addEventListener('keydown', (e) => {
+    const t = e.target.closest('.an-t'); if (!t || solved || !/^Arrow(Left|Right)$/.test(e.key)) return;
+    e.preventDefault();
+    if (e.key === 'ArrowLeft' && t.previousElementSibling) box.insertBefore(t, t.previousElementSibling);
+    else if (e.key === 'ArrowRight' && t.nextElementSibling) box.insertBefore(t.nextElementSibling, t);
+    else return;
+    t.focus();
+    const tiles = $$('.an-t', box); announce(`Position ${tiles.indexOf(t) + 1} of ${tiles.length}`);
+    check();
+  });
   box.addEventListener('pointerdown', (e) => {
     const t = e.target.closest('.an-t'); if (!t || solved) return;
     e.preventDefault();
@@ -674,7 +694,7 @@ function snowman(el) {
   let word, clue, guessed, miss, done;
   function render() {
     $('#clue', el).textContent = clue;
-    $('#word', el).innerHTML = [...word].map((l) => `<span class="hm-slot">${guessed.has(l) || done ? letterCell(l) : '<span class="cell blank">' + '<i></i>'.repeat(6) + '</span>'}${guessed.has(l) || done ? `<b>${l}</b>` : ''}</span>`).join(''); card.classList.toggle('done', done);
+    $('#word', el).innerHTML = [...word].map((l) => `<span class="hm-slot">${guessed.has(l) || done ? letterCell(l) : '<span class="cell blank" aria-hidden="true">' + '<i></i>'.repeat(6) + '</span><span class="visually-hidden">blank</span>'}${guessed.has(l) || done ? `<b>${l}</b>` : ''}</span>`).join(''); card.classList.toggle('done', done);
     const state = {}; guessed.forEach((k) => { state[k] = word.includes(k) ? 'hit' : 'miss'; });
     $('#keys', el).innerHTML = brailleKeys({ state, disabled: (k) => guessed.has(k) || done });
     $$('#art .parts .p', el).forEach((p, i) => p.classList.toggle('on', i < miss));
@@ -722,7 +742,7 @@ function mirror(el, level) {
     if (cfg.groups) opts = pick(cfg.groups);
     else { const t = pick(HARD); opts = [t, ...HARD.filter((x) => x !== t).sort((a, b) => near(t, b) - near(t, a) + (Math.random() - 0.5)).slice(0, 3)]; }
     target = pick(opts);
-    $('#cells', el).innerHTML = cell(cellFor(target));
+    $('#cells', el).innerHTML = cell(cellFor(target)); $('#cells', el).setAttribute('role', 'img'); $('#cells', el).setAttribute('aria-label', cellsLabel(cellFor(target))); say(cellsLabel(cellFor(target)));
     $('#opts', el).innerHTML = shuffle(opts).map((o) => `<button class="choice" data-o="${o}">${o}</button>`).join('');
   }
   function answer(ok) {
@@ -807,7 +827,8 @@ function maze(el, level) {
     grid.innerHTML = cells.map((row, r) => row.map((c, k) => {
       const here = pos[0] === r && pos[1] === k;
       const st = grid.dataset['s' + r + '_' + k] || '';
-      return `<button class="mz-cell ${st} ${here ? 'here' : ''}" data-r="${r}" data-c="${k}">${c ? cell(c) : '<span class="mz-flag">⚑</span>'}</button>`;
+      const where = `Row ${r + 1}, column ${k + 1}`, what = c ? cellsLabel(c) : 'start';
+      return `<button class="mz-cell ${st} ${here ? 'here' : ''}" data-r="${r}" data-c="${k}" aria-label="${where}: ${what}${here ? ', you are here' : st === 'walked' ? ', on your path' : st === 'trap' ? ', trap' : ''}">${c ? cell(c) : '<span class="mz-flag" aria-hidden="true">⚑</span>'}</button>`;
     }).join('')).join('');
   }
   grid.onclick = (e) => {

@@ -125,7 +125,7 @@ views[''] = () => {
 
   view.innerHTML = `
     <div class="home-head">
-      <div class="home-brand" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
+      <div class="home-brand" role="heading" aria-level="1" aria-label="Learn Braille">${$('.brand').innerHTML}</div>
     </div>
     ${isNew ? `<div class="hnew">${cellHTML(LETTERS.a, 'md')}${cellHTML(LETTERS.b, 'md')}<div><b>New here?</b><span>Start with Learn, then practise, then play.</span></div></div>` : ''}
     <section class="hsec">${learn}</section>
