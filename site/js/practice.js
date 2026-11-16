@@ -266,7 +266,7 @@ export const HELP = {
   read: ['A braille cell appears. Pick what it says.', 'Grade 2 signs that sit inside words are shown in a real word, with the rest of the word faded. Where the sign falls in the word tells you what it means.', 'The card glows green when you’re right, and red with a small shake when you’re not.', 'Each item’s pill goes from pale blue to dark blue, then green once you know it. Ones you miss come up more often.'],
   write: ['Tap the dots that make the letter or symbol. It checks itself as you go.', 'The card glows green when the dots are right, and red if you add one that doesn’t belong.', 'Longer symbols are built one cell at a time.'],
   words: ['Decode the word and type it. It checks as you type.', 'Pick Grade 1 or Grade 2 braille, and short, medium or long words. Words come from the 5,000 most common in English, in random order.', 'Hint reveals one cell at a time. Skip shows the answer.'],
-  compose: ['Write the words or sentence in braille, one cell at a time: tap the dots of a cell, then Add cell. Space adds a blank cell between words.', 'Check lines your cells up with the right braille: green cells are right, red ones are wrong or extra, and a dashed gap is a missing cell. The right braille is shown underneath, with each sign labelled.', 'Pick Grade 1 to spell everything out, or Grade 2 to use contractions. Hint removes wrong cells from the end, then adds the next right one.'],
+  compose: ['Write the words or sentence in braille, one cell at a time: tap the dots of the next cell. As soon as they match, the cell is added and you move on; spaces between words are added for you.', 'A dot that isn’t in the cell turns red: tap it again to take it off. The words and your braille sit on one line at the top, which scrolls along as you write.', 'Pick Grade 1 to spell everything out, or Grade 2 to use contractions. Hint fills in the next cell. Right first time counts the ones written with no red dots or hints.'],
   sweep: ['Put your finger on the line and slide right, like reading real braille.', 'Each letter fades in as you reach the end of its cell.', 'Hold your finger right of the middle and the line keeps moving, faster the further out you go. Lift it and you glide back to the middle.', 'Restart goes back to the start of the line. Next loads a new one.'],
 };
 export const HELP_KEYS = {
@@ -274,7 +274,7 @@ export const HELP_KEYS = {
   write: 'F, D and S are the left column, top to bottom; J, K and L are the right column, like a Perkins brailler. Backspace clears.',
   words: 'Just type the word; there is no need to press Enter.',
   sweep: 'Move the mouse along the line, or use the arrow keys.',
-  compose: 'F D S J K L are dots 1 to 6. Enter adds the cell (or checks, when the pad is empty), Space adds a space, Backspace deletes. With six-key typing on, press a whole cell at once.',
+  compose: 'F D S J K L are dots 1 to 6, and Enter goes to the next one when you finish. With six-key typing on, press a whole cell at once.',
 };
 export const helpHTML = (k) => HELP[k].map((t) => `<p>${esc(t)}</p>`).join('') + (HELP_KEYS[k] ? `<p class="help-keys">${icon('keyboard', 18)}<span>${esc(HELP_KEYS[k])}</span></p>` : '');
 views.practice = (q, sub) => {
@@ -309,7 +309,7 @@ export function quizMode(mode, q) {
     ${mode === 'words' ? `<div class="w-score" id="wScore"></div><div id="wkb"></div>` : `<div class="below-stage">
       <div class="mastery-h"><span><span id="pRound"></span>Known: <b id="known">0</b> of <b id="kTotal">0</b><span id="mLearn"></span> <span class="m-sep">·</span> <a class="st-link" href="#/practice/stats" data-stats>Stats</a></span><button type="button" class="m-more" id="mMore" aria-expanded="false" aria-label="Show all" hidden>${icon('chevron', 20)}</button></div>
       <div class="mastery" id="mastery" role="list" aria-label="Signs in this set"></div>
-      <p class="pl-link" id="plLink" hidden>Know some braille already? <a href="#/practice/place">Take the placement check</a></p>
+      <p class="pl-link" id="plLink" hidden>Know braille already? <a href="#/practice/place">Take the placement check</a></p>
       <p class="kb-hint">${mode === 'read' ? 'Keys: press the answer, or <b>1</b>–<b>4</b> for the choices. <b>Enter</b> moves on after a new sign.' : 'Keys: <b>F D S</b> and <b>J K L</b> are dots 1 2 3 and 4 5 6.'}</p>
     </div>`}`;
   const stage = $('#stage');

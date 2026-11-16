@@ -98,7 +98,7 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
   await page.close();
 }
 // Spot the right brailling and Watch Out: the right braille is the translator's, every wrong one differs from it
-// and from each other. Write: the alignment finds a missing, an extra and a wrong cell.
+// and from each other. Write: each text splits into its words with the translator's cells.
 {
   const page = await browser.newPage();
   await page.goto(base + '#/practice/read');
@@ -120,10 +120,11 @@ for (const [tag, opts] of [['phone', { viewport: { width: 412, height: 915 }, is
       if (new Set(all).size !== all.length) out.push(`spot ${sp.word}: two options are the same`);
       if (!sp.wrongs.length || sp.wrongs.some((w) => !w.why)) out.push(`spot ${sp.word}: missing a reason`);
     }
-    const t = (a, b) => W.align([...a], [...b]).map((x) => x.t[0]).join('');
-    if (t('abd', 'abcd') !== 'oomo') out.push('align: missing cell ' + t('abd', 'abcd'));
-    if (t('abxcd', 'abcd') !== 'ooeoo') out.push('align: extra cell ' + t('abxcd', 'abcd'));
-    if (t('abxd', 'abcd') !== 'oos' + 'o') out.push('align: wrong cell ' + t('abxd', 'abcd'));
+    for (const [t, g, n] of [['offer watch other', 1, 3], ['the cat and the dog', 2, 5], ['knowledge is power', 2, 3]]) {
+      const ws = W.composeWords(t, g);
+      if (ws.length !== n) out.push(`Write: ${t} split into ${ws.length} words`);
+      if (ws.map((w) => w.cells.join('')).join(' ') !== B.unicodeOf(B.translate(t, 'en', g))) out.push(`Write: ${t} cells differ from the translator`);
+    }
     return out;
   });
   if (bad.length) failures.push('Grade 2 rules / Write:\n  ' + bad.slice(0, 20).join('\n  '));
