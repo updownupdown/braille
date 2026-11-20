@@ -12,6 +12,7 @@ import { chord, sixKeyOn } from './sixkey.js';
 import { $, $$, cellHTML, esc, radios, bindRadios, shuffle, store, sheet } from './core.js';
 import { announce, feedback, cue, haptic, cellLabel, say, refocus, reducedMotion } from './a11y.js';
 import { logDay } from './home.js';
+import { activeNow } from './clock.js';
 import { setPeek } from './learn.js';
 
 export const COMPOSE_SRC = { words: 'Words', phrases: 'Sentences', formats: 'Everyday' };
@@ -153,7 +154,7 @@ export function composeMode(q) {
   // Tapping a dot: right when the pad now matches the cell; a dot that isn't in the cell is shown red until tapped off.
   function toggle(d) {
     if (done) return;
-    t0 = t0 || performance.now();
+    t0 = t0 || activeNow();
     if (pad.has(d)) { pad.delete(d); if (bad === d) bad = 0; paint(); return; }
     pad.add(d);
     const need = toDots(want());
@@ -164,13 +165,13 @@ export function composeMode(q) {
   // Six-key typing: a whole cell at once.
   function whole(cell) {
     if (done) return;
-    t0 = t0 || performance.now(); sixUsed = true;
+    t0 = t0 || activeNow(); sixUsed = true;
     if (cell === want()) { pad = new Set(); bad = 0; return accept(); }
     slip(`Not quite, ${cellLabel(cell)} isn't the next cell`);
   }
   function hint() {
     if (done) return;
-    slips++; helped = true; t0 = t0 || performance.now(); pad = new Set(toDots(want()));
+    slips++; helped = true; t0 = t0 || activeNow(); pad = new Set(toDots(want()));
     paint(); announce(`Hint: ${cellLabel(want())}`);
     setTimeout(() => { if (!done && stage.isConnected) accept(); }, 700);
   }
@@ -179,7 +180,7 @@ export function composeMode(q) {
     const ok = !slips;
     stats.total++; if (ok) stats.right++; logDay();
     // Words a minute for this line; a new best only counts without hints or peeks, and after at least two seconds.
-    const secs = (performance.now() - t0) / 1000, n = text.trim().split(/\s+/).length;
+    const secs = (activeNow() - t0) / 1000, n = text.trim().split(/\s+/).length;
     stats.wpm = Math.max(1, Math.round(n / (secs / 60))); stats.six = sixUsed; stats.counts = !helped && secs >= 2;
     if (stats.counts) { const k = speedKey(grade, sixUsed); if (stats.wpm > store.get(k, 0)) store.set(k, stats.wpm); }
     score();

@@ -211,6 +211,10 @@ export function route() {
   const raw = location.hash.replace(/^#\/?/, '');
   let [path, qs] = raw.split('?');
   path = path || '';
+  // Opening the app on Home (its start page) picks up where it was left: the last tab, game or lesson.
+  // Practice mode and set, the Learn section and Translate's state are remembered by those pages themselves.
+  const last = store.get('lastRoute', '');
+  if (!routed && !path && last && last !== location.hash) { location.replace(last); return; }
   if (path === 'sweep') path = 'practice/sweep';
   if (path === 'games/hangman') { location.replace('#/games/snowman'); return; }
   if (path.startsWith('signs')) path = 'reference/' + path;
@@ -226,6 +230,7 @@ export function route() {
   $$('[data-route]').forEach((a) => { const on = a.dataset.route === key; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
   document.title = TITLES[key];
+  if (key) store.set('lastRoute', '#/' + raw); else store.remove('lastRoute');
   // Screen readers: say which page this is, and move focus into it when the old focus is gone or was a main tab.
   if (routed) {
     const same = wasHref && !(was && was.isConnected) ? $$('#subbar [href]').find((x) => x.getAttribute('href') === wasHref) : null;
