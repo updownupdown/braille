@@ -13,6 +13,7 @@ import { $, $$, INDICATORS, S, announce, reducedMotion, bindRadios, cellHTML, ce
 import { logDay, openStats } from './home.js';
 import { feedback, haptic, cellsLabel, say, refocus, nativeKey } from './a11y.js';
 import { spotItems } from './rules.js';
+import { activeNow, MAX_ANSWER_MS } from './clock.js';
 import { composeMode } from './compose.js';
 import { placementView } from './placement.js';
 // ---------- practice data ----------
@@ -199,16 +200,40 @@ export function allowedPos(x) {
 // Shown on its own (pos null), no other reading of the same cells is offered, so the choices alone settle it.
 // Shown inside a real word (pos start/mid/end), the word settles it, so readings that can't sit there
 // become the best wrong answers (bb in rabbit is offered with be and ;).
+// Signs read as several letters (ch, er, people) get wrong answers that start with the same letter where there
+// are any, so the first letter never gives the answer away. A whole-word sign (people, quite, child) shown alone
+// also draws on whole-word signs from the rest of the course and then on common words, so it always has three.
 export function guessOptions(item, pool, pos = null) {
   const same = autoCourse().filter((u) => u.cells === item.cells && u.answer !== item.answer);
   const fits = same.filter((u) => !pos || allowedPos(u).includes(pos));
   const bad = new Set([item.answer, ...fits.map((u) => u.answer)]);
+  const first = /^[a-z]{2,}$/.test(item.answer) ? item.answer[0] : '';
+  const wordSign = first && !pos && isWordSign(item);
   const seen = new Set(), cands = [];
-  for (const x of [...pool, ...(pos ? same : [])]) {
-    if ((!pos && x.cells === item.cells) || bad.has(x.answer) || seen.has(x.answer)) continue;
-    seen.add(x.answer); cands.push([(x.cells === item.cells ? 100 : likeness(item, x)) + Math.random() * 9, x]);
+  const add = (x, base) => {
+    if ((!pos && x.cells === item.cells) || bad.has(x.answer) || seen.has(x.answer)) return;
+    seen.add(x.answer); cands.push([base + (first && x.answer[0] === first ? 200 : 0) + Math.random() * 9, x]);
+  };
+  for (const x of [...pool, ...(pos ? same : [])]) add(x, x.cells === item.cells ? 100 : likeness(item, x));
+  if (wordSign) {
+    const have = cands.filter(([sc]) => sc >= 200).length;
+    if (have < 3) for (const x of autoCourse()) if (x.answer[0] === first && isWordSign(x)) add(x, likeness(item, x) + 10 - 4 * Math.abs(x.answer.length - item.answer.length));
+    if (cands.filter(([sc]) => sc >= 200).length < 3) {
+      for (const w of sameLetterWords(first)) add({ key: 'w:' + w, answer: w }, 20 - 4 * Math.abs(w.length - item.answer.length));
+    }
   }
   return cands.sort((p, q) => q[0] - p[0]).slice(0, 3).map(([, x]) => x);
+}
+// A sign that stands for a whole word: wordsigns, shortforms and and/for/of/the/with.
+const isWordSign = (x) => x.kind === 'contraction' && (x.grp === 'Strong contractions' || !allowedPos(x).length);
+// Common words (three letters or more, among the 2,000 most used) by first letter, for Guess's same-letter wrong answers.
+let BY_LETTER = null;
+function sameLetterWords(l) {
+  if (!BY_LETTER) {
+    BY_LETTER = {};
+    for (const w of COMMON_WORDS.slice(0, 2000)) if (w.length > 2 && /^[a-z]+$/.test(w)) (BY_LETTER[w[0]] = BY_LETTER[w[0]] || []).push(w);
+  }
+  return BY_LETTER[l] || [];
 }
 // ---------- Guess: signs inside real words ----------
 // Grade 2 signs that live inside words are asked inside a real word: the sign at full strength, the rest of
@@ -343,7 +368,7 @@ export function quizMode(mode, q) {
   if (!CATS[state.cat].sets[state.set] || !setsFor(state.cat).some(([k]) => k === state.set)) state.set = setsFor(state.cat)[0][0];
   const m = mastery();
   // Practice runs in rounds of ROUND_LEN scored questions, then shows a summary (see renderSummary).
-  const newRound = () => ({ n: 0, right: 0, best: 0, run: 0, met: 0, start: Date.now(), log: [] });
+  const newRound = () => ({ n: 0, right: 0, best: 0, run: 0, met: 0, start: activeNow(), log: [] });
   let round = newRound(), queue = [];
   const rlen = () => round.len || ROUND_LEN;
   const picker = $('#picker'), body = $('#modeBody');
@@ -448,7 +473,7 @@ export function quizMode(mode, q) {
       if (item.key && auto()) autoResult(pre, item.key, ok);
       round.n++; round.run = ok ? round.run + 1 : 0; round.best = Math.max(round.best, round.run);
       if (ok) round.right++;
-      round.log.push({ item: mode === 'words' ? state.last : item, ok, ms: Date.now() - state.shownAt, wrong: ok ? null : state.wrongAns });
+      round.log.push({ item: mode === 'words' ? state.last : item, ok, ms: Math.min(MAX_ANSWER_MS, activeNow() - state.shownAt), wrong: ok ? null : state.wrongAns });
     }
     state.firstTry = false;
     if (mode === 'words') { wScore(); return; }
@@ -482,7 +507,7 @@ export function quizMode(mode, q) {
   }
 
   function renderRead() {
-    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true; state.shownAt = Date.now(); state.wrongAns = null;
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true; state.shownAt = activeNow(); state.wrongAns = null;
     if (item.spot) return renderSpot(item);
     stage.classList.remove('glow-good', 'glow-bad');
     let pool = items().filter((x) => x.key !== item.key);
@@ -561,7 +586,7 @@ export function quizMode(mode, q) {
   }
 
   function renderWrite() {
-    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true; state.shownAt = Date.now(); state.wrongAns = null;
+    const item = takeItem(); if (!item) return; state.last = item; state.firstTry = true; state.shownAt = activeNow(); state.wrongAns = null;
     stage.classList.remove('glow-good', 'glow-bad');
     const targets = [...item.cells];
     let done = false, shown = false;
@@ -610,7 +635,7 @@ export function quizMode(mode, q) {
 
   function renderWords() {
     const word = queue.length ? queue.shift() : wordDeck();
-    state.last = word; state.firstTry = true; state.shownAt = Date.now(); state.wrongAns = null;
+    state.last = word; state.firstTry = true; state.shownAt = activeNow(); state.wrongAns = null;
     stage.classList.remove('glow-good', 'glow-bad');
     const cells = toCells(translate(word, 'en', state.wgrade));
     let done = false, hinting = false;
@@ -709,7 +734,7 @@ export function quizMode(mode, q) {
   // End of a round: score, a few facts, then the signs worth another look (misses first, then the slowest).
   function renderSummary() {
     stage.classList.remove('glow-good', 'glow-bad'); haptic('done');
-    const secs = Math.round((Date.now() - round.start) / 1000);
+    const secs = Math.round((activeNow() - round.start) / 1000);
     const cellsOf = (x) => (mode === 'words' ? toCells(translate(x, 'en', state.wgrade)).map((c) => c.cell).join('') : x.cells);
     const keyOf = (x) => (mode === 'words' ? x : x.key);
     const seen = new Map();
@@ -722,7 +747,7 @@ export function quizMode(mode, q) {
     const slow = [...seen.values()].filter((s) => !s.miss && s.ms >= 5000).sort((a, b) => b.ms - a.ms);
     const look = [...missed, ...slow].slice(0, 5);
     const note = (s) => {
-      if (!s.miss) return `Slow: ${Math.round(s.ms / 1000)} s`;
+      if (!s.miss) return s.ms >= MAX_ANSWER_MS ? 'Slow: over a minute' : `Slow: ${Math.round(s.ms / 1000)} s`;
       const w = [...s.wrong.entries()].sort((a, b) => b[1] - a[1])[0];
       const times = s.miss > 1 ? (s.miss === 2 ? ', twice' : `, ${s.miss} times`) : '';
       return w ? `Mixed up with ${w[0]}${times}` : `Missed${times}`;
@@ -818,10 +843,10 @@ export function sweepMode(q) {
     el.innerHTML = [pass, extra || `${words()} words${b ? ` · best ${b} words a minute` : ''}`].filter(Boolean).join(' · ');
   };
   function timing(pos) {
-    if (!t0 && active) t0 = performance.now();
+    if (!t0 && active) t0 = activeNow();
     const last = cells.length - 1;
     if (t0 && !tDone && last >= 0 && pos > lefts[last] + widths[last]) {
-      tDone = performance.now(); haptic('done');
+      tDone = activeNow(); haptic('done');
       const secs = (tDone - t0) / 1000, wpm = Math.round(words() / (secs / 60));
       const bk = 'swBest' + S.swGrade, b = Math.max(store.get(bk, 0), wpm);
       const counts = secs > 2 && !peeked, best = counts ? b : store.get(bk, 0);

@@ -1534,7 +1534,7 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .crow.has-ex .ex-tog.open { color: var(--accent); }
 .crow-ex { grid-column: 1 / -1; display: grid; gap: 8px; margin: 10px 0 4px; }
 .crow-ex[hidden] { display: none; }
-.g2ex { display: grid; grid-template-columns: 22px auto minmax(0, 1fr); align-items: center; column-gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.g2ex { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; column-gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
 .g2ex-mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
 .g2ex.ok .g2ex-mark { color: #fff; background: var(--good); }
 .g2ex.no { border-color: color-mix(in srgb, #c97a1a 45%, var(--line)); background: color-mix(in srgb, #c97a1a 7%, var(--surface)); }
@@ -1543,7 +1543,11 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .g2ex-t b { font-weight: 600; }
 .g2ex.no .g2ex-t b { color: #b76a10; }
 .g2ex-t small { color: var(--muted); font-size: .8rem; }
-.g2ex-b .braille-line { flex-wrap: nowrap; }
+/* Braille then words; a long example wraps word by word and its words drop below the braille. */
+.g2ex-c { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.g2ex-b { min-width: 0; max-width: 100%; }
+.g2ex-t { flex: 1 1 7em; }
+.crow-ex { min-width: 0; }
 .g2-compare { padding: 0; overflow: hidden; }
 .g2c-scroll { overflow-x: auto; padding: 14px 16px; scrollbar-width: thin; }
 .g2c-grid { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content; column-gap: 14px; row-gap: 10px; align-items: end; width: max-content; }

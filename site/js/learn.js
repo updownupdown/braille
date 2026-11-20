@@ -126,7 +126,7 @@ export function grade2Section(key = 'grade2') {
     const same = tr.map((x) => x.cells).join('') === cells.join('');
     return [{ cells: [...uni][0], print: pre, kind: 'contraction' }, ...(same ? tr : [...rest].map((ch, i) => ({ cells: cells[i] || '', print: ch, kind: 'letter' })))];
   };
-  const exHTML = (x, pre = '') => !x ? '' : [...x.ok.map((t, i) => [t, 'ok', '', x.okBraille && x.okBraille[i]]), ...(x.no ? [[x.no.text, 'no', x.no.note]] : [])].map(([t, k, n, uni]) => `<div class="g2ex ${k}"><span class="g2ex-mark" aria-label="${k === 'ok' ? 'Correct use' : 'Not this sign'}">${k === 'ok' ? icon('check', 16) : icon('warn', 16)}</span><span class="g2ex-b">${lineHTML(uni ? fixedParts(t, uni, pre) : translate(t, 'en', 2), { cls: 'sm' })}</span><span class="g2ex-t"><b>${esc(t)}</b>${n ? `<small>${esc(n)}</small>` : ''}</span></div>`).join('');
+  const exHTML = (x, pre = '') => !x ? '' : [...x.ok.map((t, i) => [t, 'ok', '', x.okBraille && x.okBraille[i]]), ...(x.no ? [[x.no.text, 'no', x.no.note]] : [])].map(([t, k, n, uni]) => `<div class="g2ex ${k}"><span class="g2ex-mark" aria-label="${k === 'ok' ? 'Correct use' : 'Not this sign'}">${k === 'ok' ? icon('check', 16) : icon('warn', 16)}</span><span class="g2ex-c"><span class="g2ex-b">${lineHTML(uni ? fixedParts(t, uni, pre) : translate(t, 'en', 2), { cls: 'sm' })}</span><span class="g2ex-t"><b>${esc(t)}</b>${n ? `<small>${esc(n)}</small>` : ''}</span></span></div>`).join('');
   // These three only ever follow other letters, so a pale hyphen goes in front.
   const PRE = { ound: '-', ance: '-', sion: '-' };
   const row = (e, i) => {

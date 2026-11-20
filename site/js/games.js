@@ -2,6 +2,7 @@
 import { LETTERS, IND, translate, toCells, toDots, unicodeOf } from './braille.js';
 import { wrongWays } from './rules.js';
 import { WORDS } from './data.js';
+import { activeNow } from './clock.js';
 import { chord } from './sixkey.js';
 import { gameStore } from './storage.js';
 import { SIGNS, PHRASES } from './phrases.js';
@@ -629,7 +630,7 @@ function timeAttack(el, level) {
   let cur, sc = 0, end = 0, raf = 0, running = false;
   const nextItem = () => { let x; do { x = pick(pool); } while (x === cur && pool.length > 1); cur = x; const cs = $('#cells', el); cs.innerHTML = [...cellsOf(x)].map((c) => cell(c)).join(''); cs.setAttribute('role', 'img'); cs.setAttribute('aria-label', cellsLabel(cellsOf(x))); say(cellsLabel(cellsOf(x))); };
   function tick() {
-    const left = Math.max(0, end - performance.now());
+    const left = Math.max(0, end - activeNow());
     setTimer(el, left / 60000, Math.ceil(left / 1000));
     if (!left) return over();
     raf = requestAnimationFrame(tick);
@@ -641,7 +642,7 @@ function timeAttack(el, level) {
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
-  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; $('#skip', el).hidden = false; running = true; end = performance.now() + 60000; inp.value = ''; nextItem(); raf = requestAnimationFrame(tick); }
+  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; $('#skip', el).hidden = false; running = true; end = activeNow() + 60000; inp.value = ''; nextItem(); raf = requestAnimationFrame(tick); }
   const check = () => {
     if (!running) return;
     const v = inp.value.trim().toLowerCase(); if (!v) return;
@@ -915,9 +916,9 @@ function mirror(el, level) {
     if (ok) sc++;
     $('#sc', el).textContent = sc; glow(card, ok); next();
   }
-  function tick(t) {
+  function tick() {
     if (!running) return;
-    const left = Math.max(0, end - t);
+    const left = Math.max(0, end - activeNow());
     setTimer(el, left / 30000, Math.ceil(left / 1000));
     if (!left) return over();
     raf = requestAnimationFrame(tick);
@@ -929,7 +930,7 @@ function mirror(el, level) {
     ov.innerHTML = `<b class="g-big">${sc}</b><small>Best ${b}</small><button class="btn primary" id="go">Play again</button>`;
     $('#go', el).onclick = go;
   }
-  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; running = true; end = performance.now() + 30000; next(); raf = requestAnimationFrame(tick); }
+  function go() { sc = 0; $('#sc', el).textContent = 0; $('#ov', el).hidden = true; running = true; end = activeNow() + 30000; next(); raf = requestAnimationFrame(tick); }
   $('#opts', el).onclick = (e) => { const b = e.target.closest('[data-o]'); if (b && running) answer(b.dataset.o === target); };
   const off = keys((e) => { if (!running) return; const k = e.key.toLowerCase(); if (/^[a-z]$/.test(k) && $(`[data-o="${k}"]`, el)) answer(k === target); });
   $('#go', el).onclick = go;
