@@ -70,6 +70,28 @@ for (const [tag, opts, settings] of SIZES) {
   }
   await ctx.close();
 }
+// Write: a wrong dot left on never lets a cell through, even when the pad has as many dots as the cell;
+// the cell goes in only once the pad holds exactly its dots.
+{
+  const page = await browser.newPage();
+  await page.goto(base + '#/practice/compose?src=words');
+  await page.waitForTimeout(400);
+  const need = await page.evaluate(async () => {
+    const B = await import('./js/braille.js');
+    const w = document.querySelector('.cw-w .cw-p').textContent;
+    return B.toDots([...B.unicodeOf(B.translate(w, 'en', 1))][0]);
+  });
+  const wrong = [1, 2, 3, 4, 5, 6].find((d) => !need.includes(d));
+  const written = () => page.$$eval('.cw-c:not(.now)', (els) => els.length);
+  await page.click(`#cwPad [data-d="${wrong}"]`);
+  for (const d of need.slice(0, -1)) await page.click(`#cwPad [data-d="${d}"]`);
+  if (await written()) failures.push('Write: a cell with a wrong dot was accepted');
+  await page.click(`#cwPad [data-d="${need[need.length - 1]}"]`);
+  if (await written()) failures.push('Write: a cell with a wrong dot still on was accepted');
+  await page.click(`#cwPad [data-d="${wrong}"]`);
+  if ((await written()) !== 1) failures.push('Write: taking the wrong dot off did not complete the cell');
+  await page.close();
+}
 // Guess: exactly one choice may be right. Shown alone, no wrong choice may share the sign's cells
 // (b is also "but", bb is also "be" and ";"); shown inside a word, only readings that can't sit there may.
 {
