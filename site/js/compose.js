@@ -89,9 +89,10 @@ export function composeMode(q) {
       el.querySelector('.cw-cells').innerHTML = h;
       el.setAttribute('aria-hidden', 'true');
     });
+    const need = done ? [] : toDots(want());
     $$('#cwPad button', stage).forEach((b) => {
       const d = Number(b.dataset.d), on = pad.has(d);
-      b.classList.toggle('on', on); b.classList.toggle('bad', d === bad); b.setAttribute('aria-pressed', String(on));
+      b.classList.toggle('on', on); b.classList.toggle('bad', on && !need.includes(d)); b.setAttribute('aria-pressed', String(on));
     });
     const strip0 = $('#cwStrip', stage);
     if (strip0) strip0.setAttribute('aria-label', done ? `Written in Grade ${grade}: ${text}` : `Write in Grade ${grade} braille: ${text}. Now writing ${words[wi].print}, ${ci ? `${ci} ${ci === 1 ? 'cell' : 'cells'} done` : 'first cell'}${pad.size ? `, dots ${[...pad].sort().join('-')} set` : ''}`);
@@ -151,16 +152,21 @@ export function composeMode(q) {
     const p = $('#cwPad', stage); p.classList.remove('wrong'); void p.offsetWidth; p.classList.add('wrong');
     cue(false); announce(what);
   }
-  // Tapping a dot: right when the pad now matches the cell; a dot that isn't in the cell is shown red until tapped off.
+  // Tapping a dot: right only when the pad holds exactly the cell's dots, as in Draw, so a red dot left on never
+  // lets a cell through. A dot that isn't in the cell is shown red until tapped off; taking it off can complete the cell.
   function toggle(d) {
     if (done) return;
     t0 = t0 || activeNow();
-    if (pad.has(d)) { pad.delete(d); if (bad === d) bad = 0; paint(); return; }
-    pad.add(d);
     const need = toDots(want());
-    if (!need.includes(d)) { bad = d; paint(); return slip(`Dot ${d} isn't in this cell`); }
+    if (pad.has(d)) {
+      pad.delete(d);
+      bad = [...pad].find((x) => !need.includes(x)) || 0;
+    } else {
+      pad.add(d);
+      if (!need.includes(d)) { bad = d; paint(); return slip(`Dot ${d} isn't in this cell`); }
+    }
     paint();
-    if (need.length === pad.size) accept();
+    if (need.length === pad.size && need.every((x) => pad.has(x))) accept();
   }
   // Six-key typing: a whole cell at once.
   function whole(cell) {
