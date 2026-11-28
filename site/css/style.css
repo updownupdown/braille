@@ -1288,7 +1288,13 @@ body[data-page="home"] .top:not(.scrolled) { border-bottom-color: transparent; b
 .tb-dot.on { background: var(--ink); box-shadow: none; }
 .tb-add { flex: none; background: none; cursor: pointer; }
 
-.tb-h { font-size: 1rem; font-weight: 600; margin: 0 0 8px; }
+/* Braille to text: readings scroll in a box that fills the screen; the cells stay along the bottom. */
+#trDots:not([hidden]) { display: flex; flex-direction: column; gap: 12px; height: calc(100dvh - var(--head-h, 120px) - var(--tabbar-h, 0px) - env(safe-area-inset-bottom) - 22px); min-height: 360px; }
+.tb-out { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); scrollbar-width: thin; }
+.tb-out > p { margin: 12px 0; }
+.tb-out .tb-list li:last-child { border-bottom: 0; }
+#trDots .tb-row { flex: none; }
+.tb-pre { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600; letter-spacing: .02em; color: var(--accent); background: var(--accent-soft); }
 .tb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .tb-list li { padding: 12px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 .tb-list li > b { font-size: 1.25rem; font-weight: 600; }

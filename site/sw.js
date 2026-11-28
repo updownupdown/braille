@@ -7,7 +7,7 @@ const NET_WAIT = 3000; // ms to wait for the network before falling back to the 
 let slowUntil = 0; // after a slow fetch, serve cached files at once until this time
 const SHELL = ['./', './index.html', './css/style.css', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './fonts/outfit-latin.woff2', './fonts/outfit-latin-ext.woff2',
   './js/app.js', './js/core.js', './js/home.js', './js/practice.js', './js/learn.js', './js/translate.js', './js/braille.js', './js/data.js', './js/games.js', './js/gamedata.js', './js/wordlist.js', './js/phrases.js',
-  './js/snowman.js', './js/agentcases.js', './js/g2examples.js', './js/trivia2.js', './js/langcontractions.js', './js/sixkey.js', './js/storage.js', './js/passages.js', './js/a11y.js', './js/rules.js', './js/compose.js', './js/placement.js', './js/milestones.js', './js/clock.js', './js/preueb.js'];
+  './js/snowman.js', './js/agentcases.js', './js/g2examples.js', './js/trivia2.js', './js/langcontractions.js', './js/sixkey.js', './js/storage.js', './js/passages.js', './js/a11y.js', './js/rules.js', './js/compose.js', './js/placement.js', './js/milestones.js', './js/clock.js', './js/preueb.js', './js/readbraille.js', './js/ebaewords.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE)

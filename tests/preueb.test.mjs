@@ -28,3 +28,9 @@ test('dropped contractions appear as in liblouis EBAE', { skip: !hasLou && 'libl
     assert.equal(lou(w).slice(at, at + cells.length), cells, print);
   }
 });
+
+test('pre-UEB word list for Braille to text is up to date with liblouis', { skip: !hasLou && 'liblouis not installed' }, async () => {
+  const { build, FILE } = await import('./ebaewords.mjs');
+  const { readFileSync } = await import('node:fs');
+  assert.equal(readFileSync(FILE, 'utf8'), build(), 'run: node tests/ebaewords.mjs');
+});

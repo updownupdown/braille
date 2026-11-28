@@ -1,58 +1,13 @@
 // Translate: text to braille and braille to text.
-import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, translate, unicodeOf } from './braille.js';
+import { fromDots, translate, unicodeOf } from './braille.js';
+import { readBraille } from './readbraille.js';
 import { LANG_INFO } from './data.js';
 
 import { chord } from './sixkey.js';
 
-import { $, INDICATORS, bindRadios, cellHTML, dropdown, esc, icon, lineHTML, radios, setSub, setTitle, store, view, views } from './core.js';
+import { $, bindRadios, cellHTML, dropdown, esc, icon, lineHTML, radios, setSub, setTitle, store, view, views } from './core.js';
 import { plateHTML } from './learn.js';
 // ---------- translate ----------
-// ---------- braille to text: every sign that a run of cells could be ----------
-export let BR_INDEX = null;
-export function brailleIndex() {
-  if (BR_INDEX) return BR_INDEX;
-  const m = new Map();
-  const add = (cells, text, kind) => {
-    if (!cells) return;
-    const a = m.get(cells) || [];
-    if (!a.some((x) => x.text === text || (x.kind === kind && kind !== 'letter'))) a.push({ text, kind });
-    m.set(cells, a);
-  };
-  Object.entries(LETTERS).forEach(([l, c]) => add(c, l, 'letter'));
-  Object.entries(CONTRACTIONS).forEach(([cat, g]) => g.items.forEach(([t, d]) => add(cellsOf(d), t, cat.toLowerCase().replace(/s$/, ''))));
-  Object.entries(UEB_PUNCT).forEach(([ch, v]) => v && add(v[0], ch, v[1]));
-  INDICATORS.forEach(([name, d]) => add(cellsOf(d), '', name));
-  return (BR_INDEX = m);
-}
-export const DIGIT_OF_CELL = Object.fromEntries('abcdefghij'.split('').map((l, i) => [LETTERS[l], String((i + 1) % 10)]));
-// All ways to read a row of cells (blank cell = space), most compact first.
-export function readBraille(cells) {
-  const idx = brailleIndex(), out = [];
-  const go = (i, toks, cap) => {
-    if (out.length >= 60) return;
-    if (i >= cells.length) { out.push(toks); return; }
-    if (cells[i] === '⠀') { go(i + 1, [...toks, { text: ' ', kind: 'space', cells: '⠀' }], 0); return; }
-    if (cells[i] === IND.number) {
-      let j = i + 1, d = '';
-      while (j < cells.length && DIGIT_OF_CELL[cells[j]]) d += DIGIT_OF_CELL[cells[j++]];
-      if (d) { go(j, [...toks, { text: d, kind: 'number', cells: cells.slice(i, j) }], 0); }
-    }
-    for (let L = Math.min(4, cells.length - i); L >= 1; L--) {
-      const c = cells.slice(i, i + L);
-      if (c.includes('⠀')) continue;
-      for (const e of idx.get(c) || []) {
-        if (e.kind === 'capital letter') { go(i + L, [...toks, { text: '', kind: e.kind, cells: c }], 1); continue; }
-        if (e.kind === 'capital word') { go(i + L, [...toks, { text: '', kind: e.kind, cells: c }], 2); continue; }
-        if (!e.text) { if (L === cells.length) go(i + L, [...toks, { text: '', kind: e.kind, cells: c }], cap); continue; }
-        const t = cap === 2 ? e.text.toUpperCase() : cap === 1 ? e.text[0].toUpperCase() + e.text.slice(1) : e.text;
-        go(i + L, [...toks, { text: t, kind: e.kind, cells: c }], cap === 2 ? 2 : 0);
-      }
-    }
-  };
-  go(0, [], 0);
-  const seen = new Set();
-  return out.sort((a, b) => a.length - b.length).filter((r) => { const k = r.map((t) => t.text + '|' + t.kind).join('/'); if (seen.has(k)) return false; seen.add(k); return true; });
-}
 // Direction pictograms: a print "A", an arrow, and a braille cell (or the reverse).
 export function dirIcon(dir) {
   const A = (x) => `<path d="M${x} 17 ${x + 5} 5l5 12M${x + 2} 13h6"/>`;
@@ -123,7 +78,7 @@ views.translate = (q) => {
   document.addEventListener('keydown', onKey); document.addEventListener('keyup', onKeyUp);
   return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); };
 };
-// Braille to text: tap dots across one or more cells; every possible reading is listed.
+// Braille to text: tap dots across one or more cells along the bottom; the likeliest readings are listed above, best first.
 export let dotsKey = null, dotsKeyUp = null, dotsClear = null;
 export function dotsEditor(root) {
   let cells = store.get('trDots', [[5], [1, 2, 4]]);
@@ -137,10 +92,14 @@ export function dotsEditor(root) {
     // Redrawing replaces the buttons: put keyboard focus back on the same one.
     const a = document.activeElement, keep = a && root.contains(a) ? (a.dataset.n ? `.tb-cell[data-c="${a.closest('.tb-cell').dataset.c}"] [data-n="${a.dataset.n}"]` : a.id ? '#' + a.id : null) : null;
     root.innerHTML = `
+      <div id="tbOut" class="tb-out" role="region" aria-label="Readings" aria-live="polite" tabindex="0"></div>
       <div class="tb-row" id="tbRow">${cells.map((d, i) => `<div class="tb-col"><div class="tb-cell" data-c="${i}">${POS.map((n) => `<button type="button" class="tb-dot ${d.includes(n) ? 'on' : ''}" data-n="${n}" aria-label="Cell ${i + 1}, dot ${n}" aria-pressed="${d.includes(n)}"></button>`).join('')}</div><button type="button" class="tb-del" data-del="${i}" aria-label="Remove cell ${i + 1}">${icon('trash', 18)}</button></div>`).join('')}
-        <button type="button" class="tb-add" id="tbAdd"><span>+</span>Add cell</button></div>
-      <div id="tbOut" class="tb-out" aria-live="polite"></div>`;
+        <button type="button" class="tb-add" id="tbAdd"><span>+</span>Add cell</button></div>`;
     if (keep) { const k = $(keep, root); if (k) k.focus(); }
+    // Keep the cell being written in view; a new cell at the end brings the Add button along.
+    const row = $('#tbRow', root), at = $(`.tb-cell[data-c="${cur}"]`, root);
+    if (cur === cells.length - 1) row.scrollLeft = row.scrollWidth;
+    else if (at) { const r = at.getBoundingClientRect(), rr = row.getBoundingClientRect(); if (r.left < rr.left || r.right > rr.right) row.scrollLeft += r.left - rr.left - 12; }
     $('#tbRow', root).onclick = (e) => {
       const add = e.target.closest('#tbAdd');
       if (add) { cells.push([]); cur = cells.length - 1; save(); draw(); return; }
@@ -160,11 +119,9 @@ export function dotsEditor(root) {
     if (!str.replace(/⠀/g, '')) { out.innerHTML = '<p class="muted">Tap dots to build one or more cells. Leave a cell empty for a space.</p>'; return; }
     const reads = readBraille(str);
     if (!reads.length) { out.innerHTML = `<p class="muted">No known reading for this. Check the dots, or try it as separate cells.</p>`; return; }
-    const shown = reads.slice(0, 8);
-    out.innerHTML = `<h3 class="tb-h">${reads.length > 1 ? 'Possible readings' : 'Reading'}</h3>
-      <ol class="tb-list">${shown.map((r) => `<li><b>${esc(r.map((t) => t.text).join('') || r.map((t) => t.kind).join(' + '))}</b>
-        <span>${r.filter((t) => t.kind !== 'space').map((t) => `<span class="tb-tok"><span class="tb-c">${[...t.cells].map((c) => cellHTML(c, 'xs')).join('')}</span>${t.text ? `<i>${esc(t.text)}</i>` : ''} ${esc(t.kind)}</span>`).join('')}</span></li>`).join('')}</ol>
-      ${reads.length > shown.length ? `<p class="muted small">and ${reads.length - shown.length} less likely readings.</p>` : ''}`;
+    out.innerHTML = `<ol class="tb-list">${reads.map((r) => `<li><b>${esc(r.text)}${r.pre ? ' <span class="tb-pre" title="Read as pre-UEB (older) braille">Pre-UEB</span>' : ''}</b>
+        <span>${r.toks.filter((t) => t.kind !== 'space').map((t) => `<span class="tb-tok"><span class="tb-c">${[...t.cells].map((c) => cellHTML(c, 'xs')).join('')}</span>${t.text ? `<i>${esc(t.text)}</i>` : ''} ${esc(t.kind)}</span>`).join('')}</span></li>`).join('')}</ol>`;
+    out.scrollTop = 0;
   }
   const KEYS = { f: 1, d: 2, s: 3, j: 4, k: 5, l: 6 };
   // Six-key mode: a chord fills the current cell (or a new one after a filled cell) and the next chord goes after it.
