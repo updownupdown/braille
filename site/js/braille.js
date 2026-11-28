@@ -151,6 +151,15 @@ export const CONTRACTIONS = {
 };
 export const cellsOf = (dotSeq) => dotSeq.split(' ').map(fromDots).join('');
 
+// Indicators: name, dots, what it does.
+export const INDICATORS = [
+  ['capital letter', '6', 'Next letter is a capital.'], ['capital word', '6 6', 'The whole next word is in capitals.'],
+  ['capital passage', '6 6 6', 'Three or more words in capitals, ended by the terminator.'], ['capitals terminator', '6 3', 'Ends a capital word or passage.'],
+  ['number sign', '3456', 'Letters a–j that follow are digits 1–0.'], ['grade 1 symbol', '56', 'Read the next cell as a plain letter, not a contraction.'],
+  ['grade 1 word', '56 56', 'Read the next word uncontracted.'], ['grade 1 passage', '56 56 56', 'Uncontracted passage.'],
+  ['italic', '46 23', 'Italic symbol (a different sign marks a whole italic word).'], ['bold', '45 23', 'Bold symbol.'],
+];
+
 // Build lookup tables for the grade 2 translator.
 const WORDSIGN = {};
 const add = (w, d) => { if (!WORDSIGN[w]) WORDSIGN[w] = cellsOf(d); };

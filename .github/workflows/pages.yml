@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 22
       - name: Translator checks
-        run: node --test tests/translator.test.mjs
+        run: node --test tests/translator.test.mjs tests/readbraille.test.mjs
       - name: Pre-UEB examples match liblouis EBAE
         run: sudo apt-get update -q && sudo apt-get install -y liblouis-bin liblouis-data && node --test tests/preueb.test.mjs
       - name: Install Playwright

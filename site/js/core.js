@@ -1,6 +1,6 @@
 // Shared helpers: storage, icons, settings, braille cells, the modal sheet, drop-downs, the header, Settings and the symbol dictionary.
 import { store, snapshot, restore, clear } from './storage.js';
-import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, cellsOf, fromDots, toDots, dotsLabel, translate, toCells } from './braille.js';
+import { LETTERS, IND, UEB_PUNCT, CONTRACTIONS, INDICATORS, cellsOf, fromDots, toDots, dotsLabel, translate, toCells } from './braille.js';
 
 // ---------- helpers ----------
 export const $ = (s, el = document) => el.querySelector(s);
@@ -427,13 +427,7 @@ for (const [p, v] of Object.entries(UEB_PUNCT)) {
   DICT.push({ print: p, cells: v[0], cat: 'Punctuation & symbols', note: v[1], group: 'Punctuation' });
 }
 DICT.push({ print: '“ ”', cells: fromDots('236') + fromDots('356'), cat: 'Punctuation & symbols', note: 'open and close quotes', group: 'Punctuation' });
-export const INDICATORS = [
-  ['capital letter', '6', 'Next letter is a capital.'], ['capital word', '6 6', 'The whole next word is in capitals.'],
-  ['capital passage', '6 6 6', 'Three or more words in capitals, ended by the terminator.'], ['capitals terminator', '6 3', 'Ends a capital word or passage.'],
-  ['number sign', '3456', 'Letters a–j that follow are digits 1–0.'], ['grade 1 symbol', '56', 'Read the next cell as a plain letter, not a contraction.'],
-  ['grade 1 word', '56 56', 'Read the next word uncontracted.'], ['grade 1 passage', '56 56 56', 'Uncontracted passage.'],
-  ['italic', '46 23', 'Italic symbol (a different sign marks a whole italic word).'], ['bold', '45 23', 'Bold symbol.'],
-];
+export { INDICATORS };
 for (const [p, d, n] of INDICATORS) DICT.push({ print: p, cells: cellsOf(d), cat: 'Indicator', note: n, group: 'Indicators' });
 for (const [cat, { blurb, items }] of Object.entries(CONTRACTIONS)) for (const [p, d, n] of items) DICT.push({ print: p, cells: cellsOf(d), cat, note: n || '', blurb, group: cat });
 export const KIND_OF_GROUP = { Letters: 'letter', Numbers: 'digit', Punctuation: 'punct', Indicators: 'indicator' };
