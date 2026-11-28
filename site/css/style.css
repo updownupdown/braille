@@ -1788,6 +1788,22 @@ body[data-page="games"] #view > .sec-h:first-child { margin-top: 20px; }
 .mk-row.no .braille-line { opacity: .85; }
 .mk-row .braille-line { flex-wrap: wrap; }
 .mk-why { margin: 0; font-size: .85rem; color: var(--muted); }
+/* Pre-UEB braille: example cards (pre-UEB, then UEB) and the punctuation table */
+.pu-card .mk-row { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+.pu-tag { font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.pu-ueb .pu-tag { color: var(--muted); }
+.pu-grid { margin-bottom: 4px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); }
+.prose ul.pu-list, .g2-body ul.pu-list { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 4px; }
+.pu-table { --ps: 7px; display: grid; border-top: 1px solid var(--line); margin-bottom: 22px; max-width: 680px; }
+.pu-row { display: grid; grid-template-columns: minmax(0, 1fr) calc(var(--ps) * 17.5) calc(var(--ps) * 13); column-gap: 12px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--line); }
+.pu-row b { font-weight: 600; font-size: .95rem; }
+.pu-p { color: var(--muted); font-weight: 400; margin-left: 2px; }
+.pu-head span { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.pu-c { display: flex; gap: 2px; }
+.pu-c .cell { --s: var(--ps); }
+.pu-row .cnote { grid-column: 1 / -1; font-size: .8rem; color: var(--muted); margin-top: 4px; }
+@media (max-width: 360px) { .pu-table { --ps: 6px; } }
+@media (min-width: 700px) { .pu-table { --ps: 9px; } }
 
 /* ---------- Contraction Hunt ---------- */
 :is(.gc-chunt, a[href="#/games/chunt"] .hrow-ic) { --gc: #a0602a; }

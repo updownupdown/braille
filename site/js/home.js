@@ -76,11 +76,11 @@ export function statsHTML() {
   </div>`;
 }
 // Home: each main section in tab order, with "continue" (if visited), a suggestion based on progress, and a carousel of the rest.
-export const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
+export const SEC_ICON = { overview: 'info', alphabet: 'alpha', numbers: 'hash', grade2: 'layers', g2words: 'words', g2strong: 'layers', g2lower: 'layers', g2affix: 'layers', g2short: 'edit', preueb: 'book', signs: 'sign', science: 'sigma', languages: 'globe', systems: 'map', cheatsheet: 'print' };
 // Each lesson's icon is a braille cell from that lesson: full cell, a, number sign, and, but (b), the, en, one, ab (about).
 export const LESSON_CELLS = { overview: '⠿', alphabet: '⠁', numbers: '⠼', grade2: '⠯', g2words: '⠃', g2strong: '⠮', g2lower: '⠢', g2affix: '⠐⠕', g2short: '⠁⠃' };
 export const secIcon = (k, done = false, size = 24) => (done ? icon('check', size) : LESSON_CELLS[k] ? `<span class="lic">${[...LESSON_CELLS[k]].map((c) => cellHTML(c)).join('')}</span>` : icon(SEC_ICON[k], size));
-export const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
+export const SEC_DESC = { overview: 'How a cell works · 2 min', alphabet: 'a–z in three simple rows', numbers: 'Digits, capitals, punctuation', grade2: 'Why contract, and where to start', g2words: 'Whole words in one cell', g2strong: 'and, for, the, ch, ing…', g2lower: 'The lower-dot signs', g2affix: 'Two-cell word parts', g2short: '75 common words', preueb: 'Reading older braille books', signs: 'Real-world signage', science: 'Equations and Nemeth', languages: 'Six other languages', systems: 'Braille around the world', cheatsheet: 'Print a one-page sheet' };
 export const GAME_ORDER = ['memory', 'wordle', 'mirror', 'rain', 'snowman', 'anagrams', 'time', 'maze', 'signhunt', 'chunt', 'proof', 'agent', 'trivia', 'riddles'];
 views[''] = () => {
   setTitle('Home'); setSub('');
