@@ -3,6 +3,7 @@
 import { openStats } from './home.js';
 import './practice.js';
 import './learn.js';
+import { DROPPED } from './preueb.js';
 import './translate.js';
 import { toDots, translate, unicodeOf, LANGS } from './braille.js';
 import { SCIENCE_SYMBOLS, LANG_INFO, SYSTEMS, HISTORY, SIGN_REGIONS } from './data.js';
@@ -70,6 +71,8 @@ export function buildIndex() {
     act: () => openSheet(e.group === 'Letters' ? letterDetail(e.print) : symbolDetail(e), { title: e.group === 'Letters' ? 'Letter ' + e.print : 'Symbol' }),
   }));
   REF_SECTIONS.forEach(([k, t]) => out.push({ title: t, sub: 'Learn section', sec: k, page: true, act: nav('#/reference/' + k) }));
+  out.push({ title: 'EBAE', sub: 'Pre-UEB braille · reading older books', sec: 'preueb', page: true, act: nav('#/reference/preueb') });
+  for (const [cells, print] of DROPPED) out.push({ title: print, sub: 'Pre-UEB contraction · dropped in UEB', cells, kind: 'contraction', sec: 'preueb', act: nav('#/reference/preueb') });
   Object.entries(MODES).forEach(([k, t]) => out.push({ title: t, sub: 'Practice mode', sec: 'practice', page: true, act: nav('#/practice/' + k) }));
   out.push({ title: 'Placement Check', sub: 'Practice · already know some braille? Find where to start', sec: 'practice', page: true, act: nav('#/practice/place') });
   Object.entries(GAMES).forEach(([k, g]) => out.push({ title: g.name, sub: 'Game · ' + g.desc, sec: 'games', page: true, act: nav('#/games/' + k) }));

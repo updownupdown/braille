@@ -4,6 +4,7 @@ import { SCIENCE, SCIENCE_SYMBOLS, NEMETH, LANG_INFO, JAPANESE, SYSTEMS, HISTORY
 
 import { LANG_CONTRACTIONS } from './langcontractions.js';
 import { G2_EXAMPLES } from './g2examples.js';
+import { DROPPED, PUNCT, EX, ebaeParts } from './preueb.js';
 import { feedback, haptic, cellsLabel, say, refocus } from './a11y.js';
 import { MISTAKES, mistake } from './rules.js';
 
@@ -174,7 +175,7 @@ export function grade2Section(key = 'grade2') {
 }
 // ---------- reference ----------
 export const REF_SECTIONS = [
-  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & Symbols'], ['grade2', 'Grade 2 Basics'], ...Object.entries(G2_LESSONS).map(([k, [t]]) => [k, t]), ['signs', 'Signs'],
+  ['overview', 'Overview'], ['alphabet', 'Alphabet'], ['numbers', 'Numbers & Symbols'], ['grade2', 'Grade 2 Basics'], ...Object.entries(G2_LESSONS).map(([k, [t]]) => [k, t]), ['preueb', 'Pre-UEB Braille'], ['signs', 'Signs'],
   ['science', 'Maths & Science'], ['languages', 'Languages'], ['systems', 'World Systems'], ['cheatsheet', 'Cheat Sheet'],
 ];
 export function alphabetSection() {
@@ -369,7 +370,7 @@ export function systemsSection() {
   return { html: `<p class="lead-p">The braille family: the codes you’re likely to meet, plus special-purpose and tactile cousins. Tap a row to expand it; many include a full chart.</p>
     ${SYSTEMS.map((g) => `<div class="group-title"><h3>${esc(titleCase(g.group))}</h3></div><div class="acc-list">${g.items.map(([n, w, d, chars]) => `
       <details class="acc-item"><summary><span><b>${esc(titleCase(n))}</b><small>${esc(w)}</small></span>${icon('chevron', 20)}</summary>
-      <div class="acc-body"><p>${esc(d)}</p>${chars ? `<button class="btn small-btn" data-chars="${chars}">See all characters ${icon('right', 16)}</button>` : ''}</div></details>`).join('')}</div>`).join('')}`,
+      <div class="acc-body"><p>${esc(d)}</p>${chars ? `<button class="btn small-btn" data-chars="${chars}">See all characters ${icon('right', 16)}</button>` : ''}${chars === 'ebae' ? ` <a class="btn small-btn" href="#/reference/preueb">Reading guide ${icon('right', 16)}</a>` : ''}</div></details>`).join('')}</div>`).join('')}`,
     bind: () => { $$('[data-chars]').forEach((b) => { b.onclick = () => openSheet(charsTable(b.dataset.chars, { examples: true }), { title: CHART_NAMES()[b.dataset.chars] }); }); },
   };
 }
@@ -385,12 +386,48 @@ export function scienceSection() {
     html: parts.map(([id, t, h]) => `<div class="sg" id="${id}"><h3 class="sg-h">${titleCase(t)}</h3>${h}</div>`).join(''),
   };
 }
+// Pre-UEB braille: reading EBAE books and signs with the UEB this app teaches. Cards show each example both ways.
+export function preuebSection() {
+  const card = (x) => `<div class="mk pu-card"><div class="print">${esc(x.p)}</div>
+    <div class="mk-row"><span class="pu-tag">Pre-UEB</span>${lineHTML(ebaeParts(x.e), { cls: 'sm' })}</div>
+    <div class="mk-row pu-ueb"><span class="pu-tag">UEB</span>${lineHTML(x.u ? ebaeParts(x.u) : translate(x.p, 'en', 2), { cls: 'sm' })}</div>
+    ${x.n ? `<p class="mk-why">${esc(x.n)}</p>` : ''}</div>`;
+  const cards = (list, title = 'Examples') => `<h4 class="ex-h">${title}</h4><div class="mk-grid pu-grid">${list.map(card).join('')}</div>`;
+  const c = (cells, kind = 'punct') => `<span class="pu-c">${[...cells].map((x) => cellHTML(x, '', { kind })).join('')}</span>`;
+  const sm = (cells, kind) => [...cells].map((x) => cellHTML(x, 'sm', { kind })).join('');
+  const parts = [
+    ['pu-start', 'Before you start', `<p>Before Unified English Braille, Canada and the US used <b>English Braille American Edition</b> (EBAE). Both countries moved to UEB between 2010 and 2016, so books, magazines and signs made before then are usually in EBAE. Older British and Australian braille is very close to it.</p>
+      <p><b>Most of it is the same</b>: the letters, digits, number sign, capital sign, and every other contraction and shortform you learn here. Most punctuation is the same too.</p>
+      <p>What’s different:</p>
+      <ul class="pu-list"><li>Nine contractions that UEB dropped.</li><li>“to”, “into” and “by” are joined to the next word, and “and”, “for”, “of”, “the”, “with” and “a” run together.</li><li>Parentheses, brackets, dashes, the ellipsis and a few other marks.</li><li>One number sign carries across a colon or hyphen, and the decimal point is a different cell.</li><li>Capitals and italics have no passage or end signs, and one sign stands for every accent.</li></ul>
+      <p class="muted small">When a cell makes no sense as UEB, it is probably one of the signs on this page. Every example is shown both ways.</p>`],
+    ['pu-gone', 'Dropped contractions', `<p class="lead-p">Each of these cells means something else in UEB, so where it sits tells you which reading is meant.</p>
+      <div class="ctable">${DROPPED.map(([cells, print, note]) => crowHTML(cells, print, { kind: 'contraction', note })).join('')}</div>${cards(EX.gone)}`],
+    ['pu-join', 'Joined words', `<p>“to”, “into” and “by” are written <b>with no space</b> before the next word, so a word that seems to start with ${sm('⠖', 'contraction')} or ${sm('⠴', 'contraction')} is really two words. When nothing follows but punctuation, the word is spelled out.</p>
+      <p>The one-cell words “and”, “for”, “of”, “the” and “with”, plus “a”, also <b>run together</b> when one follows another, as in “of the” and “with a”. UEB puts a space between them, as print does.</p>${cards(EX.join)}`],
+    ['pu-punct', 'Punctuation', `<p>The period, comma, question and exclamation marks, semicolon, colon, apostrophe, hyphen, slash and double quotes are the same. These are not:</p>
+      <div class="pu-table" role="table" aria-label="Punctuation, pre-UEB and UEB"><div class="pu-row pu-head" role="row"><span role="columnheader">Mark</span><span role="columnheader">Pre-UEB</span><span role="columnheader">UEB</span></div>
+      ${PUNCT.map(([name, print, e, u, note]) => `<div class="pu-row" role="row"><b role="cell">${esc(name)} <span class="pu-p">${esc(print)}</span></b><span role="cell">${c(e)}</span><span role="cell">${c(u)}</span>${note ? `<span class="cnote" role="cell">${esc(note)}</span>` : ''}</div>`).join('')}</div>${cards(EX.punct)}`],
+    ['pu-num', 'Numbers', `<p>Digits and the number sign are the same. Two things differ: the decimal point is ${sm('⠨', 'punct')}, and <b>one number sign covers the whole number</b> even across a colon or hyphen, as in times and phone numbers. UEB starts again with a new number sign after them.</p>
+      <p class="muted small">Older books also used contractions right after a number, such as ${sm('⠼⠁⠌', 'digit')} for “1st”.</p>${cards(EX.num)}`],
+    ['pu-caps', 'Capitals, letters and italics', `<p><b>Capitals.</b> ${sm('⠠', 'indicator')} and ${sm('⠠⠠', 'indicator')} work as in UEB, but there is no capitals passage and no end sign: every word in capitals gets its own ${sm('⠠⠠', 'indicator')}. Many older signs leave capital signs out altogether.</p>
+      <p><b>Letter sign.</b> ${sm('⠰', 'indicator')} shows that a lone letter is a letter, not a word, the same as UEB’s grade 1 indicator. Pre-UEB braille has no grade 1 word or passage indicators.</p>
+      <p><b>Italics.</b> ${sm('⠨', 'indicator')} before a word puts it in italics (UEB uses two cells). For a longer passage, ${sm('⠨⠨', 'indicator')} goes before the first word and ${sm('⠨', 'indicator')} before the last. Inside a word, ${sm('⠨', 'contraction')} still begins groupsigns like “ance” and “less”, and between digits it is the decimal point.</p>${cards(EX.caps)}`],
+    ['pu-ex', 'Examples', `<p class="lead-p">Whole sentences from an older book, then the same in UEB.</p>${cards(EX.sent, 'Sentences')}`],
+  ];
+  return {
+    jumps: parts.map(([value, label]) => ({ value, label: titleCase(label) })),
+    html: `<p class="lead-p">How to read braille made before UEB, using the UEB you learn here plus the differences below.</p><div class="g2-groups">${parts.map(([id, t, h], i) => foldHTML(id, titleCase(t), h, i === 0)).join('')}</div>
+      <p class="muted small">See <a href="#/reference/systems">World Systems</a> for EBAE’s place among other braille codes.</p>`,
+  };
+}
 export function refSection(key, sub) {
   switch (key) {
     case 'alphabet': return { html: alphabetSection() };
     case 'numbers': return numbersSection();
     case 'grade2': return grade2Section();
     case 'g2words': case 'g2strong': case 'g2lower': case 'g2affix': case 'g2short': return grade2Section(key);
+    case 'preueb': return preuebSection();
     case 'signs': return signsSection(sub);
     case 'science': return scienceSection();
     case 'languages': return languagesSection();
